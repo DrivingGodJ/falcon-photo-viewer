@@ -14,8 +14,7 @@ project's README and a record of the design thinking behind it.
 
 **Windows 10 and 11 · Apple Silicon Macs · [Download](https://github.com/HWu0101/falcon-photo-viewer/releases)**
 
-<!-- HERO: a screen recording of holding the arrow key through a 30 fps burst. Record at 60 fps and
-upload it as an MP4 through GitHub's editor so it plays inline at full frame rate. -->
+![Falcon workflow: browse bursts, view RAW and EXIF, check focus at 1:1, rate and flag, and export picks.](docs/images/falcon-workflow.png)
 
 ## Contents
 
@@ -144,8 +143,6 @@ Press **C**, or drag a filmstrip thumbnail upward, to put two frames side by sid
 linked across both halves, so you inspect the same eye in both at once. Pin the frame you like, then
 step through challengers against it. Your rating goes to whichever half you are focused on.
 
-<!-- SCREENSHOT: Compare with both halves zoomed on the same eye. -->
-
 ### Also included
 
 - **Focus check in one click.** Click a photo to see true 1:1 at that point. The badge reads
@@ -186,9 +183,6 @@ The icon grew out of my own abstract drawings. I set the rules first: one to thr
 recognisable at 16 pixels in a taskbar or Dock, and a palette of blues. I took passages from my own
 pencil drawings, reworked them into clean shapes and refined the mark through several revisions in
 Figma until it held up at taskbar size.
-
-<!-- ICON EVOLUTION: optional strip from drawing to final mark. -->
-<!-- FILM: add the YouTube link here when the new film is uploaded. -->
 
 ## How it was made
 
