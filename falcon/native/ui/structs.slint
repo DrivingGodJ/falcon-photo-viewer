@@ -1,0 +1,211 @@
+// v0.9.5 (ui.rs extraction series): the exported data structs (the Rust-facing model
+// rows) extracted VERBATIM from the slint! macro in src/ui.rs. They were already
+// `export struct` — the macro imports AND re-exports them, so the generated Rust API
+// (main.rs's FilmItem/ExifRow/… types) is unchanged.
+
+    export struct FilmItem {
+        thumb: image,
+        number: string,
+        name: string,
+        badge: string,      // filetype label shown on the tile (JPG / PNG / TIFF / RAW / R+J / HEIC …)
+        current: bool,
+        valid: bool,
+        pending: bool, // presentation-only continuation tile; never a photo
+        unsupported: bool,  // a recognised image we can't decode (AVIF/JXL/…) — show a broken-image glyph
+        // v0.8.120 (design-sweep Y48): this tile's THUMBNAIL DECODE FAILED at runtime (the
+        // `film.failed` (generation, idx) latch). `unsupported` is the SCAN-time source class only,
+        // so a transient AV/OneDrive file lock, an odd TIFF variant or a truncated file from an
+        // interrupted card dump left the tile showing the quiet "···" loading dots — in the
+        // filmstrip, the grid dock AND the Selection panel — for the whole folder session, with
+        // nothing retrying and nothing saying so. Rendered as the same broken-image glyph
+        // `unsupported` uses, which is the honest shared meaning: no picture here.
+        failed: bool,
+        rating: int,
+        flag: bool,
+        reject: bool,
+        idx: int,
+        rot: int, // v0.8.0: manual rotation quarter-turns (0..3) → SelTile badge
+        // v0.8.129 (W1-1): this shot is in the transient multi-select working set. ONE field lights
+        // all three tile surfaces, and `make_film_item` (tick.rs) is its only production writer --
+        // it reads the SelectSet, so the strip, the grid dock and the Selection panel cannot
+        // disagree about what is selected. VOID cells arrive as FilmItem::default() => false.
+        selected: bool,
+    }
+
+    // One row of the Selection tile grid (2 tiles; `has-b` false on a trailing odd item).
+    // Slint 1.17 has no flex-wrap, so the grid is row-chunked in Rust.
+    export struct SelTileRow { a: FilmItem, b: FilmItem, has-b: bool }
+
+    export struct ExifRow { k: string, v: string }
+
+    // ── v0.8.159 (B2, OWNER RULING Q19): ONE FLOATING EXIF PANEL'S WHOLE STATE. ──────────────────
+    // The list of these (cap 4, ordered by open sequence, newest last) IS the feature's model: Rust
+    // owns it, the window mounts ONE `FloatingExif` per entry through a `for`, and there is no
+    // per-panel state anywhere in Slint except the live drag offset, which lasts one gesture.
+    //
+    // `rows` is THIS panel's own EXIF — a panel pinned to a photograph shows that photograph's
+    // metadata while the docked panel shows the current shot's, so the rows cannot be a shared
+    // window-level property. They are produced by the SAME off-thread parse + `exif_cache` the
+    // docked panel reads (tick::step_float_exif), never a second parser.
+    //
+    // `x`/`y` are LOGICAL px in window coordinates, carried as float rather than length because a
+    // struct field's Rust type is what Rust has to write, and the drag publishes plain numbers.
+    // The rendered position CLAMPS them (FloatingExif's own binding), so a window resize or a
+    // display-scale change can never strand a panel off screen (L23/L24) while the stored value
+    // stays exactly what the photographer dragged.
+    export struct FloatExifPanel {
+        name: string,      // the panel's shot's filename — the header, elided
+        pinned: bool,      // true = locked to `key`'s photograph; false = follows the current shot
+        x: float,
+        y: float,
+        rows: [ExifRow],
+    }
+
+    // Folded-view essentials, laid out as a 5×3 grid (some cells span 2 columns).
+    export struct ExifBrief {
+        camera: string, shutter: string, iso: string,
+        lens: string, focal: string,
+        wb: string, ev: string, aperture: string,
+        datetime: string, colorspace: string,
+        artist: string, files: string,
+    }
+
+    // v0.8.65 (C3, J5-3): `warn` = the inline capture-collision message shown under the row whose
+    // capture was refused ("" = none). A collision no longer silently clears the other binding.
+    export struct KeybindRow { action: string, label: string, key: string, capturing: bool, warn: string }
+
+    // v0.9.16 (Round B assoc): one Mac FILE ASSOCIATIONS row (per ASSOC_FAMILIES family). `current`
+    // is the Rust-composed read-back line ("Default: Preview"); `note` ("" = none) explains a
+    // disabled Reset (no captured incumbent and Preview unavailable for that type).
+    export struct MacAssocRow { label: string, current: string, reset-enabled: bool, note: string }
+
+    // A single entry in the unified events/notifications centre (top-right bell).
+    export struct NotifRow {
+        text: string,
+        kind: int,          // severity: 0 info / 1 success / 2 warn / 3 error
+        when: string,       // relative time, e.g. "just now" / "2m" / "1h"
+        reveal-path: string, // absolute result-folder path for a "Show" button ("" = none)
+        undoable: bool,     // a still-reversible "Move rejected" → an "Undo" button
+        jump-to: int,       // D2 resume: a shot index to jump to → a "Resume" button (< 0 = none)
+        // v0.8.120 (design-sweep O5): this row is a DELETE result that offered Recover. The pill
+        // mounts only while `can-recover` is also live (the same shape `undoable` + `can-undo-move`
+        // has), i.e. while the delete record still exists AND the user is still on the folder the
+        // delete ran in — so a logged row can never fire a recovery into a different folder.
+        recover: bool,
+        // v0.8.121 (Round-B fix F19 = audit Y16): this row carried an "Open Settings" pill on its
+        // toast. It was the ONLY toast action with no persisted twin — Undo, Resume and Recover all
+        // have one — so any notification landing inside the dwell window (a thumbnail warning, a
+        // finished background copy) replaced the toast and took the route to the fix with it,
+        // leaving a logged row that states the colour problem and offers nothing. No live gate: the
+        // Settings panel is always openable, so unlike Recover/Resume this one cannot go stale.
+        open-settings: bool,
+    }
+
+    // One row in the configurable Ctrl+C copy-priority list (§33 Settings). Order in the model IS the
+    // priority; `mode` (2 both / 0 finished / 1 raw) is the stable id used by the tick callback.
+    export struct CopyPrefRow {
+        mode: int,
+        label: string,   // v0.8.194 (§1F1): "RAW + image" / "Image only (non-RAW)" / "RAW only" — built in Rust (support::copy_pref_label); mode 0 is the FINISHED-image slot, not JPEG
+        enabled: bool,
+    }
+
+    // v0.8.107 (per-display colour management): ONE display's section in the Settings colour card.
+    // Every field is COMPOSED IN RUST — the section stack has no logic of its own beyond mounting
+    // what the model says, so the card and the persisted `display_colors` map can never spell the
+    // same state two ways.
+    //
+    // The ACTIVE display's row (`active`) mirrors the LIVE scalars (`output-gamut`,
+    // `custom-gamut-label`, `custom-icc-*`) because that display IS the installed transform; every
+    // other row is composed from its persisted entry. A DISCONNECTED display keeps its row — faded,
+    // marked "· not connected", collapsed BY DEFAULT but fully EXPANDABLE, with a Remove button in
+    // its body (owner ruling D2) — so a dock/laptop configuration is visibly remembered and can be
+    // forgotten without plugging the screen back in.
+    //
+    // v0.8.108 (audit): TWO fields are GONE — `chip` and `custom-path`. Both were recomposed on every
+    // resolve and read by nothing; `chip`'s doc even described a state chip element the card does not
+    // render. What the header shows is `head`, composed in Rust, and the profile path is a Rust-side
+    // concern. (v0.8.109 / V12+V20: the count is two, not the three the v0.8.108 note claimed, and the
+    // card's DEFAULT section literal no longer assigns the two removed names — Slint's struct
+    // conversion silently drops extra fields when the literal is a strict superset, so those two
+    // assignments compiled while documenting fields this struct does not have.)
+    export struct DisplaySection {
+        key: string,          // the STABLE display key — routed back through every callback, never shown
+        name: string,         // friendly name — the section title
+        // v0.8.107 (owner ruling D1) + v0.8.108: the section's HEADER LINE, composed in Rust. An OPEN
+        // active section shows its name alone (its full body is right below it); every collapsed row,
+        // the active one included, shows "<name> — <its colour setting>". The "· not connected"
+        // marker is NOT in this string — it is its own non-eliding sibling in the header row, so the
+        // words that state the disconnection can never be the first thing elision cuts.
+        head: string,
+        // v0.8.109 (V8): the per-section Auto-detect pill's WHOLE label, composed and LENGTH-GATED in
+        // Rust ("Auto-detect this monitor" for the active/single section; "Auto-detect <name>" for
+        // another display, falling back to "Auto-detect this display" for a name that would not fit).
+        // The pill's Text has no elide and no max width, so its label IS the pill's minimum width in
+        // a 296 px card — and Slint cannot measure text, so the gate has to live here (the
+        // `custom-long` pattern, v0.8.76).
+        auto-label: string,
+        // Is this section's body mounted? Sections open and close INDEPENDENTLY (D1: this is not a
+        // one-open accordion) — the open set lives in Rust, so the card carries no state of its own.
+        // A ONE-ROW card (single display) is always mounted open and renders no header at all.
+        expanded: bool,
+        gamut: int,           // 0 sRGB / 1 P3 / 2 AdobeRGB / 3 Rec.2020 / 4 Custom / 5 DCI-P3
+        custom-label: string, // this entry's Custom chip label ("Custom…" when it has no profile)
+        custom-long: bool,    // v0.8.76 full-row gate, computed PER ENTRY in Rust (Slint can't measure text)
+        // v0.8.108 (audit A11): the failure state is per DISPLAY, not per live-scalar. It is set for
+        // any display whose profile THIS SESSION tried and could not install — so a screen Falcon
+        // proved unloadable keeps its dimmed chip, its warning row and its recovery sentence after
+        // the window moves off it, instead of recomposing as a clean, working-looking row.
+        custom-failed: bool,
+        custom-warn: string,  // the Rust-composed failure FACT for this display ("" = no failure row)
+        custom-auto: bool,    // the failed profile is Falcon's OWN auto-detect artifact (→ point at Auto-detect)
+        connected: bool,      // false = configured but not plugged in: faded text, "· not connected", live controls
+        active: bool,         // this is the display the window is on ("· this screen")
+        // v0.8.109 (the TWINS ruling): this display shares its whole identity with an identical
+        // sibling, so the only thing telling them apart is where they sit in the arrangement — which
+        // a rearrangement swaps. Its settings are therefore live for the session and never written to
+        // disk, and the expanded body says exactly that in one muted line.
+        session-only: bool,
+        // v0.8.110 (owner ruling): this display is keyed by the WEAK (size, position) fallback — the
+        // same positional shape, but it DOES persist (V3 restored it precisely so a display Falcon
+        // cannot name still keeps the edits made on it). So it gets the other honest line: what it is
+        // recognised BY, and therefore what its settings follow. Never set together with
+        // `session-only`, which says more about the same shape.
+        weak: bool,
+        // v0.8.110 (the twins ruling, SECOND HALF): the colour setting saved under this display's key
+        // was written for a DIFFERENT physical panel of the same model. A Windows display key names
+        // the PORT (the PnP device instance is the adapter output), so swapping two identical
+        // monitors' cables hands each panel the other's key — and its calibration — without adoption
+        // ever being consulted. Falcon refuses the stored entry, runs sRGB, and the section says why.
+        unit-mismatch: bool,
+    }
+
+    // ── queue 34 (§1.D, OWNER ASK): ONE SAVED PRESET'S KEY CHARACTERISTICS. ──────────────────
+    // The owner asked that a preset row carry "a brief overview of the key characteristics of this
+    // preset (format, resolution, compression, plus watermark if watermark is on)". Four
+    // already-composed words, one per chip: Slint has no int→string concatenation (the `hud-pos`
+    // rule) and, more to the point, every term's MEANING lives in Rust — the `100000 = Full`
+    // sentinel, the custom-overrides-tier rule, the mark kinds.
+    //
+    // `support::wm_preset_brief` and `support::wm_preset_recipe` (the hover tooltip) compose these
+    // through the SAME three term helpers, so the chips and the tooltip cannot describe two
+    // different exports (L28), and `main.rs`'s `publish_presets` fills this model in the same walk
+    // as the names and the tips so row i's brief is row i's preset by construction.
+    //
+    // AN EMPTY FIELD MEANS "this preset has no such term", and the chip is then not mounted at all
+    // (`if` sibling — ledger L4, and never a ternary on a class-selecting property, L47): a PNG
+    // preset has no compression term, and a preset with no watermark has no mark term.
+    export struct PresetBrief { fmt: string, size: string, quality: string, mark: string }
+
+    // v0.8.90: one watermark font-picker row — the family name + its own-typeface preview strip
+    // (rendered OFF-THREAD by the strip producer at 2x the row's 12px text size; `pw`/`ph` are the
+    // strip's PHYSICAL pixel dims, displayed at half size so it stays crisp up to 200% display
+    // scale). `has-preview` mount-gates the text→image swap (ledger L4: `if`, never both mounted);
+    // it stays false for symbol fonts (all-.notdef names) and render/load failures, so those rows
+    // keep the plain name forever.
+    export struct WmFontRow {
+        name: string,
+        preview: image,
+        pw: float,
+        ph: float,
+        has-preview: bool,
+    }

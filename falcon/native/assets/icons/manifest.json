@@ -1,0 +1,211 @@
+{
+  "schema": 2,
+  "design_revision": 3,
+  "ico_sizes": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    96,
+    128,
+    256
+  ],
+  "mask_sha256": "8e06a702632a562f2523393474eaab421e630b7622d8cfe24010d2efba5faa85",
+  "font_sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+  "resources": [
+    {
+      "id": 1,
+      "file": "app.ico",
+      "sha256": "b9ccacc952ca83c163f8f2a4b569c869aaf8823e49312b1dee03c3b8050aa91a"
+    },
+    {
+      "id": 2,
+      "file": "document.ico",
+      "sha256": "53a50dbaf7a118da4e623f7cf6ef12c7ea9d396b79914ab8e3b5c36e284ecaaf"
+    },
+    {
+      "id": 3,
+      "file": "raw.ico",
+      "sha256": "e3a71f3ba3292665235996c4ffd9473157c70962efe072d75dbc31bd76ed7057"
+    },
+    {
+      "id": 10,
+      "file": "jpg.ico",
+      "sha256": "58098dddd099a2ac2d46e3a071d304d3aa8a14b0437e99d34686a14576cdeb2e"
+    },
+    {
+      "id": 11,
+      "file": "png.ico",
+      "sha256": "e0fc345512a9b1799daf990dc6df169fbd566e6ff6e917c06a3e7a68dbacbf14"
+    },
+    {
+      "id": 12,
+      "file": "tiff.ico",
+      "sha256": "64a64c54ad6686a95dae05628077ad99282355f46b07d7c43413562981c08c94"
+    },
+    {
+      "id": 13,
+      "file": "heic.ico",
+      "sha256": "523a27c355cc6dfc2dd83136a9987ba537d20810b389710a071965834f45eb2a"
+    },
+    {
+      "id": 14,
+      "file": "heif.ico",
+      "sha256": "5abde1a2b9ccfcde7cc463b248614a10b15a80cb974a17c73c20233755013801"
+    },
+    {
+      "id": 15,
+      "file": "webp.ico",
+      "sha256": "09065036196ff6b39610f79a17a32a3ec84ababcc1c38e266391126426cc03d6"
+    },
+    {
+      "id": 16,
+      "file": "bmp.ico",
+      "sha256": "9abe156c5582bad9a068e7f548f153a6108d9ab5e82f33fb27c0fa1f399ce0dc"
+    },
+    {
+      "id": 17,
+      "file": "jxl.ico",
+      "sha256": "a64669e8aee10e60c96c05edef02c473d551d710fa9cffcc8a3844cd4f75c334"
+    },
+    {
+      "id": 18,
+      "file": "gif.ico",
+      "sha256": "ee56060213fefef9849d490b9c6e70844010071ca90cca45e80956a07690ba4e"
+    },
+    {
+      "id": 19,
+      "file": "apng.ico",
+      "sha256": "83a98399ccbd75635ae47d78ba237838f9ac4aa9b5818c15e6f5fe46a342e895"
+    },
+    {
+      "id": 100,
+      "file": "cr3.ico",
+      "sha256": "3b22055dd2d88407d3e17e700426f0b34173138caaf6470eb664cc6db229ad48"
+    },
+    {
+      "id": 101,
+      "file": "cr2.ico",
+      "sha256": "2036a1ac97617d12b1a109ecc0256a5dcea3636684a9668c0b888b7792e23587"
+    },
+    {
+      "id": 102,
+      "file": "nef.ico",
+      "sha256": "3e0a7959eb5af573857283a80a7dd22c9f4c55e6752d90f481eee1e8dc49e4a7"
+    },
+    {
+      "id": 103,
+      "file": "arw.ico",
+      "sha256": "97b0afe1b3f02313ba7aac122f611dbeb8ffdae50f8a145949848e772da770b2"
+    },
+    {
+      "id": 104,
+      "file": "raf.ico",
+      "sha256": "70088de1bbd52f7232cb5c41136acbe56dbd3c20bc6201f41d56c454f34d9323"
+    },
+    {
+      "id": 105,
+      "file": "rw2.ico",
+      "sha256": "1a2578880f72e04b12ac1f45be891c52aba7753e9164a2275282dbfcd6de0fdc"
+    },
+    {
+      "id": 106,
+      "file": "dng.ico",
+      "sha256": "53e8a87293c534bed2ac6170b484e037ca841e77d99b28135d0f2df83cc0ef48"
+    },
+    {
+      "id": 107,
+      "file": "orf.ico",
+      "sha256": "4212ed62d802d746b270c876932d55aba5015e2ea498d85f6518e7ebf2a38429"
+    },
+    {
+      "id": 108,
+      "file": "pef.ico",
+      "sha256": "e08d19b4a823b5f05dfb0584b44fbc107bf4116dfc7b13ceedcb3b33de857651"
+    },
+    {
+      "id": 109,
+      "file": "srw.ico",
+      "sha256": "c7fe6460d92f4a2da9c8b8fcb409946fd62853a738f16f83370040b17db3b9cb"
+    },
+    {
+      "id": 110,
+      "file": "iiq.ico",
+      "sha256": "42090d3eaac6da4815426832c5e6453c84b871e6adbef9cb5ca865c24d0564d2"
+    },
+    {
+      "id": 111,
+      "file": "3fr.ico",
+      "sha256": "ffa6463ab4b6288e770bb673883c489f0cf9d225964d9b7791e8a485d4ca659a"
+    },
+    {
+      "id": 112,
+      "file": "x3f.ico",
+      "sha256": "b380a042c1c1813313025f32e3dca1448f03366ec6ba795dbb991bb7943b478b"
+    },
+    {
+      "id": 113,
+      "file": "nrw.ico",
+      "sha256": "dc21b4ea5b6f1313c902285904a6d2b6e31faa694b61214e15dc77de41a81907"
+    },
+    {
+      "id": 114,
+      "file": "crw.ico",
+      "sha256": "cf3e53158cb77e7a66ba1d1a122cd37ac6d5573106f682a5681bc754662fa9bf"
+    },
+    {
+      "id": 115,
+      "file": "mrw.ico",
+      "sha256": "7d3998e364f37ae5f62c98b77d4d9f9e1db1ef867bf9a0f9989d9cb30015e0ab"
+    },
+    {
+      "id": 116,
+      "file": "erf.ico",
+      "sha256": "0006c12e93ce08152b21a6f1cf5f8c804737032ad8732c8c02be3592d2e0d19e"
+    },
+    {
+      "id": 117,
+      "file": "sr2.ico",
+      "sha256": "850353b66b047119c63221fc0f2b178e4401ff4bdc39e3c451035ad9591a999a"
+    }
+  ],
+  "mac_resources": [
+    {
+      "file": "app-1024.png",
+      "sha256": "78ddb58f55b506ffbc6e2c05e15adde8b562f05f9b4d031ce88b74d35a44ec91"
+    },
+    {
+      "file": "document-1024.png",
+      "sha256": "d05031869e07f0d1e7cebce991ef45493320b1279e648837316dacfefa1b54aa"
+    }
+  ],
+  "mac_iconsets": {
+    "app": {
+      "icon_128x128.png": "300c7a62d8057d7b280ebb84617cd3d2f142c46b57ee833930f533b82095f489",
+      "icon_128x128@2x.png": "386e3cd1884903e5323a2e3768dd7bef19910546c0873689dbe03b3278319864",
+      "icon_16x16.png": "55170901a0d03508c87fd634869f6c6f9d54e4b8d0804e91e77f7eeb8dc80332",
+      "icon_16x16@2x.png": "fadadede47f4a5fe0ea36368d617da2030395f8bc21d74d4538cef240a170ff7",
+      "icon_256x256.png": "386e3cd1884903e5323a2e3768dd7bef19910546c0873689dbe03b3278319864",
+      "icon_256x256@2x.png": "ef35910714c4478197e4ba0ea0a6927de95a4a16462161749f34b804e59b1d11",
+      "icon_32x32.png": "fadadede47f4a5fe0ea36368d617da2030395f8bc21d74d4538cef240a170ff7",
+      "icon_32x32@2x.png": "14faf1fb6e087642a311d179c133d0b7aa6c910cfdeae746f044f756c6406617",
+      "icon_512x512.png": "ef35910714c4478197e4ba0ea0a6927de95a4a16462161749f34b804e59b1d11",
+      "icon_512x512@2x.png": "78ddb58f55b506ffbc6e2c05e15adde8b562f05f9b4d031ce88b74d35a44ec91"
+    },
+    "document": {
+      "icon_128x128.png": "c519f018b934e8f6979e5cb65410d7288e3b174ee3968eaa04a1d93a774d2aa1",
+      "icon_128x128@2x.png": "71aff7041583b39abe20e7a9236a6f86623c732f346bb58f819f360e71dbdba9",
+      "icon_16x16.png": "dc88180cdfe51cd80584086a46abaf53b9fdfa79384fc77e06b924be0124df56",
+      "icon_16x16@2x.png": "660069a64eb4be5573e259e27e98642e07aea5eac320b95fdcd663f618b57275",
+      "icon_256x256.png": "71aff7041583b39abe20e7a9236a6f86623c732f346bb58f819f360e71dbdba9",
+      "icon_256x256@2x.png": "a460644e40f9b1955a2a4c47df74ae354648c6284fe0cff5975cad3983d9da87",
+      "icon_32x32.png": "660069a64eb4be5573e259e27e98642e07aea5eac320b95fdcd663f618b57275",
+      "icon_32x32@2x.png": "509f4ae631c2cc6f9bb62794f4c4507eafeb5161fda2051ebc7c7c135ea0b175",
+      "icon_512x512.png": "a460644e40f9b1955a2a4c47df74ae354648c6284fe0cff5975cad3983d9da87",
+      "icon_512x512@2x.png": "d05031869e07f0d1e7cebce991ef45493320b1279e648837316dacfefa1b54aa"
+    }
+  }
+}

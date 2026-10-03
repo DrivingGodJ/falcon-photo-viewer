@@ -1,0 +1,1 @@
+// Note copied from the stdlib under MIT license

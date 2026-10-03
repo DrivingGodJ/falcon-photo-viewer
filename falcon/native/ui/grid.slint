@@ -1,0 +1,242 @@
+// v0.8.50 (G1, the grid batch): the folder-grid dock tile.
+//
+// GridThumb = the FILMSTRIP thumb's visual weight and size (the 120×80 cell, block
+// fill, filetype/number badges, rating chip, hover lift + white lift-frame, the
+// "···" loading affordance) married to the SELTILE interaction grammar (clean
+// click = jump, right-click = the stage/film context menu, press-drag past the
+// 6px slop = the shared drag-to-compare pipeline) plus SelTile's corner cull
+// TOGGLES at CullBadge scale (18px) — hover-revealed so a quiet grid keeps the
+// filmstrip's calm (active states stay visible, exactly the CullBadge look).
+//
+// PHOTO-FIRST (the standing owner rule): the thumbnail always renders at original
+// colour — every state/hover affordance lives AROUND the pixels (identity border,
+// lift shadow, white frame overlay), never as a tint/dim on them.
+//
+// The current-shot highlight is REACTIVE (cur-idx property, the SelTile idiom):
+// nav never rebuilds the grid model. VOID tail cells of a partial last row arrive
+// as FilmItem::default() (badge == "") and render nothing at all.
+
+import { Theme } from "theme.slint";
+import { Chip, ChipRole } from "widgets.slint";
+import { FlagGlyph, ArchiveGlyph, UnsupportedGlyph } from "glyphs.slint";
+import { FilmItem } from "structs.slint";
+import { TileBadge } from "filmstrip.slint";
+
+    export component GridThumb inherits Rectangle {
+        in property <FilmItem> item;
+        in property <bool> edits-enabled: true;
+        in property <int> cur-idx: -1;      // reactive current highlight — no model rebuild on nav
+        // v0.8.129 (W1-3): Shift held → the CURRENT tile previews the range origin (host-pushed;
+        // see SelTile's twin note — compare/immersive dormancy is decided in ONE place).
+        in property <bool> preview: false;
+        // v0.8.133 (the visual wave, D): Ctrl held and the selection affordance live (host-decided,
+        // once). ANDed with this tile's own hover it is the GHOST of what a click would do. THE
+        // REST-VISUAL RULE: a ghost is hovered by definition, so it renders the 1px / 55% rest visual
+        // and never the hovered escalation (SelTile's twin note).
+        in property <bool> ctrl-preview: false;
+        // v0.8.129 (W1-2): a clean left click WITH its modifiers; the host classifies + routes.
+        callback clicked-with(bool, bool);
+        callback toggle-flag;
+        callback toggle-reject;
+        callback ctx(length, length);       // right-click → the stage/film context menu at (window x, y)
+        callback drag-start;
+        callback drag-move(length, length); // cursor in WINDOW coords (absolute-position + mouse)
+        callback drag-end;
+        property <bool> is-current: !root.item.pending && root.item.idx == root.cur-idx;
+        // v0.8.133 (D): `sel-real` owns the hover escalation; `sel-vis` adds the Ctrl ghost, which
+        // owns the rest visual only (SelTile's twin split).
+        property <bool> sel-real: root.item.selected || (root.preview && root.is-current);
+        property <bool> sel-ghost: !root.item.pending && root.ctrl-preview && root.hot;
+        property <bool> sel-vis: root.sel-real || root.sel-ghost;
+        // Slint hover is exclusive — hovering a corner toggle drops jta.has-hover, so the tile's
+        // lift (and the toggles' own reveal) key on the OR of every hover surface in the tile.
+        property <bool> hot: jta.has-hover || fta.has-hover || rta.has-hover;
+        // ── v0.8.135 (W7) — ONE CONDITION PER BADGE, and it is the old bug ────────────────────
+        // Both corner toggles were mounted on the UNION — `hot || flag || reject` — against their
+        // own comment ("an ACTIVE toggle is exactly the CullBadge look"): flag a photograph and its
+        // REJECT badge appeared beside it at rest, on every unhovered tile in the dock, so a quiet
+        // grid of picks wore a row of grey archive squares that meant nothing. A copy-paste, and the
+        // second line is the one that was never edited. Each badge shows for ITS OWN mark, or for
+        // hover, and nothing else.
+        property <bool> flag-vis: !root.item.pending && (root.hot || root.item.flag);
+        property <bool> reject-vis: !root.item.pending && (root.hot || root.item.reject);
+        // v0.8.137 (W1): the top-right corner's slot pitch — an 18px badge plus the 4px gap to the
+        // next one. The flag badge's corner/left step and the digit chip's visible-badge-count offset
+        // are the only two readers; naming it once is what keeps them from disagreeing.
+        property <length> slot-pitch: 18px + 4px;
+        visible: root.item.badge != "" || root.item.pending;     // VOID tail cell → nothing (no fill, no hits)
+        content := Rectangle {
+            width: 100%; height: 100%;
+            border-radius: Theme.radius-sm;
+            // FilmThumb's constant-geometry identity border: current accent / reject danger-soft.
+            // v0.8.129 (W1-3, spec section 4): the selection rim wins over accent AND danger-soft
+            // (see FilmThumb's note). 1px rest / 2px hover; the white glow replaces the dark lift.
+            // 9px/2px is this surface's measured elevation, inherited from FilmThumb.
+            // v0.8.133 (D): the escalation arm reads `sel-real` — a Ctrl ghost stays at the rest
+            // weight. The else-arm's anonymous 2px is `border-identity-w` now (E).
+            border-width: root.sel-vis ? ((root.sel-real && root.hot) ? Theme.border-select-hi-w : Theme.border-select-w) : Theme.border-identity-w;
+            border-color: root.sel-vis ? Theme.border-select
+                        : (root.is-current ? Theme.accent : (root.item.reject ? Theme.danger-soft : transparent));
+            animate border-color { duration: root.hot ? 0ms : Theme.anim; easing: ease; }
+            // hover LIFT — FilmThumb's reduced elevation (9/2); instant engage, eased release.
+            drop-shadow-color: root.sel-vis ? ((root.sel-real && root.hot) ? Theme.glow-select-hi : Theme.glow-select)
+                             : (root.hot ? Theme.shadow-lift : transparent);
+            drop-shadow-blur: 9px;
+            drop-shadow-offset-y: 2px;
+            animate drop-shadow-color { duration: root.hot ? 0ms : Theme.anim; easing: ease; }
+            background: Theme.block;
+            clip: true;
+            if root.item.valid : Image {
+                source: root.item.thumb;
+                image-fit: contain; // native aspect, no crop — the filmstrip rule
+                width: 100%;
+                height: 100%;
+            }
+            // v0.8.120 (design-sweep Y48): `|| failed` — a runtime thumbnail-decode failure gets the
+            // same broken-image mark as an undecodable source type. The two are different CAUSES but
+            // the same FACT for the tile ("no picture here"), and the stage already says the same
+            // thing about the same shot through its placeholder card.
+            if (root.item.unsupported || root.item.failed) && !root.item.valid : UnsupportedGlyph {
+                width: 22px; height: 22px;
+                x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            }
+            // loading cell — the FilmThumb "···" affordance (badge != "" is the root visible gate,
+            // so a mounted tile is always a REAL shot; quiet dots, never broken/black).
+            if !root.item.valid && !root.item.unsupported && !root.item.failed : Text {
+                text: root.item.pending ? "Loading…" : "···"; color: Theme.text-mute;
+                font-size: root.item.pending ? Theme.font-sm : Theme.font-md; font-weight: root.item.pending ? 400 : 700;
+                x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            }
+            // jump / right-click menu / drag-to-compare — the SelTile jta grammar verbatim.
+            // Declared FIRST so the corner toggles (declared after) win clicks where they overlap.
+            jta := TouchArea {
+                property <bool> dragged;
+                pointer-event(e) => {
+                    if (!root.item.pending && e.kind == PointerEventKind.down && e.button == PointerEventButton.right) {
+                        root.ctx(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+                    }
+                    if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                        self.dragged = false;
+                    }
+                    if (e.kind == PointerEventKind.up && e.button == PointerEventButton.left) {
+                        if (self.dragged) { root.drag-end(); self.dragged = false; }
+                        // v0.8.129 (W1-2): modifiers ride out; the host classifies + routes.
+                        else { root.clicked-with(e.modifiers.control, e.modifiers.shift); }
+                    }
+                }
+                moved => {
+                    if (self.pressed && !root.item.pending) {
+                        if (!self.dragged && (abs(self.mouse-x - self.pressed-x) > 6px || abs(self.mouse-y - self.pressed-y) > 6px)) {
+                            self.dragged = true;
+                            root.drag-start();
+                        }
+                        if (self.dragged) {
+                            root.drag-move(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+                        }
+                    }
+                }
+            }
+            if root.item.badge != "" : TileBadge { x: 4px; y: 4px; text: root.item.badge; }
+            // cull TOGGLES (top-right): SelTile's corner-pair grammar at CullBadge scale. Hover-revealed
+            // (tile hot) OR active — an unmarked, unhovered tile shows nothing, the filmstrip's calm;
+            // an ACTIVE toggle is exactly the CullBadge look (accent/danger square + glyph).
+            // v0.8.135 (W7): the appear/hide is the HOUSE FADE — an opacity step with the
+            // title-bar wash's timing (instant engage while hot, 120ms eased release), the same
+            // grammar the lift frame below already uses. `visible:` snapped, which on a slow sweep
+            // across the dock read as badges flickering in and out of existence.
+            //
+            // AND THE INPUT IS GATED WITH THE PAINT. An opacity swap alone leaves a fully live
+            // 18px TouchArea in each top corner of every unhovered tile: it would eat the first
+            // click on that corner (a jump), eat the press that starts a drag-to-compare, and —
+            // because `hot` ORs `fta`/`rta` — latch the tile hot the moment the pointer crossed it.
+            // `enabled` on a Slint TouchArea passes input THROUGH (the filmstrip's `hit` idiom), so
+            // gating it on the badge's own visibility condition gives back exactly the pass-through
+            // `visible: false` used to provide, with the fade added.
+            //
+            // ── v0.8.137 (W1, owner's fourth feel-test) — THE CORNER IS NEVER EMPTY. ─────────────
+            // "the flag badge sits in the left slot with the top-right corner empty" (his screenshot:
+            // tile 7782 flagged + unhovered showed exactly that; 7783 rejected looked right only
+            // because reject already OWNS the corner). v0.8.135 made each badge appear for its own
+            // mark and stopped there — the flag badge's x was still hard-pinned one slot in from the
+            // corner, a position that only makes sense when the reject badge is standing beside it.
+            // So the pair's slots are STEPPED BY VISIBILITY, exactly the way the digit chip below
+            // already steps: the corner slot is whoever is rightmost of the two, and a single visible
+            // badge is always in it.
+            //
+            // ONE PITCH, NAMED ONCE (`slot-pitch` = the 18px badge + its 4px gap): the flag badge and
+            // the digit chip both read it, so a future badge-size change cannot move one of them and
+            // leave a hole between the others.
+            //
+            // AND THE REJECT BADGE IS DECLARED FIRST, WHICH IS A PAINT-ORDER DECISION, not a tidy-up.
+            // The x step is instant (no motion is minted here) while the release fade is 120ms, so on
+            // un-hovering a FLAGGED tile the flag badge arrives in the corner while the unmarked
+            // reject badge is still fading out of it. Slint paints in declaration order, so with the
+            // flag declared LAST its opaque accent square covers the ghost for the whole fade and the
+            // corner simply reads as the flag. (The digit chip is declared after both for the same
+            // reason: it steps into a slot a fading badge is still leaving.)
+            Rectangle {
+                x: parent.width - 18px - 4px; y: 4px;
+                width: 18px; height: 18px; border-radius: Theme.radius-xs;
+                opacity: root.reject-vis ? (root.edits-enabled ? 1.0 : 0.35) : 0.0;
+                animate opacity { duration: root.hot ? 0ms : Theme.anim; easing: ease; }
+                background: root.item.reject ? Theme.danger : Theme.badge-bg;
+                border-width: 1px; border-color: root.item.reject ? Theme.danger : Theme.border-strong;
+                // v0.8.139 (AA/M8): 14px, not 12px — (18 - 14)/2 = 2 is EVEN where (18 - 12)/2 = 3
+                // was odd (device 4.5). The Selection tile draws this same pair at 14px in a 22px
+                // badge and centres to 4; the folder-grid tile and the Selection tile are the two
+                // families that sit closest together in the UI, and they were at two parities.
+                ArchiveGlyph { tint: root.item.reject ? Theme.text : Theme.text-mute; width: 14px; height: 14px;
+                               x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                rta := TouchArea { enabled: root.reject-vis; clicked => { if (root.edits-enabled) { root.toggle-reject(); } } }
+            }
+            Rectangle {
+                x: root.reject-vis ? parent.width - 18px - 4px - root.slot-pitch
+                                   : parent.width - 18px - 4px;
+                y: 4px;
+                width: 18px; height: 18px; border-radius: Theme.radius-xs;
+                opacity: root.flag-vis ? (root.edits-enabled ? 1.0 : 0.35) : 0.0;
+                animate opacity { duration: root.hot ? 0ms : Theme.anim; easing: ease; }
+                background: root.item.flag ? Theme.accent : Theme.badge-bg;
+                border-width: 1px; border-color: root.item.flag ? Theme.accent : Theme.border-strong;
+                // v0.8.139 (AA/M8): 14px, the reject badge's twin above — same parity, same size.
+                FlagGlyph { tint: root.item.flag ? Theme.text : Theme.text-mute; width: 14px; height: 14px;
+                            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                fta := TouchArea { enabled: root.flag-vis; clicked => { if (root.edits-enabled) { root.toggle-flag(); } } }
+            }
+            if !root.item.pending : TileBadge {
+                x: parent.width - self.width - 4px; y: parent.height - self.height - 4px;
+                text: root.item.number;
+            }
+            // rating badge — the FilmThumb gold-digit Chip, sitting LEFT of the toggle pair when the
+            // pair is showing, else in the pair's place (the FilmThumb dual-badge rule).
+            // v0.8.135 (W7): the digit steps left past whichever badges are actually SHOWING —
+            // three positions now, not two, because the pair no longer appears and disappears
+            // together. It has no animation of its own (the shared Chip primitive carries none and
+            // this round mints no new motion); the perceived movement is the tile's own fades.
+            //
+            // v0.8.137 (W1): ...and the three-position LADDER is gone, because it encoded an
+            // assumption that has just stopped being true. It read `flag-vis ? two-slots :
+            // (reject-vis ? one-slot : none)`, which is only correct while the flag badge is always
+            // left OF the reject badge — now that a lone flag badge takes the CORNER, `flag-vis`
+            // alone no longer means "two badges stand to my right". The digit offsets by the COUNT
+            // of visible badges instead, which is the quantity it always meant and which leaves no
+            // gap in any of the four visibility states (0/1/1/2 slots).
+            if root.item.rating > 0 : ratechip := Chip {
+                role: ChipRole.badge;
+                text: root.item.rating;
+                x: parent.width - self.width - 4px
+                   - ((root.flag-vis ? 1 : 0) + (root.reject-vis ? 1 : 0)) * root.slot-pitch;
+                y: 4px;
+            }
+            // the hover-lift FRAME — FilmThumb's twin overlay (opacity fade of a constant white
+            // frame; instant engage / eased release; identity states suppress it).
+            Rectangle {
+                width: 100%; height: 100%;
+                border-radius: Theme.radius-sm;
+                border-width: Theme.border-lift-w;
+                border-color: Theme.border-lift;
+                opacity: (root.hot && !root.sel-vis && !root.is-current && !root.item.reject) ? 1.0 : 0.0; // v0.8.129: the selection rim owns the look while selected
+                animate opacity { duration: root.hot ? 0ms : Theme.anim; easing: ease; }
+            }
+        }
+    }

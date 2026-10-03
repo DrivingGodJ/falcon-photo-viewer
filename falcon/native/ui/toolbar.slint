@@ -1,0 +1,1207 @@
+// Shared titlebar, extracted from MainWindow without changing its geometry or design.
+// All actions execute against the owning MainWindow; this component holds no review/settings state.
+import { Theme, Tip } from "theme.slint";
+import { IconBtn } from "controls.slint";
+import { AaHairline, FlagGlyph } from "glyphs.slint";
+import { CacheMeter, SectionChip, HudChip } from "hud.slint";
+
+export struct ToolbarState {
+    cache-frac-after: float,
+    cache-frac-before: float,
+    cache-len-after: float,
+    cache-len-before: float,
+    cache-meter-hover: bool,
+    cache-meter-show: bool,
+    chrome-eff: float,
+    compare: bool,
+    count-all: int,
+    count-picks: int,
+    count-rejects: int,
+    dbg-chrome: bool,
+    efficiency-leaf: bool,
+    empty-state: bool,
+    film-visible: bool,
+    grid-open: bool,
+    hud-pos: string,
+    hud-pos-widest-a: string,
+    hud-pos-widest-b: string,
+    immersive: bool,
+    loading-open: bool,
+    maximized: bool,
+    modal-blocking: bool,
+    motion-ui: bool,
+    native-window-controls: bool,
+    notif-open: bool,
+    notif-unread: int,
+    path-dir: string,
+    path-mid: string,
+    path-text: string,
+    sel-open: bool,
+    settings-open: bool,
+    titlebar-h: length,
+    titlebar-leading-inset: length,
+}
+
+export component MainToolbar inherits Rectangle {
+    in property <float> cache-frac-after;
+    in property <float> cache-frac-before;
+    in property <float> cache-len-after;
+    in property <float> cache-len-before;
+    in property <bool> cache-meter-hover;
+    in property <bool> cache-meter-show;
+    in property <float> chrome-eff;
+    in property <bool> compare;
+    in property <int> count-all;
+    in property <int> count-picks;
+    in property <int> count-rejects;
+    in property <bool> dbg-chrome;
+    in property <bool> efficiency-leaf;
+    in property <bool> empty-state;
+    in property <bool> film-visible;
+    in property <bool> grid-open;
+    in property <string> hud-pos;
+    in property <string> hud-pos-widest-a;
+    in property <string> hud-pos-widest-b;
+    in property <bool> immersive;
+    in property <bool> loading-open;
+    in property <bool> maximized;
+    in property <bool> modal-blocking;
+    in property <bool> motion-ui;
+    in property <bool> native-window-controls;
+    in property <bool> notif-open;
+    in property <int> notif-unread;
+    in property <string> path-dir;
+    in property <string> path-mid;
+    in property <string> path-text;
+    in property <bool> sel-open;
+    in property <bool> settings-open;
+    in property <length> titlebar-h;
+    in property <length> titlebar-leading-inset;
+    callback action(string, float, float);
+    callback meter-hover(bool, float, float);
+    callback dbg-chips-log(float, float, float, bool, bool, float, int, bool, bool);
+    // 2026-09-25 (owner, Mac title-bar toolbar, option 1): a bar-wash button's CELL is its square
+    // plus IconBtn's 2px side insets — side = titlebar-h − 8px, cell = side + 4px — so the square
+    // stays square at any bar height. The 44px bar (Windows, ordinary Mac) keeps its 40px cells; the
+    // Mac title-bar toolbar, sized to AppKit's 38pt title bar, gets 34px cells and 30px squares.
+    property <length> bar-cell-w: root.titlebar-h - 4px;
+
+            height: root.titlebar-h;
+            opacity: root.chrome-eff; // M6 fade
+            background: Theme.base;
+                drag := TouchArea {
+                    enabled: !root.immersive; // M6 gate: dies the frame immersive engages (the fade is visual-only)
+                    // Start the OS window-drag only on actual movement, not on a bare
+                    // click. A bare click used to enter Windows' modal move loop, which
+                    // then captured held arrow keys to MOVE (and so un-maximize) the
+                    // window — the "holding an arrow restores the window" bug.
+                    property <bool> dragging: false;
+                    pointer-event(e) => {
+                        if (e.kind == PointerEventKind.down) { self.dragging = false; }
+                    }
+                    moved => {
+                        if (self.pressed && !self.dragging) {
+                            self.dragging = true;
+                            root.action("drag", 0, 0);
+                        }
+                    }
+                    // v0.8.121 (Round-B fix F15 = audit Y7, L26): the maximize BUTTON got
+                    // `close-bar-menus()` in v0.8.120 because "the resize invalidates the menu's
+                    // anchor x" — this is the same body's other invoker, and on macOS (where the
+                    // Falcon-drawn button is mount-culled) it is the only one.
+                    double-clicked => { root.action("maximize", 0, 0); }
+                }
+                HorizontalLayout {
+                    // v0.8.180 (owner fix, second look): the 2px lead-in completes the uniform-4px
+                    // promise at the WINDOW EDGE — the first cell's wash is inset 2px within its
+                    // cell, so without this the leftmost visible gap read 2px against 4px
+                    // everywhere else. v1.0 MERGE (F1-6, the post-merge sweep): the total this line
+                    // used to quote (2 + 282 = 284) was the pre-v0.8.180 cell pitch. The five bar
+                    // buttons are 40 px cells now, so the left group is 2 + 5×40 + 62 = 264 inside
+                    // hudclip's UNCHANGED 286 px reservation (22 px slack; tiers untouched).
+                    // v1.0 MERGE (F1-5 / owner default L2): KEEP BOTH, IN THIS ORDER, and the mac
+                    // Settings-centre pin depends on the SUM. `native_window_controls_shift_cluster
+                    // _and_inert_inset` asserts the first cell's centre is 102 with an 80px inset:
+                    // 80 + 2 (this lead-in) + 20 (half a 40px cell) = 102. Drop the 2px on the
+                    // grounds that the lights own the leading zone and that pin moves to 100.
+                    // 2026-09-25 (owner, "Option 1 + 2 pt"): on the Mac the caption trio is unmounted and
+                    // the bell became the last cell, flush against the window edge — its badge 3pt and
+                    // its hover square 2pt from it. The 2px trailing lead-in mirrors the leading one, so
+                    // the bell's square keeps the same 4px window-edge gap. Windows is unchanged: its
+                    // caption trio tiles into the corner by design (R1). The tester decides next whether
+                    // the bell needs more room.
+                    padding-left: 2px; padding-right: root.native-window-controls ? 2px : 0px; spacing: 0px;
+                    // v0.9.11 (native traffic lights): leading spacer reserving the macOS light
+                    // zone. Unmounted on Windows (native-window-controls false) — layout byte-
+                    // identical (and spacing is 0px, so even a 0-width mount would add nothing).
+                    // A bare Rectangle: NO input handlers, so the native buttons floating above
+                    // win every click, and the bar's drag TouchArea (behind this layout) still
+                    // owns drags here — no Falcon hover/tip can fire under the lights by
+                    // construction (nothing interactive mounts left of the inset).
+                    if root.native-window-controls : Rectangle { width: root.titlebar-leading-inset; }
+                    IconBtn {
+                        width: root.bar-cell-w; radius: 0; hit: !root.immersive && !root.modal-blocking; bar: true; // 40x44 cell (44px bar) -> the 2/4px-inset wash is a TRUE 36px rounded square (uniform 4px gaps, v0.8.180 owner ruling)
+                        // v0.8.120 (design-sweep O8): the panel this button opens mounts BELOW every
+                        // scrim-bearing modal, so under an open dialog it used to appear as a
+                        // full-height glass panel at ~33% brightness that is completely inert — its
+                        // own close X included — with no cue explaining why. `hit: false` lets the
+                        // press through to the bar (window drag) instead of swallowing it; `enabled`
+                        // is the P5 mute so the state is VISIBLE rather than discovered by clicking.
+                        enabled: !root.modal-blocking;
+                        active: root.settings-open;
+                        tip: "Settings"; // G11 (v0.8.44): delayed tooltip — the asterisk glyph STAYS (user decision)
+                        // v0.8.68 (D-audit FIX 4): close the welcome FIRST so this panel doesn't mount
+                        // behind the modal scrim (invisible until welcome closes). welcome-open=false is
+                        // a no-op when it's already closed; when open, its changed-observer latches
+                        // onboarding-shown (the same path the footer "Show welcome" link uses).
+                        clicked => { root.action("settings", 0, root.height / 1px); } // v0.8.14 (Item 2): one top-left panel at a time; panel-switch (M5) recorded BEFORE the flips = "did this close a sibling"; v0.8.120 (Y75): + the shared bar-menu close
+                        // v0.8.188 (L41/L46 sweep): the ONLY odd-sized glyph in the left bar group,
+                        // and so the only one whose plain centring minted a HALF-logical origin —
+                        // (40 − 15)/2 = 12.5 and (44 − 15)/2 = 14.5, absolute (14.5, 14.5), device
+                        // (21.75, 21.75) at 150%. Its 14px and 16px siblings in the same row divide
+                        // evenly and were always integer. That round floored both axes to 12 / 14,
+                        // absolute (14, 14), device (21.0, 21.0).
+                        // ── v0.8.191 (W7-a, OWNER REPORT 08-16: "the icons in the title bar buttons
+                        //    seem not perfectly centered"): THE FLOOR WAS NOT FREE, AND THIS IS WHAT
+                        //    IT COST. ────────────────────────────────────────────────────────
+                        // The banner above priced the floor as pure gain. It was not: flooring an
+                        // ODD box in an EVEN cell moves the INK off the cell's centre by half a
+                        // logical pixel on each axis. Slint fits a Path's viewbox into
+                        // (size − stroke) at +stroke/2, so the ink centre IS the element box's centre;
+                        // with the box at (12, 14) and 15px wide that centre was (19.5, 21.5) against
+                        // the 40 × 44 cell's (20, 22) — 0.75 device px high AND left at 150%, on the
+                        // one button in the row that wears a painted active chip and sits beside a
+                        // » that measures exactly centred. That is the button the owner was looking at.
+                        // THE FIX IS THE BOX, NOT THE MOUNT: 16px divides the cell exactly on both
+                        // axes ((40 − 16)/2 = 12, (44 − 16)/2 = 14 — the SAME origin, now exact
+                        // rather than floored), so the mount arithmetic is byte-identical in output
+                        // and the glyph joins its 16px siblings' spelling. The POLYLINE is rescaled
+                        // about the viewbox centre by 0.85/0.9125 = 0.9315068 so THE DRAWN INK DOES
+                        // NOT CHANGE SIZE: a 15px box at stroke 1.4 fits the 16-viewbox at 13.6/16 =
+                        // 0.85, a 16px box at 14.6/16 = 0.9125, and the ratio is exactly that factor.
+                        // Measured both ways in the rig: the ink stays 8.5 × 10.2 logical px and its
+                        // centre moves from (19.5, 21.5) to (20, 22) — dead centre of the cell.
+                        astpath := Path {
+                            x: (parent.width - 16px) / 2;
+                            y: (parent.height - 16px) / 2;
+                            width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+                            stroke: Theme.text-dim; stroke-width: Theme.icon-stroke;
+                            MoveTo { x: 8; y: 2.410959; } LineTo { x: 8; y: 13.589041; }
+                            MoveTo { x: 3.342466; y: 4.926027; } LineTo { x: 12.657534; y: 11.073973; }
+                            MoveTo { x: 12.657534; y: 4.926027; } LineTo { x: 3.342466; y: 11.073973; }
+                        }
+                    }
+                    IconBtn {
+                        width: root.bar-cell-w; radius: 0; hit: !root.immersive && !root.modal-blocking; bar: true; // 40x44 cell (44px bar) -> the 2/4px-inset wash is a TRUE 36px rounded square (uniform 4px gaps, v0.8.180 owner ruling)
+                        // v0.8.120 (design-sweep O8): the panel this button opens mounts BELOW every
+                        // scrim-bearing modal, so under an open dialog it used to appear as a
+                        // full-height glass panel at ~33% brightness that is completely inert — its
+                        // own close X included — with no cue explaining why. `hit: false` lets the
+                        // press through to the bar (window drag) instead of swallowing it; `enabled`
+                        // is the P5 mute so the state is VISIBLE rather than discovered by clicking.
+                        enabled: !root.modal-blocking;
+                        active: root.loading-open;
+                        tip: "Browse speed"; // G11 (v0.8.44): delayed tooltip
+                        clicked => { root.action("speed", 0, root.height / 1px); } // v0.8.14 (Item 2): one top-left panel at a time; panel-switch (M5) recorded BEFORE the flips; v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the panel isn't mounted behind the modal; v0.8.120 (Y75): + the shared bar-menu close
+                        Path {
+                            x: (parent.width - 14px) / 2; y: (parent.height - 14px) / 2;
+                            width: 14px; height: 14px; viewbox-width: 16; viewbox-height: 16;
+                            stroke: Theme.text-dim; stroke-width: Theme.icon-stroke; fill: transparent;
+                            MoveTo { x: 3; y: 3; } LineTo { x: 8; y: 8; } LineTo { x: 3; y: 13; }
+                            MoveTo { x: 8; y: 3; } LineTo { x: 13; y: 8; } LineTo { x: 8; y: 13; }
+                        }
+                    }
+                    // Open a folder (native picker) — the primary way to load photos on
+                    // any machine (no hardcoded path). Also reachable from the empty-state.
+                    IconBtn {
+                        // v0.8.131 (JV1 / F-P7): + the modal-blocking gate its two neighbours have.
+                        // A folder swap was reachable from UNDER the export sheet and every other
+                        // scrim-bearing modal — the one action that invalidates a dialog's captured
+                        // set while the dialog is still on screen asking about it. The hit gate passes the
+                        // press through to the bar (window drag) and the enabled mute makes the state
+                        // visible rather than discovered by clicking (the O8 pattern, verbatim).
+                        width: root.bar-cell-w; radius: 0; hit: !root.immersive && !root.modal-blocking; bar: true; // 40x44 cell (44px bar) -> the 2/4px-inset wash is a TRUE 36px rounded square (uniform 4px gaps, v0.8.180 owner ruling)
+                        enabled: !root.modal-blocking;
+                        tip: "Open…"; // G11 delayed tooltip; v0.8.65 (C3/M6): honest label — the button now offers Image | Folder
+                        // v0.8.65 (C3/M6): rfd has no combined file+folder dialog, so the button
+                        // opens a small two-option menu (the sort-menu overlay grammar) instead of a
+                        // file picker pretending to cover both. Anchored at this button's ax (the
+                        // x=0-TouchArea absolute-position rule); one title-bar menu at a time.
+                        clicked => { root.action("open", self.ax / 1px, root.height / 1px); }
+                        // ── v0.8.191 (W7-b, owner report 08-16): THE BOX WAS CENTRED; THE DRAWING
+                        //    INSIDE IT WAS NOT. ────────────────────────────────────────────
+                        // The 16px element box divides the 40 × 44 cell exactly, and Slint maps the
+                        // VIEWBOX centre onto the BOX centre — so a polyline that is off-centre in
+                        // its own 16-viewbox draws off-centre in a perfectly centred button. This
+                        // one spanned y 5..12.5, centre 8.75 against the viewbox's 8: 0.75 units =
+                        // 0.6845 logical = 1.03 DEVICE px low at 150%, the largest miscentring in
+                        // the left group and visible beside the » and the A|B. Every y drops 0.75
+                        // (4.25 / 5.65 / 11.75); the SHAPE, the widths and the x coordinates are
+                        // untouched, so this is a pure translation of the same drawing.
+                        // NOTE, RECORDED: the 60px empty-state folder above (the "open a folder"
+                        // placeholder) is a second copy of this polyline and KEEPS the old y values
+                        // — it is a decorative 60px glyph in an 80px box that the owner has never
+                        // reported, and moving it is not this item's ruling. The two copies now
+                        // differ by 0.75 viewbox units; hoisting them into one `FolderGlyph` is in
+                        // the v0.8.191 close as an owner line, not taken here.
+                        Path {
+                            x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
+                            width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+                            stroke: Theme.text-dim; stroke-width: Theme.icon-stroke; fill: transparent;
+                            MoveTo { x: 2; y: 4.25; } LineTo { x: 6; y: 4.25; } LineTo { x: 7.4; y: 5.65; }
+                            LineTo { x: 14; y: 5.65; } LineTo { x: 14; y: 11.75; } LineTo { x: 2; y: 11.75; }
+                            LineTo { x: 2; y: 4.25; }
+                        }
+                    }
+                    // Selection / cull-management panel (flags, rejects, copy/move).
+                    IconBtn {
+                        width: root.bar-cell-w; radius: 0; hit: !root.immersive && !root.modal-blocking; bar: true; // 40x44 cell (44px bar) -> the 2/4px-inset wash is a TRUE 36px rounded square (uniform 4px gaps, v0.8.180 owner ruling)
+                        // v0.8.120 (design-sweep O8): the panel this button opens mounts BELOW every
+                        // scrim-bearing modal, so under an open dialog it used to appear as a
+                        // full-height glass panel at ~33% brightness that is completely inert — its
+                        // own close X included — with no cue explaining why. `hit: false` lets the
+                        // press through to the bar (window drag) instead of swallowing it; `enabled`
+                        // is the P5 mute so the state is VISIBLE rather than discovered by clicking.
+                        enabled: !root.modal-blocking;
+                        active: root.sel-open;
+                        tip: "Review"; // G11 (v0.8.44): delayed tooltip
+                        clicked => { root.action("review", 0, root.height / 1px); } // v0.8.38 (G6): shared exclusivity toggle (keyboard 's' + this button); v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the panel isn't mounted behind the modal; v0.8.120 (Y75): + the shared bar-menu close
+                        // ── v0.8.191 (W7-d): THE SHARED `FlagGlyph`, NOT A SEVENTH COPY OF IT. ────
+                        // This was a hand-rolled polyline BYTE-IDENTICAL to glyphs.slint's `FlagGlyph`
+                        // — the drawing the filmstrip badge, the grid badge, the HUD picks chip, the
+                        // two CullButtons and the Settings rank rows all already mount from the one
+                        // component. An L7 duplicate of the app's own icon, in the title bar. Same
+                        // 16px box, same mount, same `text-dim` tint; nothing about the drawing moves.
+                        // ITS CENTRING IS AN OWNER QUESTION AND IS DELIBERATELY UNTOUCHED (recorded).
+                        // The flag's bbox is x 4..13, y 2.5..14 — centre (8.5, 8.25) against the
+                        // viewbox's (8, 8), so by BBOX it sits 0.5 right and 0.25 low; but its ink is
+                        // a pennant with a long empty staff, so by optical CENTROID it reads 0.28
+                        // left and 1.79 device px HIGH. The two criteria disagree, and moving a
+                        // shared icon on a coin-flip would change it at six other sites. Left as it
+                        // is until the owner rules.
+                        FlagGlyph {
+                            x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
+                            width: 16px; height: 16px;
+                            tint: Theme.text-dim;
+                        }
+                    }
+                    // A | B compare (side-by-side focus check) — disabled with < 2 shots.
+                    IconBtn {
+                        width: root.bar-cell-w; radius: 0; hit: !root.immersive; bar: true; // 40x44 cell (44px bar) -> the 2/4px-inset wash is a TRUE 36px rounded square (uniform 4px gaps, v0.8.180 owner ruling)
+                        active: root.compare;
+                        // v0.8.119 (design-sweep O2/Y55): the folder truth, NOT `film.length`.
+                        // `root.film` is the VIRTUALIZED strip window — step_filmstrip sizes it
+                        // from the viewport (>=5 slots, ~15 at a 1200px stage) and pads the
+                        // out-of-range cells with FilmItem::default(), so `film.length >= 2` was
+                        // true with 0 or 1 shots and this marquee button sat fully lit over a
+                        // handler that refuses len<2 (L15/L21). `count-all` is the same quantity
+                        // menubar_model::enabled_for uses for TAG_COMPARE, so the button, the two
+                        // menu rows below and the macOS row cannot drift apart.
+                        // v0.8.121 (Round-B fix F10 = audit A19): + the modal gate. Wave 2's Y42
+                        // blocked compare's Tab/Space from the keyboard under a modal for exactly
+                        // this reason (it changes `current` behind the scrim); this button drove the
+                        // same body while fully lit. `enabled` is the P5 mute, so the state is
+                        // visible rather than discovered by clicking — the O8 rule, sixth invoker.
+                        enabled: (root.count-all >= 2 || root.compare) && !root.modal-blocking; // P5: needs >=2 shots (or already comparing -> can always toggle off)
+                        // v0.8.154 (A1, owner ruling Q2): a DISABLED title-bar button says WHY, in
+                        // its tooltip, while it is disabled — "Compare: needs 2 photos" is the
+                        // ruling's own example. The two disabling terms are the `enabled` line
+                        // directly above, read back one term at a time, so the tip cannot claim a
+                        // reason the gate does not hold (L21: the enablement predicate IS the
+                        // sentence). The count term is checked first because it is the one whose
+                        // cause is INVISIBLE — a modal is on screen explaining itself, a one-photo
+                        // folder is not.
+                        //
+                        // THIS BUTTON IS THE WHOLE TITLE BAR'S REACHABLE SET, and that is a fact
+                        // about `hit`, not an omission: Settings / Browse speed / Open… / Review /
+                        // the bell all carry `hit: … && !root.modal-blocking` (the v0.8.120 O8
+                        // pattern — the press passes THROUGH to the bar so the window still drags),
+                        // and IconBtn's TouchArea is `enabled: root.hit`, so on those five the
+                        // pointer can never hover the button in the only state that disables them.
+                        // Compare's hit gate is `!root.immersive` alone, so it hovers under a modal
+                        // AND at count < 2 — both of its disabled states are reachable, and both
+                        // now speak. (Making the other five hoverable-while-disabled would swallow
+                        // the drag press that O8 deliberately lets through — a ruled behaviour, not
+                        // a gap to close here.)
+                        tip: (root.count-all < 2 && !root.compare) ? "Compare A/B — needs 2 photos"
+                           : (root.modal-blocking ? "Compare A/B — close the dialog first"
+                           : "Compare A/B"); // G11 (v0.8.44): delayed tooltip; v0.8.154 (A1): state-derived
+                        clicked => { root.action("compare", 0, root.height / 1px); } // v0.8.120 (Y75)
+                        Path {
+                            x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
+                            width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+                            stroke: root.compare ? Theme.accent : Theme.text-dim; stroke-width: Theme.icon-stroke; fill: transparent;
+                            MoveTo { x: 2.5; y: 3.5; } LineTo { x: 13.5; y: 3.5; } LineTo { x: 13.5; y: 12.5; }
+                            LineTo { x: 2.5; y: 12.5; } LineTo { x: 2.5; y: 3.5; }
+                            MoveTo { x: 8; y: 3.5; } LineTo { x: 8; y: 12.5; }
+                        }
+                    }
+                    // Cache-status meter — one fixed-width bar split into a BEHIND (left) and AHEAD
+                    // (right) half. The split point moves with position in the folder (each half's
+                    // width ∝ shots available to cache that way), the total width is constant, and
+                    // each half fills toward the centre in traffic-light colour as decoding catches
+                    // up — so a cold jump drops to red and visibly climbs to green, and near a folder
+                    // edge the short side is simply "fewer shots that way" (not "under-cached").
+                    // [status visibility]. Shown only with a real (≥2-shot) folder loaded.
+                    // v0.8.21 (field repro): joined the auto-hide set — the user reads the
+                    // meter + path as "chips". v0.8.82 (owner: two modes): the meter now rides
+                    // the CONTROL-ONLY gate (ctrl-show), not the full cluster's — it lives in
+                    // this LEFT button row inside the constant 286px reservation (2px lead-in
+                    // + 5·40 buttons + 62 meter = 264 ≤ 286 at ANY window width, incl. the
+                    // 560px minimum), so
+                    // keeping it mounted costs the centre band nothing. hudclip's 286/180
+                    // margins stay constants, so mounting it cannot feed back into either mode.
+                    // v0.9.59 (OWNER RULING 08-02, S4b): on macOS this meter has MOVED to the right
+                    // group, immediately left of the notification bell, to balance the bar; Windows
+                    // keeps it here, byte-identically (`native-window-controls` is false there, so
+                    // this gate is the historic one and the twin below never mounts). The body is
+                    // the shared `CacheMeter` component (hud.slint) — one geometry, two anchors.
+                    // L4: BOTH sites are `if` mount gates, never `visible:`. L22: the hover latch
+                    // cleanup still lives on hudclip's `changed ctrl-show` observer, because the
+                    // MOUNT GATE is unchanged — moving the element did not move its unmount edge.
+                    //
+                    // ── v0.8.196 (WAVE 2, §C) x v1.0 MERGE: WHERE THE LEAF WENT. ──────────────
+                    // The wave-2 leaf was written INLINE here, against a meter body this branch had
+                    // already extracted into `CacheMeter` so it could mount on either side of the bar.
+                    // Copying that body back would leave two hand-copies of a 62px split-bar one edit
+                    // apart — the exact drift the extraction exists to prevent, and the exact drift
+                    // F1-1 caught. So the leaf, the shortened track and the 8px fill floor live in the
+                    // component and BOTH anchors host them from one body; `leaf:` is the Rust-published
+                    // posture bit (L4), passed at each mount.
+                    //
+                    // `cmeter` is named for the rig: the leaf rows measure the meter's OUTER footprint
+                    // in both postures, and an element with no id cannot be found at all.
+                    if root.cache-meter-show && hudclip.ctrl-show && !root.native-window-controls : cmeter := CacheMeter {
+                        len-before: root.cache-len-before; len-after: root.cache-len-after;
+                        frac-before: root.cache-frac-before; frac-after: root.cache-frac-after;
+                        leaf: root.efficiency-leaf;
+                        hit: !root.immersive; // M6 gate (root's changed immersive also resets the hover flag)
+                        hover-changed(h, cx) => { root.meter-hover(h, cx / 1px, root.height / 1px); }
+                    }
+                    // Empty stretchy spacer (content-free, so it can't drive the window's
+                    // preferred width). The path text is positioned ABSOLUTELY below,
+                    // OUTSIDE this layout — see the long note there.
+                    Rectangle { horizontal-stretch: 1; min-width: 0px; preferred-width: 0px; }
+                    // v1.0 MERGE [A-4] / owner default L3 — THE MAC BATTERY LEAF RETIRED HERE.
+                    // v0.9.60 (W2-4) mounted a 24 px battery-saver leaf in this slot, BOOT-LATCHED from IOKit's
+                    // providing power source (an L43 live-but-irreversible latch, F3-3). The v1.0 trunk answers
+                    // the same question LIVE — `support::power_probe()` now has a macOS arm over the very probe
+                    // that latch read — and the owner ruled ONE leaf for the title bar: the wave-2 leaf INSIDE
+                    // the preload meter (`CacheMeter.leaf`, hud.slint), on both platforms. So this cell, its
+                    // `battery-saver` / `battery-tip` properties, its L22 unmount observer and the 24 px term in
+                    // the right reservation below all go together. The mac low-power ADAPTER pick is untouched
+                    // (Apple Silicon is single-adapter; boot-only, and documented where it is chosen).
+                    // v0.9.59 (OWNER RULING 08-02, S4b): the macOS anchor for the cache meter —
+                    // immediately LEFT of the bell. The two gates are mutually exclusive, so exactly
+                    // one instance ever exists and `cache-meter-cx` can never be written by two
+                    // hosts. The reservation arithmetic moves WITH it: hudclip's left margin drops
+                    // 286 → 224 and its right margin grows 48 → 110 under native window controls, so
+                    // the centre BAND WIDTH is unchanged (W − 414) and every tier threshold below
+                    // stands exactly as pinned.
+                    if root.cache-meter-show && hudclip.ctrl-show && root.native-window-controls : CacheMeter {
+                        len-before: root.cache-len-before; len-after: root.cache-len-after;
+                        frac-before: root.cache-frac-before; frac-after: root.cache-frac-after;
+                        leaf: root.efficiency-leaf;
+                        hit: !root.immersive;
+                        hover-changed(h, cx) => { root.meter-hover(h, cx / 1px, root.height / 1px); }
+                    }
+                    // Events / notifications centre — the unified top-right sink for all warnings + results.
+                    IconBtn {
+                        width: root.bar-cell-w; radius: 0; hit: !root.immersive && !root.modal-blocking; bar: true; // 40x44 cell (44px bar) -> the 2/4px-inset wash is a TRUE 36px rounded square (uniform 4px gaps, v0.8.180 owner ruling)
+                        // v0.8.120 (design-sweep O8): the panel this button opens mounts BELOW every
+                        // scrim-bearing modal, so under an open dialog it used to appear as a
+                        // full-height glass panel at ~33% brightness that is completely inert — its
+                        // own close X included — with no cue explaining why. `hit: false` lets the
+                        // press through to the bar (window drag) instead of swallowing it; `enabled`
+                        // is the P5 mute so the state is VISIBLE rather than discovered by clicking.
+                        enabled: !root.modal-blocking;
+                        active: root.notif-open;
+                        tip: "Notifications"; // v0.8.45 (Fix 3): the bell was the one unlabeled title-bar glyph G11 missed (min/max/close = OS-standard, deliberately untipped)
+                        clicked => { root.action("notifications", 0, root.height / 1px); } // v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the panel isn't mounted behind the modal; v0.8.120 (Y75): + the shared bar-menu close
+                        // bell glyph — amber when there are unread events
+                        // v0.8.191 (W7-c, owner report 08-16): the same class as the folder beside it,
+                        // smaller — the polyline spanned y 3.6..13, centre 8.3 against the viewbox's
+                        // 8, so the ink drew 0.3 units = 0.41 device px low at 150% in a box that is
+                        // itself exactly centred. Every y drops 0.3; the shape is untouched.
+                        Path {
+                            x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
+                            width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+                            stroke: root.notif-unread > 0 ? Theme.warn : Theme.text-dim; stroke-width: Theme.icon-stroke; fill: transparent;
+                            MoveTo { x: 3; y: 11.2; } LineTo { x: 13; y: 11.2; }
+                            MoveTo { x: 4.6; y: 11.2; } LineTo { x: 4.6; y: 7.3; } LineTo { x: 8; y: 3.3; }
+                            LineTo { x: 11.4; y: 7.3; } LineTo { x: 11.4; y: 11.2; }
+                            MoveTo { x: 6.7; y: 12.7; } LineTo { x: 9.3; y: 12.7; }
+                        }
+                        // unread badge
+                        if root.notif-unread > 0 : unreadbadge := Rectangle {
+                            // y: 5px above the 16px glyph box, the 44px bar's original 9px; follows
+                            // a shorter bar instead of drifting down onto the bell (2026-09-25).
+                            x: parent.width / 2 + 2px; y: (parent.height - 16px) / 2 - 5px;
+                            width: 15px; height: 15px; border-radius: 7.5px;
+                            background: Theme.danger;
+                            Text {
+                                text: root.notif-unread > 9 ? "9+" : root.notif-unread;
+                                color: Theme.text; font-size: Theme.font-xs; font-weight: 700;
+                                x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+                            }
+                        }
+                    }
+                    // v0.9.11 (native traffic lights): the custom min/max/close cluster unmounts
+                    // when the OS draws the window controls (macOS) — mount-culled (if:), never
+                    // opacity-hidden, so no invisible TouchArea lingers to steal clicks (the
+                    // v0.7.2 click-steal class). Windows (false) mounts all three byte-identically
+                    // (tipgeom pins the bell's centre at width−4·44+22 in that state). The R1 ruling
+                    // below is about the WASH these three cells paint, which is orthogonal to the
+                    // mount gate: on macOS none of them exists at all, so R1 is a Windows-visible
+                    // change that the gate simply never lets the Mac see.
+                    //
+                    // ── v0.8.139 (R1, OWNER RULING + MARKED-UP SCREENSHOT): THE CAPTION BUTTONS ARE
+                    //    WINDOWS CAPTION BUTTONS. ──────────────────────────────────────────────────
+                    // He circled the three window controls: on Windows they are full-height
+                    // rectangles that tile edge-to-edge into the top-right corner, and their hover
+                    // fill paints the WHOLE cell. Falcon drew them with `bar: true`, whose wash is a
+                    // 3px-inset rounded square (Theme.radius) floating inside the 44px cell — so
+                    // three little rounded tiles with gaps above, below and between them where the
+                    // OS convention is a continuous band.
+                    //
+                    // THE FIX IS A MODE THAT ALREADY EXISTED. `circle: false` is IconBtn's plain
+                    // full-rect wash, and controls.slint still describes it in its own words as
+                    // "the Windows-convention title-bar close" — it is what these buttons used
+                    // before v0.7.0 generalised every title-bar button to the rounded hover square.
+                    // With the `radius: 0` these call sites already pass, the wash becomes the cell:
+                    // 44x44, square, flush. NOTHING MOVES: the cells were always 44x44 and always
+                    // tiled contiguously (spacing 0, padding-right 0, close last), so every glyph
+                    // keeps its centre x and the hit targets are unchanged — this is paint, not
+                    // layout. They also stop consuming `Theme.radius`, which is the token the owner
+                    // named; the token itself is untouched.
+                    //
+                    // THE CLOSE EXCEPTION ("except close which upper right corner is naturally
+                    // rounded by the window corner") NEEDS NO CODE. `winroot` clips every pixel to
+                    // the 16px arc whenever the window is rounded (`clip: !root.chrome-square`), so
+                    // the red fill is cut to the window silhouette by the shell; when chrome-square
+                    // is true the window really is square and a square fill is what is wanted. A
+                    // hand-rolled top-right radius here would have been a second, drifting copy of
+                    // the window's own corner.
+                    //
+                    // The LEFT cluster keeps `bar: true` deliberately: those are application
+                    // buttons, not caption buttons, and the Windows convention this ruling invokes
+                    // distinguishes the two. [VD — he judges the pairing next feel-test.]
+                    if !root.native-window-controls : IconBtn {
+                        width: 44px; radius: 0; hit: !root.immersive; circle: false; // 44x44 cell -> the wash IS the cell (R1)
+                        clicked => { root.action("minimize", 0, root.height / 1px); } // v0.8.120 (Y75): a minimise/restore leaves an anchored menu floating over whatever is under it
+                        Path {
+                            x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
+                            width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+                            stroke: Theme.text-dim; stroke-width: Theme.icon-stroke;
+                            // v0.8.139 HOTFIX: 8px of ink, 18..26 in the cell — see the banner on
+                            // maximize below. (Was 3..13 = 10px, ending on device 25.5 / 40.5.)
+                            MoveTo { x: 4; y: 8; } LineTo { x: 12; y: 8; }
+                        }
+                    }
+                    if !root.native-window-controls : IconBtn {
+                        width: 44px; radius: 0; hit: !root.immersive; circle: false; // 44x44 cell -> the wash IS the cell (R1)
+                        clicked => { root.action("maximize", 0, root.height / 1px); } // v0.8.120 (Y75): the resize invalidates the menu's anchor x
+                        // ── v0.8.139 HOTFIX (OWNER, SIDE-BY-SIDE AGAINST WINDOWS EXPLORER): THE
+                        //    THREE CAPTION GLYPHS ARE ONE 8px INK FAMILY. ────────────────────────
+                        // He put Falcon's window controls next to Explorer's and read all three as
+                        // too big — "especially maximize(restore)". The measurement agreed, and it
+                        // named the "especially": minimize's bar and close's X carried 10px of ink
+                        // (16px Path boxes at (44 - 16)/2 = 14, ink 3..13 -> 17..27 in the cell)
+                        // while THIS button was a 12px square. Two px larger, and the only one of
+                        // the three that ENCLOSES AREA where a bar and a cross merely cross it —
+                        // so it read heaviest of a row that is supposed to read as one set.
+                        //
+                        // ── v0.8.191 (H13, BANNER ONLY — NO GEOMETRY MOVED): THE SENTENCE THAT STOOD
+                        //    HERE WAS FALSE FOR TWO OF THE THREE, AND THE MEASURED NUMBERS ARE WORTH
+                        //    MORE THAN THE CLAIM WAS. ───────────────────────────────────────
+                        // It read: "ALL THREE INKS ARE 8px NOW and every one of them spans 18..26
+                        // inside its 44px cell, centred on (22, 22)", with the neighbours' ink ends
+                        // "whole device pixels as a side effect". The nominal coordinates are right
+                        // (the bar is MoveTo 4,8 -> 12,8, the X is 4,4 -> 12,12 and 12,4 -> 4,12,
+                        // and this square is 8px at (44 - 8)/2 = 18) — but a Path does not draw its
+                        // viewbox at face value. Slint fits Path geometry into (size − its OWN
+                        // stroke-width) offset by +stroke/2 (i-slint-core items/path.rs
+                        // `fitted_path_events`), so a 16px box at `Theme.icon-stroke` 1.4 maps the
+                        // 16-viewbox into 14.6px at +0.7 and viewbox 4..12 lands at 4.35..11.65 in
+                        // the box — 18.35..25.65 in the cell, i.e. 7.3 logical px of ink, not 8.
+                        // MEASURED, AT THE OWNER'S 150%:
+                        //   minimise bar   18.35..25.65 → device 27.525..38.475 = 10.95 device px
+                        //   this square    18.00..26.00 → device 27.000..39.000 = 12.00 device px
+                        //   close X        the same 7.3px fit, but its arms are 45° diagonals, so each
+                        //                  butt cap's half-width projects (1.4 × 1.5)/2 × sin45° =
+                        //                  0.742 device px past the endpoint → ≈26.78..39.22 =
+                        //                  ≈12.44 device px
+                        // So the trio is 10.95 / 12.00 / 12.44 — mismatched in BOTH directions, the
+                        // bar about a device pixel short of the square and the X about 0.4 long, in
+                        // the row the owner photographed against Explorer's. The "whole device
+                        // pixels as a side effect" clause is false with it: 27.525 and 38.475 are
+                        // neither. What IS whole and even is every MOUNT (14 for the Paths, 18 for
+                        // the square) and the square's own span.
+                        // THE SIZING IS AN OWNER QUESTION, RECORDED, NOT A FIX TAKEN HERE (v0.8.191
+                        // §C7): equalising the ink means growing the two Path boxes (16 → ≈17.5,
+                        // which un-evens their mount) or shrinking the square, and he has judged
+                        // this row by eye twice. This banner now states what is DRAWN.
+                        //
+                        // THIS RETIRES M3's "ONLY 12 WOULD DO", AND STATES THE RULE IT MISSED. M3
+                        // (one commit ago) grew a 10px square to 12 because 10 mounts at
+                        // (44 - 10)/2 = 17, ODD -> device 25.5, and because nudging a 10px square
+                        // onto an even mount (16 or 18) would have centred it at 21 or 23, off the
+                        // neighbours' 22. Both halves are still true OF 10 — and only of 10. The
+                        // general rule is a parity one: with an even mount the centre is
+                        // mount + size/2, so a centred box is crisp AND on the even 22-axis exactly
+                        // when size/2 is even, i.e. for the MULTIPLES OF 4. 10 is not one; 8 and 12
+                        // both are. M3 took the multiple of 4 going UP; the one going DOWN is
+                        // equally crisp, equally on-axis, and is the size the owner asked for.
+                        //
+                        // The RESTORE state is the same drawing at the same scale: an 8x8 footprint
+                        // at the SAME mount, a 6px front pane at (0,2) with its back pane 2px up
+                        // and right at (2,0), so the two states occupy exactly the same 8x8 of the
+                        // cell and maximizing cannot make the mark jump or grow. Every drawn edge —
+                        // 18 / 20 / 24 / 26 — is even, hence whole at 100 / 150 / 200%.
+                        //
+                        // STROKE WIDTHS ARE UNTOUCHED (Theme.icon-stroke 1.4 on the neighbours, this
+                        // square's 1.3px border): weight is M1, still held by the owner. This is
+                        // size. The Rectangle border insets INWARD, so the square's outer boundary
+                        // stays the crisp one M3 bought and the inner edge is still sub-pixel.
+                        if !root.maximized : Rectangle {
+                            x: (parent.width - 8px) / 2; y: (parent.height - 8px) / 2;
+                            width: 8px; height: 8px; background: transparent; border-radius: 1px;
+                            border-width: 1.3px; border-color: Theme.text-dim;
+                        }
+                        if root.maximized : Rectangle {
+                            x: (parent.width - 8px) / 2; y: (parent.height - 8px) / 2;
+                            width: 8px; height: 8px;
+                            Path {
+                                width: 8px; height: 8px; viewbox-width: 8; viewbox-height: 8;
+                                stroke: Theme.text-dim; stroke-width: 1.3px; fill: transparent;
+                                MoveTo { x: 2; y: 2; } LineTo { x: 2; y: 0; } LineTo { x: 8; y: 0; }
+                                LineTo { x: 8; y: 6; } LineTo { x: 6; y: 6; }
+                            }
+                            Rectangle {
+                                x: 0; y: 2px; width: 6px; height: 6px;
+                                background: transparent; border-width: 1.3px; border-color: Theme.text-dim; border-radius: 1px;
+                            }
+                        }
+                    }
+                    if !root.native-window-controls : IconBtn {
+                        // R1: the corner cell. `circle: false` keeps the SOLID red (the danger wash
+                        // only softens for CIRCLE buttons), now filling the whole 44x44 cell; the
+                        // winroot clip owns the top-right arc — see the banner on minimize above.
+                        width: 44px; radius: 0; hit: !root.immersive; danger: true; circle: false; // full-cell red (R1)
+                        clicked => { root.action("close", 0, root.height / 1px); } // v0.8.120 (Y75): a REFUSED close (ops running / the rotation reminder) must not leave a menu over the reminder
+                        Path {
+                            x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
+                            width: 16px; height: 16px; viewbox-width: 16; viewbox-height: 16;
+                            stroke: Theme.text-dim; stroke-width: Theme.icon-stroke;
+                            // v0.8.139 HOTFIX: 8x8 of ink, 18..26 both axes — the banner on maximize.
+                            MoveTo { x: 4; y: 4; } LineTo { x: 12; y: 12; }
+                            MoveTo { x: 12; y: 4; } LineTo { x: 4; y: 12; }
+                        }
+                    }
+                }
+                // Centred path text, positioned ABSOLUTELY (NOT in the button layout),
+                // between the left and right button groups. Being
+                // ── v1.0 MERGE MICRO-TAIL [D-V2]: this line used to quote "the left (282px) and
+                // right (176px) button groups" — both pre-v0.8.180 numbers, and it sits a few lines
+                // above the F1-6 sweep in this same file that states the true ones. Two contradicting
+                // pairs in one region is worse than one stale pair, so the numbers come OUT of this
+                // sentence entirely and live in the ONE place that derives them (hudclip's
+                // reservation block): Windows left 2 + 5×40 + 62 = 264 of 286 and right 40 + 3×44 =
+                // 172 of 180; macOS left 2 + 5×40 = 202 of 224 and right 62 + 40 = 102 of 110. This
+                // text is positioned against the RESERVATIONS, which have not moved, so nothing here
+                // depended on the stale figures. (The fix tail's grep counted zero because it was
+                // spelled `4×44 = 176` — the v0.8.196 clippy-grep lesson, again: measure the thing,
+                // do not pattern-match one spelling of it.)
+                // outside any layout, its per-shot content can never change the window's
+                // layout constraints — the definitive fix for the scrub-un-maximize bug.
+                // (It sits above the stretchy spacer, which forwards drags to the
+                // titlebar TouchArea since Text isn't interactive.)
+                // ── H6 culling HUD (v0.7.2): shortened path (click = copy, as before) + position /
+                // pick / reject CHIPS in the selection-panel grammar (well fill + hairline + glyphs;
+                // click opens the Selection panel). Centred as a GROUP between the button groups.
+                // Margins: left group is 2px lead-in + 5×40 + 62 (conditional meter) = 264 actual,
+                // 286 gives 22px slack (v0.8.180: the lead-in completes the uniform edge gap and
+                // the cells narrowed 44→40 for the true-square wash; reservations deliberately
+                // UNCHANGED so the HUD centre band does not move); right is 40 (events) + 3×44
+                // (caption trio, Windows convention, untouched) = 172 actual, 180 gives 8px slack.
+                hudclip := Rectangle {
+                    // F1: a clipping frame at the exact centre span, so HUD content can NEVER paint
+                    // or hit-test past it onto the right-hand buttons (Slint layouts don't shrink
+                    // children below their content minimum and don't clip). v0.8.21 made the hide
+                    // set cover the WHOLE status cluster (buttons-only below one threshold);
+                    // v0.8.82 (owner) split that into TWO modes; v0.8.87 (owner) refines to FOUR
+                    // TIERS — T1 FULL / T2 NO-FILEPATH (the path pill unmounts first, the count
+                    // chips SURVIVE) / T3 TOGGLES-ONLY / T4 none — see the derivation below.
+                    // v0.9.11: + titlebar-leading-inset (0 on Windows — the arithmetic below is
+                    // byte-identical there) keeps this clip frame aligned with the inset-shifted
+                    // left button group on macOS. v0.8.82 merge (the Mac double-penalty fix):
+                    // the RIGHT margin is conditional now — under native window controls the
+                    // right group is the bell alone (44 actual, 48 gives the standard 4px
+                    // slack), so reserving the Windows trio's 180 wasted 132px of centre band
+                    // on top of the leading inset. Inert on Windows (native-window-controls
+                    // false, inset 0 → the exact main arithmetic). The tier gates below read
+                    // THIS band width, so the four tiers are platform-neutral by construction
+                    // — the Mac inset/margin is already inside self.width.
+                    // v0.9.59 (OWNER RULING 08-02, S4b): the two reservations are recomputed
+                    // TOGETHER with the meter's move, never one at a time.
+                    //
+                    // ── v1.0 MERGE (F1-6 + F6-6): THE ARITHMETIC, WITH THE POST-MERGE CELL PITCH. ───
+                    // Every number below was written against 44 px bar cells. Trunk's v0.8.180 owner
+                    // ruling made every bar-wash button a 40×44 CELL (40 wide) and added a 2 px
+                    // window-edge lead-in, so all four totals moved and none of the RESERVATIONS did
+                    // — which is the whole point of stating them: the reservations are the contract,
+                    // the totals are what has to keep fitting inside it.
+                    //
+                    //   Windows  LEFT   2 + 5×40 + 62 (the conditional meter) = 264 of 286 reserved
+                    //   Windows  RIGHT  40 (bell) + 3×44 (the edge-tiled caption trio) = 172 of 180
+                    //   macOS    LEFT   2 + 5×40 = 202 of 224 reserved (the meter moved across)
+                    //   macOS    RIGHT  62 + 40 = 102 of 110 reserved
+                    //
+                    // The 62 cancels: the band is W − 224 − inset − 110 = W − 414 = exactly the
+                    // pre-move W − 286 − inset − 48, so the T1/T2/T3 seams (384/316/76) and their rig
+                    // pins are untouched by design rather than by luck.
+                    //
+                    // v0.9.60 (W2-4) → v1.0 MERGE [A-4] / owner default L3: THE `battery 24` TERM IS
+                    // GONE. The branch's boot-latched battery-saver leaf took a 24 px cell out of the
+                    // RIGHT reservation while it was mounted (24 + 62 + 44 = 130 of 134). The owner
+                    // ruled one leaf for the title bar and it is the wave-2 leaf INSIDE the preload
+                    // meter's own unchanged 62 px — which is why the live posture costs this
+                    // reservation nothing at all, on either platform, and why `right-reserve` is a
+                    // plain two-arm ternary again rather than a three-way on a latched bool.
+                    property <length> left-reserve: root.native-window-controls ? 224px : 286px;
+                    property <length> right-reserve: root.native-window-controls
+                        ? 110px : 180px;
+                    x: self.left-reserve + root.titlebar-leading-inset;
+                    width: max(0px, parent.width - self.left-reserve - root.titlebar-leading-inset
+                        - self.right-reserve);
+                    height: parent.height;
+                    clip: true;
+                    // v0.8.87 (owner: FOUR TIERS — refines the v0.8.82 two-mode split): the band
+                    // degrades INFORMATIONAL-FIRST as it narrows. Every element mounts under
+                    // EXACTLY ONE gate and the gates nest (pill-show ⇒ chips-show ⇒ ctrl-show),
+                    // so at each seam the mounted set differs by precisely one tier's elements:
+                    //   T1 FULL         (band ≥ 384): toggles + count chips + the path pill
+                    //   T2 NO-FILEPATH  (band ≥ 316): toggles + count chips — the pill unmounts
+                    //     FIRST; position/picks/rejects SURVIVE (v0.8.82 dropped them with it)
+                    //   T3 TOGGLES-ONLY (band ≥ 76):  filmstrip + grid SectionChips (the cache
+                    //     meter, in the LEFT cluster, shares this gate)
+                    //   T4 NONE         (band < 76):  buttons-only
+                    // v1.0 MERGE TAIL (architect addendum): the T3 seam is `ctrl-show: self.width
+                    // >= 76px` below and logic.md says 76; four comments in this file still said 72.
+                    // Comment-only — no threshold moved, and the four-tier rig row measures the
+                    // binding, not the prose. (The 72 px further down is the PATH PILL's width-step
+                    // ladder, a different number that stays.)
+                    // Thresholds are DERIVED constants, never live measurements (a mounted
+                    // element feeding its own mount condition would oscillate — the same rule
+                    // that keeps the 286/180 margins constant). The per-element budget
+                    // (rig-measured in hud_cluster_width_budget: sections 34+34, position 77
+                    // at the "8888/9999" templates, picks/rejects 65+65 at icon + "8888",
+                    // gaps 8, pill min tier 60; the constants keep the v0.8.82 rounded
+                    // allowances 84/68/68):
+                    //   T1 ≥ 384 — the pill's width cap (hudclip.width − 324) hits its 60px
+                    //     min tier exactly at 384, the invariant the old 300/280 pair kept and
+                    //     the reason this constant and the 324 reservation move only together.
+                    //     A >9999-shot folder's wider position chip can nudge past the constant
+                    //     (accepted, pre-existing class — the pill cap absorbs most of it).
+                    //   T2 ≥ 316 = T1 − 60 (pill min) − 8 (its gap): the same five fixed
+                    //     members + 4·8 gaps.
+                    //   T3 ≥ 76 = 34 + 8 + 34 EXACTLY (fixed widths — no headroom to spend).
+                    //     At the 560px window minimum the band is 560−286−180 = 94 ≥ 76, so
+                    //     the section toggles still survive down to the smallest window. Below
+                    //     76 (never reachable on Windows): buttons-only, exactly as before.
+                    //
+                    // ── v0.8.139 HOTFIX: THE SECTION CHIPS GREW 32 → 34 (owner report — the ──
+                    // icons were off centre and the host width is what centres them; see
+                    // hud.slint). +4px total across the cluster, and it lands differently on
+                    // the three seams because they were derived with different slack:
+                    //  · T3 was EXACT by construction, so it moves with the chips: 72 → 76.
+                    //  · T1/T2/324 keep their numbers. Their headroom was the ROUNDING UP of
+                    //    the three measured members (77/65/65 → 84/68/68 = 13px); the chips
+                    //    take 4 of it and 9px remain, so the measured need is 375 against the
+                    //    384 constant and 307 against 316. Moving them would shift the pill's
+                    //    mount seam and its elision ladder for no defect — and the 384 − 324 =
+                    //    60 invariant is only preserved if BOTH move, so neither does.
+                    //    (Pinned in hud_cluster_width_budget / hud_four_tier_flip_points.)
+                    // The 286/180 title-bar margins are NOT affected: those reserve the LEFT
+                    // and RIGHT ICON-BUTTON groups (44px cells + the 62px cache meter), and
+                    // the section chips live inside this centred band, not in either group.
+                    property <bool> pill-show: self.width >= 384px;
+                    property <bool> chips-show: self.width >= 316px;
+                    property <bool> ctrl-show: self.width >= 76px;
+                    // ── v0.8.116 (D-A, owner ruling): the pill's THREE-TIER ELISION ──────────────
+                    // Slint's `overflow: elide` cuts at the END, so the pill dropped the FILENAME
+                    // first — the one thing v0.7.5 added it for (the folder prefix is composed first,
+                    // the name last). The owner's ruling: "add a middle tier that includes the
+                    // filename, but still hides filename if too narrow (since the user can view the
+                    // filename via the exif panel anyway)". So the pill degrades by MEANING, the way
+                    // the four tiers around it already do:
+                    //   FULL     folder + filename        (fits)
+                    //   MIDDLE   "…" + filename           (the folder elides; the NAME survives)
+                    //   NARROW   folder alone             (the name goes to the EXIF panel)
+                    // WHY IT IS MEASURED, not thresholded on the band like the T1–T4 seams: those
+                    // gate MOUNTS of fixed-width elements, so constants are honest for them. A path's
+                    // width is a font metric over live text (a 12-character name and a 40-character
+                    // one are 200 px apart), so a constant here would be a guess that elides a short
+                    // path or overflows a long one on the same window. Two hidden `Text`s at the
+                    // pill's exact font spec measure the two candidates — the HudChip `widest-a`
+                    // idiom, verbatim ("text metrics are visibility-independent"), and the same
+                    // reason the position chip is measured rather than assumed.
+                    // NO FEEDBACK LOOP, which is the rule this file states for the seams: the choice
+                    // reads `pill-cap` — derived from hudclip's OWN width, an input — never the
+                    // pill's rendered width, so a tier can never re-decide itself (an element feeding
+                    // its own mount condition is the oscillation the four tiers are written against).
+                    // THE ARITHMETIC: the pill's cap is the band minus the 324 px cluster
+                    // reservation, floored at the 60 px min tier, so a candidate is chosen when
+                    // `measured + 4px ≤ cap` — the same 4 px slack the width ladder below adds. On
+                    // Windows the band is W − 466, so cap = max(60, W − 790): the FULL tier survives
+                    // to a window of (full width + 794) px, the MIDDLE to (mid width + 794) px, and
+                    // below that the folder alone — WHEN THE FOLDER ITSELF FITS.
+                    // v0.8.117 (F1/F3): the three tiers are ordered by INFORMATION, not by width, and
+                    // for a typical shoot layout the FOLDER tier is WIDER than the MIDDLE one
+                    // ("D:\…\2026Shoot\101CANON" ≈ 160px against "…\HWU_7812.CR3" ≈ 116px). The old
+                    // final arm fell to the folder whenever the middle string had ALREADY overflowed —
+                    // i.e. it handed the narrowest band a string guaranteed to overflow harder, so
+                    // across that whole band the pill rendered a truncated folder prefix that named
+                    // neither the photo nor the leaf folder, and whose visible glyphs were byte-
+                    // identical to what v0.8.115 already painted at the same width. The rung dropped
+                    // the filename and delivered nothing in exchange.
+                    // A THIRD hidden measurer (`mpathdir`, the same idiom) closes it: the FOLDER arm is
+                    // taken only where the folder GENUINELY RENDERS CLEAN — it fits (`mpathdir + 4px ≤
+                    // cap`) AND is narrower than the middle tier it would replace. Otherwise the pill
+                    // KEEPS path-mid and lets IT elide, because a truncated filename still names the
+                    // photo ("…\HWU_78…") while a truncated folder names nothing the user did not
+                    // already know. That is the owner's "still hides filename if too narrow" honoured
+                    // exactly where hiding it buys something.
+                    // SO, precisely: every arm that CAN fit is chosen with 4 px to spare; the ONE rung
+                    // that may render elided is the MIDDLE tier at the very narrowest widths, and that
+                    // is now a deliberate, measured backstop rather than an unmeasured accident.
+                    property <length> pill-cap: max(60px, self.pill-show ? self.width - 324px : self.width);
+                    mpathfull := Text { visible: false; text: root.path-text; font-size: Theme.font-body; }
+                    mpathmid := Text { visible: false; text: root.path-mid; font-size: Theme.font-body; }
+                    mpathdir := Text { visible: false; text: root.path-dir; font-size: Theme.font-body; }
+                    // v0.8.117 (F4): the pill's FRAME is the FULL string's ladder rung. Published here
+                    // because the width binding lives inside a mount-gated `if`, which cannot reach a
+                    // measurer id declared out here — the same reason `path-shown` is a property too.
+                    property <length> pill-full-w: mpathfull.preferred-width;
+                    property <string> path-shown:
+                        root.path-mid == "" ? root.path-text                                    // ABSENT ⇒ v0.8.115 verbatim
+                        : (mpathfull.preferred-width + 4px <= self.pill-cap) ? root.path-text    // FULL
+                        : (root.path-dir == ""
+                           || mpathmid.preferred-width + 4px <= self.pill-cap                    // the middle tier FITS
+                           || mpathdir.preferred-width + 4px > self.pill-cap                     // …or the folder does NOT
+                           || mpathdir.preferred-width >= mpathmid.preferred-width)              // …or it buys no width
+                            ? root.path-mid                                                     // MIDDLE (filename kept)
+                        : root.path-dir;                                                        // NARROW (folder alone)
+                    // v0.8.117 (owner default, D-A rider): the pill's tooltip carries the FULL path as
+                    // its FIRST line whenever there is one. At the MIDDLE and FOLDER tiers the folder
+                    // chain is nowhere else on screen — the EXIF panel names the FILE, not the chain —
+                    // so without this the only route back to it is "copy it and paste somewhere to
+                    // read it", which is the VISUAL-THINKERS/L25 complaint exactly. The ACTION label
+                    // stays, as the second line: it is what the tip is for. Composed on hudclip rather
+                    // than on the pill so the L22 unmount clear below compares against the SAME
+                    // expression the pill publishes — the two literals can no longer drift apart.
+                    // v0.8.192 (owner order): the action is "Copy path" again — the chip grammar names
+                    // what the click DOES ("Hide filmstrip", "Picks — open Review"), and the click does
+                    // this now.
+                    property <string> path-tip: root.path-text == ""
+                        ? "Copy path"
+                        : root.path-text + "\n" + "Copy path";
+                    // M7 (v0.8.19): the chips' POP decisions stay BINARY + INSTANT — the mount
+                    // conditions below and the path cap's 324px reservation (the `pill-show ?
+                    // hudclip.width - 324px : hudclip.width` binding) follow the TARGET
+                    // state the same frame, so the HUD text reflows once and never slides. ONLY chip
+                    // OPACITY animates: fade-in on appear (threshold cross / first rating); the
+                    // disappear stays instant WITH its width release — a lingering fade-out ghost
+                    // would overlap the reclaiming path text. motion-ui OFF ⇒ pop, as v0.8.18.
+                    property <float> chips-reveal: (self.chips-show && root.count-all > 0) ? 1.0 : 0.0;
+                    animate chips-reveal { duration: (self.chips-show && root.count-all > 0) ? Theme.anim : 0ms; easing: ease-out; } // v0.8.20: enter-only (down-snap — same class as the panel reveals)
+                    property <float> chips-eff: root.motion-ui ? self.chips-reveal : ((self.chips-show && root.count-all > 0) ? 1.0 : 0.0);
+                    // v0.8.82: the control-only twins — the SectionChips fade on THEIR mount edge
+                    // (ctrl-show), not the full cluster's, so entering control-only from
+                    // buttons-only fades the toggles in exactly like the old chips did.
+                    property <float> ctrl-reveal: (self.ctrl-show && root.count-all > 0) ? 1.0 : 0.0;
+                    animate ctrl-reveal { duration: (self.ctrl-show && root.count-all > 0) ? Theme.anim : 0ms; easing: ease-out; } // enter-only, the chips-reveal grammar verbatim
+                    property <float> ctrl-eff: root.motion-ui ? self.ctrl-reveal : ((self.ctrl-show && root.count-all > 0) ? 1.0 : 0.0);
+                    // v0.8.87: the pill's twins — the path pill fades on ITS mount edge
+                    // (pill-show, the T1 seam), the per-edge grammar v0.8.82 established for
+                    // the SectionChips. NO count-all term: the pill's own mount gate has none
+                    // (it names the folder path with zero shots too), and an eff that could
+                    // sit at 0 while the pill is mounted would leave a ghost 60px layout slot
+                    // (the L4 hidden-but-occupying class).
+                    property <float> pill-reveal: self.pill-show ? 1.0 : 0.0;
+                    animate pill-reveal { duration: self.pill-show ? Theme.anim : 0ms; easing: ease-out; } // enter-only, the chips-reveal grammar verbatim
+                    property <float> pill-eff: root.motion-ui ? self.pill-reveal : (self.pill-show ? 1.0 : 0.0);
+                    // v0.8.21 dbg (FALCON_DEBUG_CHROME=1): every transition of the chip machinery
+                    // with the whole parent chain (root → bar → hudclip), so a width-chain break or a
+                    // mount/opacity disagreement is visible at log level. Zero cost when unset.
+                    changed width => { if (root.dbg-chrome) { root.dbg-chips-log(self.width / 1px, parent.width / 1px, root.width / 1px, self.pill-show, self.chips-show, self.chips-eff, root.count-all, root.hud-pos != "", root.cache-meter-show && self.ctrl-show); } }
+                    // v0.8.119 (design-sweep O36, L22): the pill can go INERT under the pointer —
+                    // open a folder with no photos while hovering it — and a TouchArea disabled
+                    // mid-hover cannot be relied on to fire `changed has-hover`, so the shared Tip
+                    // channel would strand this pill's string. Same ownership-guarded clear as the
+                    // unmount edge below, on the inert edge. Mirrored as a local property because
+                    // `changed` observers live on the element that declares the property.
+                    property <bool> pill-inert: root.empty-state;
+                    changed pill-inert => { if (self.pill-inert && Tip.text == self.path-tip) { Tip.text = ""; } }
+                    changed pill-show => { // v0.8.87: the T1 seam gets its own log edge, the chips-show precedent
+                        // L22 (v0.8.88): the path pill's pathta writes Tip.text = its pill-tip on hover
+                        // (the pill Rectangle's `pill-tip` binding below). When this T1 seam narrows past
+                        // 384 the pill UNMOUNTS mid-hover, and a destroyed TouchArea never fires
+                        // `changed has-hover`, so the shared Tip channel strands the stale string until
+                        // the next Tip host hovers. Clear it here on the hide edge, ownership-guarded on
+                        // the text (a sentinel host may already own the channel) — the `changed immersive`
+                        // / `changed sel-open` / meter ctrl-show clears, verbatim. cx/cy untouched: pathta
+                        // is a cx-only title-bar host (never writes Tip.cy). The literal MUST mirror the
+                        // pill's pill-tip source above. v0.8.117: it no longer IS a literal — both the
+                        // pill and this clear read hudclip's `path-tip`, so "keep the two in sync" is
+                        // now structural rather than a standing instruction to a future editor.
+                        if (!self.pill-show && Tip.text == self.path-tip) { Tip.text = ""; }
+                        if (root.dbg-chrome) { root.dbg-chips-log(self.width / 1px, parent.width / 1px, root.width / 1px, self.pill-show, self.chips-show, self.chips-eff, root.count-all, root.hud-pos != "", root.cache-meter-show && self.ctrl-show); }
+                    }
+                    changed chips-show => {
+                        // L22 (v0.8.88): the T2 seam (≥316). The three count chips — position / picks /
+                        // rejects — each write Tip.text = their `tip:` string on hover (HudChip's observer,
+                        // hud.slint ~line 65). They unmount together on THIS seam; a mid-hover unmount
+                        // strands whichever tip is live, same class as the pill above. Clear on the hide
+                        // edge if the channel still holds one of theirs (ownership-guarded; enumerated from
+                        // the three count-chip call-site tip props below — keep in sync). cx/cy untouched
+                        // (cx-only hosts).
+                        if (!self.chips-show && (Tip.text == "Position in folder — sorting" || Tip.text == "Picks — open Review" || Tip.text == "Rejects — open Review")) { Tip.text = ""; }
+                        if (root.dbg-chrome) { root.dbg-chips-log(self.width / 1px, parent.width / 1px, root.width / 1px, self.pill-show, self.chips-show, self.chips-eff, root.count-all, root.hud-pos != "", root.cache-meter-show && self.ctrl-show); }
+                    }
+                    changed ctrl-show => {
+                        // v0.8.21 (moved to the ctrl edge, v0.8.82): the meter unmounts with the
+                        // CONTROL-ONLY set now — a mid-hover unmount strands the tooltip flag true
+                        // (a destroyed TouchArea never fires its changed has-hover), so clear it
+                        // on the hide edge deterministically.
+                        // L22 (v0.8.88): the two SectionChips (filmstrip / grid) live under this same
+                        // ctrl-show gate and write their DYNAMIC tip on hover (SectionChip's observer,
+                        // hud.slint ~line 138). A mid-hover unmount at the T3 seam strands whichever tip is
+                        // live, so clear on the hide edge too — enumerate BOTH states of each (the tip
+                        // binding flips with film-visible / grid-open at the SectionChip call sites below,
+                        // so a state change while hovered can leave a stale prior-state string; enumerating
+                        // all four catches it, unlike a dynamic-property compare). Ownership-guarded; cx/cy
+                        // untouched.
+                        if (!self.ctrl-show) {
+                            root.meter-hover(false, 0, root.height / 1px);
+                            if (Tip.text == "Hide filmstrip" || Tip.text == "Show filmstrip" || Tip.text == "Hide photo grid" || Tip.text == "Show photo grid") { Tip.text = ""; }
+                        }
+                        if (root.dbg-chrome) { root.dbg-chips-log(self.width / 1px, parent.width / 1px, root.width / 1px, self.pill-show, self.chips-show, self.chips-eff, root.count-all, root.hud-pos != "", root.cache-meter-show && self.ctrl-show); }
+                    }
+                    changed chips-eff => { if (root.dbg-chrome) { root.dbg-chips-log(self.width / 1px, parent.width / 1px, root.width / 1px, self.pill-show, self.chips-show, self.chips-eff, root.count-all, root.hud-pos != "", root.cache-meter-show && self.ctrl-show); } }
+                    // ── v0.8.188 (L46, OWNER REPORT 08-15: the filmstrip chip icon at maximize): ──
+                    // THE ROW ORIGIN IS THE MOUNT CHAIN'S ONE UNSNAPPED LINK, and every carefully
+                    // snapped mount below it inherited the phase it handed down. Two halves:
+                    //
+                    // Y. Every member of this row is a 26px chip inside `VerticalLayout { alignment:
+                    // center }` over a 44px bar, so all six landed at y = 9 — ODD. The SectionChip's
+                    // glyph mounts (hud.slint) then computed a perfect even-grid 8 and arrived at
+                    // ABSOLUTE 17, i.e. device 25.5 at the owner's 150%: a half device row for the
+                    // frames, permanently, at every window size. The chips' own 1px border sat on
+                    // 13.5 for the same reason. Fixing it inside SectionChip alone (a 26 -> 24
+                    // height, or an even snap on the two section wrappers) would have moved the two
+                    // section chips 1–2px off their three HudChip siblings in the same row — a
+                    // visible break traded for an invisible one — so the snap is hoisted to the row
+                    // the six share and spelled ONCE. The row declares the height its members
+                    // actually are and centres itself on the even grid: y = 10, so the chips'
+                    // borders land on device 15.0, the section glyphs on 27.0, the film line on
+                    // 39.0 and the count-chip cull glyphs on 24.0. THE RESIDUE, STATED: 10 against
+                    // a true centre of 9 puts the whole row 1px below the bar's midline (10/8
+                    // margins) — uniform across every member, which is why it is affordable and a
+                    // per-chip fix was not.
+                    //
+                    // X. `max(0px, (parent.width - self.width) / 2)` over a text-measured
+                    // preferred-width lands on quarter and half logical pixels and CYCLES with the
+                    // window width (measured, v0.8.188 probe: x = 546.5 / 547.0 / 547.5 / 1106.5 at
+                    // W = 1440 / 1441 / 1442 / 2560 — period 4). That is why the owner's maximized
+                    // window looked different from his restored one and why the frames could go pale
+                    // while the line stayed solid: same markup, different device phase. Snapped to
+                    // the even grid, the section chips' x offsets (0 and 42) stay even, so the
+                    // frames' vertical edges land on whole device columns at every window width.
+                    //
+                    // THE RESIDUE THIS CANNOT REACH (D26(b), recorded, NOT built): markup snapping
+                    // is arithmetic on LOGICAL pixels. A window whose logical width is itself
+                    // non-integer (a physical width that does not divide by the scale factor — the
+                    // maximized-with-overhang case) leaves `parent.width` fractional, and no
+                    // expression here can recover the device grid from it. The compensating seam is
+                    // Rust-side: snapping the window's PHYSICAL size before it becomes a logical
+                    // one. Not built this round.
+                    hudrow := HorizontalLayout {
+                        // the height every member of this row already is (SectionChip, the path
+                        // pill and HudChip are all 26px) — declared so the row can be centred as a
+                        // unit instead of six children centring themselves inside a 44px box.
+                        property <length> row-h: 26px;
+                        width: min(self.preferred-width, parent.width);
+                        // ── v1.0 MERGE (N13 / [A-2]): TWO ORTHOGONAL INTENTS, COMPOSED. ─────────
+                        // WHICH CENTRE (mac, v0.9.59) x WHICH GRID (trunk, v0.8.188 L46). The inner
+                        // expression is the branch's, verbatim:
+                        //
+                        // v0.9.59 (OWNER RULING C3, S4a / findings §C-2): the group is centred on the
+                        // WINDOW on macOS, not on the free band. The band is [left-reserve + inset,
+                        // W − right-reserve], so band-centring put the title/path group at W/2 + 97px
+                        // (W/2 + 159 before S4b rebalanced the margins) — visibly right of centre on
+                        // every frame. Windows keeps band-centring byte-identically: its own band is
+                        // only 53px off centre, the geometry is pinned by the v0.7.2 contract and the
+                        // whole rig, and the owner's ruling is explicitly macOS-scoped.
+                        // The CLAMP is what makes window-centring safe inside a clipping frame: at
+                        // narrow widths the window centre would push the group off the band's left
+                        // edge (or under the right-hand buttons), so it degrades to the band edge —
+                        // the same informational-first spirit as the tier ladder, and never a
+                        // clipped chip. hudclip.clip stays true regardless (the click-steal trap).
+                        //
+                        // …and the OUTER `Math.round(… / 2px) * 2px` is trunk's even-grid snap, which
+                        // [A-2] rules applies to BOTH platforms: every mount below this row is snapped,
+                        // and an unsnapped origin hands its phase down to all of them. The snap moves
+                        // the mac cluster by at most 1 logical px, so the branch's 0.5px-tolerance
+                        // centre pins are RE-DERIVED in this same commit (step 10c).
+                        x: Math.round((root.native-window-controls
+                            ? clamp((root.width - self.width) / 2 - parent.x, 0px, max(0px, parent.width - self.width))
+                            : max(0px, (parent.width - self.width) / 2)) / 2px) * 2px;
+                        y: Math.round((parent.height - self.row-h) / 2 / 2px) * 2px;
+                        height: self.row-h;
+                        spacing: Theme.space-2;
+                    // v0.8.21 (field repro): the path pill joins the 250px auto-hide set (it was
+                    // mount-unconditional — only its width CAP tracked chips-show, so a narrow
+                    // window kept a useless 60–250px elided sliver of path). v0.8.87 (owner:
+                    // four tiers): the pill gates on pill-show (≥384, the T1 seam) — ITS OWN
+                    // gate now; the count chips keep chips-show (≥316, T2) and OUTLIVE it.
+                    // v0.8.52 (owner fix 4): the two SECTION INDICATORS — filmstrip + grid on/off,
+                    // adjacent LEFT of the path (the owner's sketch). HudChip family + the panel
+                    // buttons' accent-soft active state; click toggles the section (a deliberate
+                    // second access route the owner added — the edge pills remain the primary).
+                    // v0.8.82 (owner: two modes): these are the CONTROL-ONLY set — they gate on
+                    // ctrl-show (≥76px) instead of the full cluster's chips-show, so a narrow
+                    // window keeps its section toggles all the way down to the window minimum.
+                    if root.count-all > 0 && hudclip.ctrl-show : VerticalLayout {
+                        alignment: center;
+                        SectionChip {
+                            hit: !root.immersive; opacity: hudclip.ctrl-eff;
+                            icon: 1; on: root.film-visible;
+                            tip: root.film-visible ? "Hide filmstrip" : "Show filmstrip";
+                            clicked => { root.action("filmstrip", 0, root.height / 1px); } // v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the toggle's effect isn't hidden behind the modal; v0.8.120 (Y75): + the shared bar-menu close
+                        }
+                    }
+                    if root.count-all > 0 && hudclip.ctrl-show : VerticalLayout {
+                        alignment: center;
+                        SectionChip {
+                            hit: !root.immersive; opacity: hudclip.ctrl-eff;
+                            icon: 2; on: root.grid-open;
+                            tip: root.grid-open ? "Hide photo grid" : "Show photo grid";
+                            clicked => { root.action("grid", 0, root.height / 1px); } // v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the grid dock isn't mounted behind the modal; v0.8.120 (Y75): + the shared bar-menu close
+                        }
+                    }
+                    if hudclip.pill-show : VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            // v0.8.52 (owner fix 4): the chip reservation grows 200 → 280 (the two
+                            // section chips + their 8px gaps — 32px each then, 34px since the
+                            // v0.8.139 hotfix) so the path cap keeps clearing the whole chip
+                            // cluster; elision starts proportionally earlier.
+                            // v0.8.82: 280 → 324 — the reservation re-derived from the widest
+                            // realistic cluster (32+32 sections + 84 position + 68+68 counts +
+                            // 5·8 gaps = the FULL threshold 384 minus the pill's own 60 min tier),
+                            // keeping the invariant that the cap bottoms out at the min tier
+                            // exactly at the mode boundary. v0.8.87 (four tiers): the boundary
+                            // is the T1 (pill-show) seam — same 384, so 324 is UNCHANGED and
+                            // the cap still bottoms at 60 exactly where the pill mounts
+                            // (rig-pinned in hud_four_tier_flip_points).
+                            // v0.8.139 HOTFIX: the sections went 32+32 → 34+34, so this
+                            // reservation now sits 4px under the rounded allowance sum and 9px
+                            // over the measured need. It STAYS 324 for one reason: 384 − 324 =
+                            // 60 is the invariant, and moving one without the other breaks it
+                            // for a seam that has no defect. See the tier banner above.
+                            // v0.8.57 (owner): the pill's width QUANTIZES to a tier ladder — the
+                            // smallest 72px step ≥ the rendered text (+4px pad), floored at the
+                            // 60px min tier, clamped at the unchanged cap. The path names the
+                            // CURRENT photo (v0.7.5), so an exact-width pill re-measured every
+                            // shot shifted the neighboring chips by a few px per filename and the
+                            // whole cluster jittered during fast browsing; on the ladder, a folder
+                            // with consistent naming (same stem ± a character ≈ ±3px in Inter 13)
+                            // lands in ONE tier — zero neighbor movement — while a much longer or
+                            // shorter path still adapts by stepping whole tiers. 72px ≈ 10-11
+                            // body-font chars: coarse enough that same-pattern names can't straddle
+                            // a boundary. The ladder stays coherent with the title-bar arithmetic:
+                            // at the 384px pill-show (T1) threshold the cap is max(60, 384−324) =
+                            // 60 = the min tier, and over-cap text keeps today's in-pill ellipsis.
+                            // ONLY this outer width changed — text alignment/elide and the click/
+                            // right-click zones (pathta fills the pill) are untouched.
+                            // v0.8.116 (D-A) → v0.8.117 (F4, CORRECTED): the ladder measures the FULL
+                            // string, never the shown tier. v0.8.116 fed it `pathtxt.preferred-width`,
+                            // which is the CHOSEN tier — so at the FULL→MIDDLE seam the rung dropped a
+                            // whole band in ONE pixel of window resize: with the round's own measured
+                            // full ≈ 270 / mid ≈ 116, width went min(276,274)=274 → min(132,273)=132, a
+                            // 142px collapse that shifted every title-bar chip 71px in a single frame
+                            // (the pill's own unmount seam, the worst that existed before, moves them
+                            // 34px). The sentence that stood here — "the cluster stays as still as
+                            // ever" — asserted the opposite of what it shipped.
+                            // THE GRAMMAR IS HudChip's `widest-a`: ONE STABLE FRAME, sized by the
+                            // widest string that frame can ever hold (the full path), with the shorter
+                            // tiers CENTRED inside it ("The label CENTRES inside the fixed frame",
+                            // hud.slint) — pathtxt is already width:100% + horizontal-alignment:center,
+                            // so a tier change is a text swap and nothing moves. The width chain is
+                            // therefore byte-identical to v0.8.115's again — same 72px quantisation,
+                            // same 4px slack, same cap clamp — and the cluster slides 0.5px per px of
+                            // drag through the seam instead of jumping.
+                            property <length> path-tier: 60px + Math.ceil(max(0px, hudclip.pill-full-w + 4px - 60px) / 72px) * 72px;
+                            width: min(self.path-tier, hudclip.pill-cap);
+                            height: 26px;
+                            opacity: hudclip.pill-eff; // v0.8.87: fade-in on the T1 seam (the per-edge twin grammar; unmount stays instant)
+                            // v0.8.50 (G1 trigger, owner option (b) 2026-07-16) → v0.8.192 (owner
+                            // order): the pill's click is CLICK-TO-COPY again. For 142 versions it was
+                            // the grid-dock toggle and the copy lived on a right-click menu; v0.8.52
+                            // then gave the bar its two SectionChips (filmstrip / grid) immediately
+                            // left of this pill, and the edge pills remain the primary grid reveal — so
+                            // the pill's click had been a THIRD route to the same dock. It goes back to
+                            // the one job nothing else on screen does: copy the current photo's full
+                            // path (the UNCHANGED `copy-path` callback, same payload, same toast).
+                            // Hover keeps the IconBtn wash (existing Theme hover token) + a Tip-channel
+                            // tooltip naming the action (the pill lives inside hudclip's clip, so the
+                            // window-root tiplayer is the only tooltip that can show below the bar).
+                            property <string> pill-tip: hudclip.path-tip; // v0.8.117: full path + the action label (composed on hudclip); v0.8.192: was `grid-tip` — renamed with the click (L42: the name said grid, the bytes said copy)
+                            // v0.8.118 (V1) -- A DYNAMIC TIP MUST RE-PUBLISH ON THE FLIP. v0.8.117 made this tip
+                            // carry `path-text`, which is rewritten on EVERY shot change, while BOTH ownership
+                            // guards -- pathta's unhover branch below and the L22 unmount clear above -- clear only
+                            // a tip they STILL own, i.e. one equal to the CURRENT expression. So a browse step with
+                            // the pointer resting on the pill (hovering does not move focus off `keys`, so Left/
+                            // Right still step) left the rendered tooltip naming the PREVIOUS photo -- the one thing
+                            // the rider was added to make readable -- AND stranded it: both compares missed, and
+                            // `tiplayer` shows on `Tip.text != ""` alone, so it stayed up until some other host
+                            // hovered. This is the v0.8.53 SectionChip class exactly ("a SectionChip tip is DYNAMIC
+                            // ... the unhover guard could never reclaim the pre-flip string"), so it takes that
+                            // fix's grammar: re-publish WHILE WE ARE THE HOVERED HOST, which refreshes what the
+                            // reader sees and restores channel ownership in one move. NEVER an unconditional write
+                            // or clear -- another Tip host may own the channel while this one is merely mounted.
+                            // cx is deliberately NOT re-published here: it is a HOVER-EDGE fact (the pointer
+                            // entering this host), and a change handler runs before the layout has re-solved the
+                            // new tier's width, so it would publish a centre the compositor has not produced yet.
+                            changed pill-tip => { if (pathta.has-hover) { Tip.text = self.pill-tip; } }
+                            border-radius: Theme.radius-sm;
+                            background: pathta.has-hover ? Theme.hover : transparent;
+                            animate background { duration: Theme.anim; easing: ease; }
+                            pathtxt := Text {
+                                width: 100%; height: 100%;
+                                // v0.8.116 (D-A): the chosen tier, not the raw path (see hudclip's
+                                // `path-shown`). v0.8.117 (F1/F3): `overflow: elide` is the backstop for
+                                // the MIDDLE tier at the very narrowest widths — the folder arm is taken
+                                // only when the folder measures clean, so the string that truncates is
+                                // the one that still names the photo.
+                                text: hudclip.path-shown;
+                                horizontal-alignment: center; vertical-alignment: center;
+                                color: pathta.has-hover ? Theme.text : Theme.text-dim;
+                                font-size: Theme.font-body; overflow: elide;
+                            }
+                            pathta := TouchArea {
+                                // v0.8.119 (design-sweep O36): DEAD in the empty state. On the default
+                                // first run the bar shows a centred pill reading the folder name —
+                                // indistinguishable from a window title in every other app — and
+                                // clicking it did three things, none of them visible: it dismissed the
+                                // first-run welcome AND latched onboarding-shown (so it never returns
+                                // on its own), it flipped `grid-open` and persisted that preference,
+                                // and it showed nothing, because the grid dock and BOTH edge-pill
+                                // reveals already carry `!empty-state`. The pill STAYS MOUNTED (it
+                                // names the folder, which is worth reading with zero shots) but stops
+                                // being an affordance: no hover wash, no pointer cursor, no tooltip
+                                // (`has-hover` cannot go true on a disabled TouchArea, so the two
+                                // Tip-channel writers below simply never fire), no welcome dismissal
+                                // and no persisted write. The tip's promise — "Copy path" — is false
+                                // only in this state and is gone by construction here, not by a second
+                                // literal that could drift.
+                                // v0.8.192: the gate KEEPS its job under the click's new payload. A pill
+                                // naming a folder with zero shots has no CURRENT PHOTO whose path could
+                                // be copied, so a click here would reach `on_copy_path`'s honest else-arm
+                                // and post "No photo open — nothing to copy" over a bar that is showing a
+                                // real path. The Rust else-arm stays the backstop (it also covers the
+                                // mid-swap race this gate cannot see); this is what stops the click.
+                                enabled: !root.immersive && !root.empty-state; mouse-cursor: pointer;
+                                // v0.8.192 (owner order): LEFT click = copy the path. `close-bar-menus`
+                                // stays — every bar control calls it (Y75), and the sort / Open menus are
+                                // still openable beside this pill. `welcome-open = false` stays for the
+                                // v0.8.68 FIX 4 reason, which applies to the confirmation TOAST exactly as
+                                // it applied to the dock: toasts draw UNDER the welcome scrim, so a copy
+                                // made through the first-run panel would confirm itself invisibly.
+                                clicked => { root.action("copy-path", 0, root.height / 1px); }
+                                // delayed tooltip — the IconBtn Tip-channel grammar (observer on the owner;
+                                // the unhover branch only clears a tip it still owns).
+                                changed has-hover => {
+                                    if (self.has-hover) { Tip.text = parent.pill-tip; Tip.cx = self.absolute-position.x + self.width / 2; }
+                                    else if (Tip.text == parent.pill-tip) { Tip.text = ""; }
+                                }
+                            }
+                        }
+                    }
+                    if root.count-all > 0 && hudclip.chips-show && root.hud-pos != "" : VerticalLayout {
+                        alignment: center;
+                        HudChip {
+                            hit: !root.immersive && !root.modal-blocking;
+                            opacity: hudclip.chips-eff * (root.modal-blocking ? 0.35 : 1.0); // same gate/mute as adjacent chips
+                            tip: "Position in folder — sorting"; // G11 (v0.8.44): delayed tooltip; v0.8.49: the chip opens the sort menu now
+                            label: root.hud-pos;
+                            // v0.8.58 (owner): folder-derived frame — browsing never re-sizes it
+                            widest-a: root.hud-pos-widest-a;
+                            widest-b: root.hud-pos-widest-b;
+                            // v0.8.49: opens the anchored sort menu. The v0.8.38 G7 re-centre action
+                            // moved to the menu's FIRST item ("Scroll to current") — still one click
+                            // away, and the menu names what the click used to do silently.
+                            // v0.8.66 (C3 audit): opening the sort menu closes the sibling title-bar
+                            // menus too (was one-way — only the Open menu closed the others).
+                            // v0.8.120 (Y75): the second hand-rolled site becomes a call to the one function.
+                            clicked => { root.action("sort", self.ax / 1px, root.height / 1px); }
+                        }
+                    }
+                    if root.count-all > 0 && hudclip.chips-show : VerticalLayout {
+                        alignment: center;
+                        HudChip {
+                            hit: !root.immersive && !root.modal-blocking;
+                            opacity: hudclip.chips-eff * (root.modal-blocking ? 0.35 : 1.0); // M6 gate + M7 fade-in + v0.8.121 (F10) P5 mute
+                            // v0.8.119 (design-sweep Y53): the cluster's own grammar — every
+                            // other clickable chip beside this one names its ACTION ("Hide
+                            // filmstrip", "Position in folder — sorting", the path pill's
+                            // "Copy path"). These two named the
+                            // datum only, so the one affordance the tip exists to teach —
+                            // click to open Selection — stayed undiscovered.
+                            tip: "Picks — open Review"; // G11 (v0.8.44): delayed tooltip
+                            // v0.8.121 (F10): P5 mute + the hit gate, so the dead state is VISIBLE
+                            // rather than discovered by clicking (HudChip has no `enabled` of its
+                            // own, and the call site already owns this chip's opacity).
+                            icon: 1; label: root.count-picks;
+                            // v0.8.58 (owner): digit-count-quantized frame — a cull inside the same
+                            // digit count moves nothing (count changes are rare; same tier principle)
+                            widest-a: root.count-picks >= 1000 ? "8888" : (root.count-picks >= 100 ? "888" : (root.count-picks >= 10 ? "88" : "8"));
+                            widest-b: root.count-picks >= 1000 ? "0000" : (root.count-picks >= 100 ? "000" : (root.count-picks >= 10 ? "00" : "0"));
+                            clicked => { root.action("picks", 0, root.height / 1px); } // v0.8.120 (Y75): the shared bar-menu close; v0.8.121 (F10): the SHARED, modal-gated open body
+                        }
+                    }
+                    if root.count-all > 0 && hudclip.chips-show : VerticalLayout {
+                        alignment: center;
+                        HudChip {
+                            hit: !root.immersive && !root.modal-blocking; // v0.8.121 (F10): the twin of the picks chip above
+                            opacity: hudclip.chips-eff * (root.modal-blocking ? 0.35 : 1.0); // M6 gate + M7 fade-in + v0.8.121 (F10) P5 mute
+                            tip: "Rejects — open Review"; // G11 (v0.8.44): delayed tooltip (v0.8.119 Y53: names the click, as its twin above)
+                            icon: 2; label: root.count-rejects;
+                            // v0.8.58 (owner): digit-count-quantized frame (the picks chip's twin)
+                            widest-a: root.count-rejects >= 1000 ? "8888" : (root.count-rejects >= 100 ? "888" : (root.count-rejects >= 10 ? "88" : "8"));
+                            widest-b: root.count-rejects >= 1000 ? "0000" : (root.count-rejects >= 100 ? "000" : (root.count-rejects >= 10 ? "00" : "0"));
+                            clicked => { root.action("rejects", 0, root.height / 1px); } // v0.8.120 (Y75): the shared bar-menu close; v0.8.121 (F10): the SHARED, modal-gated open body
+                        }
+                    }
+                    }
+                }
+                // ── v0.8.191 (H1, the app-wide hairline sweep): the app's LONGEST rule. ─────────
+                // Window-absolute device y 64.5 in EVERY window state and at every size (the bar
+                // overlay starts at 0, is 44 tall, and the rule sits at 43 × 1.5). A 1px AA-OFF
+                // plain fill spans 1.5 device rows, so a far edge at 66.0 lands exactly on a
+                // sample centre — in when the frame is drawn through the restored window's
+                // offscreen texture (femtovg flips Y), out when it is drawn direct at maximized:
+                // TWO device rows maximized, ONE restored. The filmstrip's top rule below sits at
+                // H − 102, so — MEASURED, not taken from the audit's merge, which said "always an
+                // integer" — its device row is WHOLE at an EVEN logical window height (1197.0 at
+                // H 900) and HALF at an odd one (1198.5 at H 901). At even heights the two longest
+                // rules in the app were therefore at opposite phases and disagreed 2:1 in BOTH
+                // window states, swapping roles on maximize; at odd heights they agreed. Neither
+                // phase is safe: 1px at 150% is 1.5 device px and always puts ONE edge on a sample
+                // centre, so there is no lucky window size. The shared `AaHairline` is an
+                // anti-aliased STROKE and is invariant under the flip at any phase; the slot is
+                // byte-identical to the fill it replaces.
+                barrule := AaHairline { y: parent.height - 1px; height: 1px; width: 100%; tint: Theme.divider; }
+
+}

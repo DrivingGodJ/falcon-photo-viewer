@@ -1,0 +1,10 @@
+[package]
+name = "falcon-color"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Parallel per-pixel transform — a 45 MP sRGB→P3 convert is ~300 ms single-threaded (it runs on every
+# on-stop detail frame when the output gamut differs from the source), ~40 ms across the pool.
+rayon = "1"

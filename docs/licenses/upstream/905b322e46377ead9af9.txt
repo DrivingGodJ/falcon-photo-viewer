@@ -1,0 +1,2 @@
+// Ported from libjxl. log_alphabet_size <= 8 and log_bucket_size <= 7, so u8 is sufficient for
+// symbols and cutoffs. alias_dist_xor allows branchless dist computation for alias symbol.

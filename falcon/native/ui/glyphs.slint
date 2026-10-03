@@ -1,0 +1,601 @@
+// v0.9.5 (ui.rs extraction series): the small Path/icon glyph primitives extracted
+// VERBATIM from the slint! macro in src/ui.rs. `export` added — they were
+// macro-file-local; importers (the macro + sibling ui/*.slint files) pull them by name.
+
+import { Theme } from "theme.slint";
+
+    // ══ v0.8.190 (OWNER RULING 08-15) — THE 1px ANTI-ALIASED HAIRLINE: THE APP'S ONE SPELLING. ══
+    // The owner judged the three v0.8.189 comparison cells and ruled: *"I have tested these options,
+    // and I prefer the '1px aa' option the best, so apply it to both the filmstrip underline and the
+    // grid rule line. Though there is a weird bug with this mode where the length of the underline
+    // is shorter than other modes, so fix it"*. So the toggles are retired, BOTH glyph lines ship
+    // this drawing, the frames stay 1px — and the length bug is fixed here, geometrically.
+    //
+    // THIS BANNER IS THE ONE NARRATIVE. Every other host — `MinimizeIcon`, `FilmFrameBlock`,
+    // `GridGlyph`, panels.slint's `HRule`, menu.slint's `MenuSep`, filmstrip.slint's `BriefSep`,
+    // hud.slint, edges.slint, theme.slint and the TEN mounts in main_window.slint (barrule,
+    // fsrule, dockdiv, cmpdiv1, cmpdiv2, evdiv and the four watermark guides) — carries a
+    // pointer line and nothing more: three copies of one story is how the v0.8.188/v0.8.189
+    // banners started disagreeing with each other.
+    //
+    // ── WHY A BORDERED RECT DRAWS A HAIRLINE AT ALL (read from the renderer, not assumed:
+    //    i-slint-renderer-femtovg 1.17.0 + femtovg 0.25.1, both on disk). ─────────────────────────
+    // A Rectangle with an OPAQUE border enters `draw_border_rectangle` (itemrenderer.rs:233) and is
+    // STROKED with anti-aliasing ON, where a plain fill goes through `draw_rectangle` and is filled
+    // `with_anti_alias(false)` (:229). `adjust_rect_and_border_for_inner_drawing` (:272 → :142) then
+    // clamps to `min(bw, WIDTH/2)` (:147 — WIDTH, on both axes) and moves the origin by bw/2 while
+    // shrinking the size by bw (:150-151), so a 1px-tall band becomes a ZERO-HEIGHT rect;
+    // `rounded_rect` emits a plain degenerate contour (radius 0 → the `< 0.1` branch) and
+    // `stroke_path` walks it at the border width. The covered span is the same 1.5 device rows a
+    // plain fill covers — anti-aliased instead of not, and therefore INVARIANT under the
+    // offscreen-texture Y flip a restored window renders through (L46). That flip is what made the
+    // plain 1px fill read ONE device row maximized and TWO restored: the report this family of
+    // rounds started from, and the reason this spelling is the one that ships.
+    //
+    // ── THE LENGTH BUG, AND THE FIX (the owner's "shorter"). ─────────────────────────────────────
+    // The inset is written for a CLOSED outline, so it insets on both axes — including the LONG one.
+    // femtovg's `calculate_joins` (path/cache.rs) sees the degenerate contour's two ends as 180°
+    // reversals (dmpos = 0 ⇒ INNERBEVEL + BEVEL with dmr2 = 0, never LEFT), and `bevel_join`'s
+    // else-branch emits its vertices at p1's OWN position ± the orthogonal: THE INK IS HARD-CUT at
+    // the inset positions. A 22×1 logical line at 150% is 33 × 1.5 device with bw 1.5, so the walk
+    // ran device x [0.75, 32.25] where the frames span [0, 33]. THE END COLUMNS DID NOT VANISH —
+    // this is an anti-aliased stroke, so column 0 kept only the quarter of its area the walk still
+    // covered (~25% coverage against a full column) and column 32 the same, while the frames' own
+    // strokes paint both to full. Two columns of INK short, one at each end — which is why the
+    // owner read it as "shorter" rather than as two missing pixels.
+    // THE FIX IS ONE LINE OF INTENT: over-size the bordered child by exactly bw ALONG THE LONG AXIS
+    // so the all-round inset lands the hard cuts on the SLOT's edges — `x: -weight/2` with
+    // `width: parent.width + weight` gives device origin −0.75 and width 34.5, which insets to exactly
+    // [0, 33]. The SHORT axis is untouched: [39.0, 40.5] is the span the owner approved. No renderer
+    // change, no clamp involved (22px ≫ bw), no class change.
+    //
+    // ── WHY VERTICAL IS THE SAME ELEMENT ROTATED, NOT A 1px-WIDE TWIN. ───────────────────────────
+    // The clamp above is on WIDTH whichever way the ink runs, so a 1px-WIDE bordered rect clamps bw
+    // to 0.75 and is drawn as its own OUTLINE — two adjacent 0.75-device strokes: a different
+    // drawing from identical bytes (an L42 instance, and the reason v0.8.189 had no AA cell for the
+    // grid rule). The owner asked for the SAME line, so the rule is this element turned a quarter
+    // turn. Slint lowers `transform-rotation` into a `Transform` item whose render is
+    // translate(origin)·scale·rotate·translate(−origin) followed by ContinueRenderingChildren
+    // (i-slint-core items.rs) — NO layer, NO offscreen texture — and femtovg caches the path THROUGH
+    // the transform before expanding the stroke (itemrenderer's `rotate` is a canvas transform), so
+    // the walk, the hard cuts and the partial-column ramp all transpose exactly. cos(90°) in f32 is
+    // −4.4e-8: sub-1e-4-px error at any title-bar coordinate, and the direction of rotation is
+    // irrelevant (the band is symmetric about its centre). This matters to the EYE, not just to the
+    // argument: the double-walked contour carries a denser (~75%) partial column than the frames'
+    // single-fringe 50% edges, and the owner chose the denser one.
+    //
+    // ── L47, WHICH IS WHY THESE ARE TWO CONDITIONAL SIBLINGS AND NOT ONE ELEMENT. ────────────────
+    // `resolve_native_classes.rs` builds its property set from `elem.bindings.keys()` — the PRESENCE
+    // of a binding, never its value (its own unit test asserts `["border-width"] ->
+    // "BasicBorderRectangle"`), and that class's render is unconditional. A class-selecting ternary
+    // is therefore not a thing that exists in this language: `vertical` is a MOUNT GATE, and neither
+    // child carries any other class-selecting binding — no border-radius, no clip, no drop-shadow,
+    // no background. Both carry ids so the rig can find whichever one is alive.
+    //
+    // ── v0.8.191: `weight`, AND WHY THE OVER-HANG HAS TO TRACK IT. ────────────────────────
+    // The 08-16 audit found the AA-off plain fill of the paragraph above on EVERY divider, rule
+    // and separator in the app — nine sites, one token (`Theme.divider`) drawn at three different
+    // weights — plus the minus mark, which is this same drawing at the owner's 1.5px. So the
+    // weight is an input now, and every derived number follows it: the child's thickness IS the
+    // weight, the border width IS the weight, and the over-hang is weight/2 at each end. That
+    // last one is not a tidiness: the renderer's inset is bw/2, so a hard-coded 0.5px over-hang
+    // would re-open the owner's length bug at every weight except 1 (at 1.5px it would leave the
+    // ink 0.375 logical px short at each end). Nothing else about the drawing changes.
+    //
+    // ── A HAZARD THIS SPELLING CARRIES, CONFIRMED BY THE v0.8.191 REVIEW AND CLEAN TODAY. ────
+    // The over-hanging child sticks OUT of its slot by weight/2, and a LAYER's origin is its
+    // children's bounding box — so an AaHairline mounted flush against the top or left edge of
+    // a clip+radius host would move that host's blit origin by half a border width, which is
+    // the H20 resampling mechanism, minted by a hairline. Every converted site is clean: each
+    // rule is inset from its host's children bbox by other content, and the two window-wide
+    // rules live under `winroot`, whose layer origin clamps to (0, 0). CHECK IT when mounting
+    // this component flush against a layer host's leading edge.
+    //
+    // THE SLOT is what the host sizes (w × 1 horizontal, 1 × h vertical); the child over-hangs it by
+    // bw/2 on the long axis. Every derived coordinate is pinned in tipgeom_tests.rs, never eyeballed.
+    export component AaHairline inherits Rectangle {          // the SLOT — no background, no border
+        // DEFAULTED like every sibling glyph in this file: an unset brush is TRANSPARENT, and a
+        // transparent border colour makes the renderer take bw to 0 — a hairline that draws NOTHING,
+        // silently. A host that forgets its tint gets the app's hairline grey instead of a hole.
+        in property <brush> tint: Theme.text-mute;
+        in property <bool> vertical: false;
+        in property <length> weight: 1px;   // the NOMINAL weight; the over-hang tracks it (v0.8.191)
+        if !root.vertical : h := Rectangle {
+            x: -root.weight / 2; y: 0px; width: parent.width + root.weight; height: root.weight;
+            border-width: root.weight; border-color: root.tint;
+        }
+        if root.vertical : v := Rectangle {
+            width: parent.height + root.weight; height: root.weight;
+            // centre the pre-rotation band on the slot's centre, then rotate about its OWN centre —
+            // the two coincide, so the rotated inset span is x [0, slot.w] and y [0, slot.h].
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            transform-rotation: 90deg;
+            transform-origin: { x: self.width / 2, y: self.height / 2 };
+            border-width: root.weight; border-color: root.tint;
+        }
+    }
+
+    // v0.8.107 (owner ruling D1): THE expand/collapse chevron. Extracted VERBATIM from the
+    // info/EXIF panel header's own inline Path (main_window.slint's `exbtn1`, which now draws
+    // THIS) so the per-display colour sections reuse the exact icon the info panel already uses —
+    // one drawing, two call sites, no second piece of art to drift.
+    //
+    // v0.8.143 (C3): THE VERTICAL PROPERTY IS `points-down`, AND IT IS NAMED AFTER WHAT IT DRAWS.
+    // It used to be `up`, and `up: true` drew a DOWNWARD V — Slint's y grows downward, so an apex
+    // at y 10 sits BELOW endpoints at y 6. The banner that stood here said the opposite ("`up` =
+    // the section is EXPANDED, the V points up"), and that sentence is where the trap came from:
+    // v0.8.138 took the name at face value and shipped the info panel's arrows backwards. The name
+    // now states the drawing, so there is nothing left to read at face value and get wrong. The
+    // rename was purely textual — every consumer's expression is byte-identical in VALUE.
+    //
+    // THE OWNER'S DIRECTION RULE (2026-08-04), which is what the consumers' expressions encode:
+    // THE ARROW POINTS WHERE THE CONTENT WILL MOVE. A section that extends downward shows DOWN
+    // while collapsed ("it will grow down") and UP while expanded ("it will fold back up"); a
+    // bottom-anchored panel that extends UPWARD is the mirror of that. Same 16-viewbox, same
+    // stroke token, same 14 px box as the original.
+    //
+    // v0.8.119 (owner report, B1-29 (d)): + `left`, the HORIZONTAL direction, so the edge pills'
+    // hide chevrons stop being a third and fourth copy of this drawing. Both pills carried their own
+    // 36px inline Path: the BOTTOM one's coordinates were already byte-identical to the (then)
+    // `up: true` arm below, just drawn in a 36px box (rendered 18x9 instead of 7x3.5), and the LEFT one was the
+    // same polyline rotated 90 degrees. Its numbers (9.5,4 -> 5.5,8 -> 9.5,12) are what the `left`
+    // arm draws, so nothing about the shape is new here - it is the same icon, at the size every
+    // other chevron in the app renders at, which is what "same size like the title bar icons"
+    // asks for. `left` DEFAULTS FALSE, so the two existing call sites (the EXIF panel header's
+    // exbtn1 and the per-display colour sections) are byte-identical in behaviour and untouched.
+    // L41 / SYMMETRY (v0.8.143, C3): THE TWO VERTICAL ARMS ARE NOW EXACT MIRRORS. Both span
+    // y 6..10 about the viewbox centre, so toggling the property flips the ink and moves it
+    // nowhere. The points-down arm used to span 6.5..10.5 — half a viewbox unit low, ~0.44 px in
+    // the 14 px box — so the glyph JUMPED a fraction of a pixel on every expand/collapse, and at
+    // the owner's 150 % scale a .5 coordinate is a half-device-pixel edge for the AA to smear.
+    // All four vertical coordinates are even now, which is the rule the rest of this file keeps.
+    //
+    // v0.8.191 (W7, the owner's title-bar centring report generalised): THE `left` ARM WAS THE
+    // ONE ARM NOT CENTRED ON ITS OWN VIEWBOX. Slint maps the viewbox centre onto the element
+    // box centre, so a polyline off-centre in its 16-viewbox draws off-centre in a perfectly
+    // centred mount — the class W7 corrected on the title bar's folder and bell. The `left`
+    // arm spanned x 5.5..9.5, centre 7.5 against the viewbox's 8: 0.5 units = 0.39 logical =
+    // 0.59 DEVICE px left at 150% (the box is 14px and Slint fits the viewbox into
+    // 14 − stroke = 12.6, so a unit is 0.7875 logical, not 0.875). Now 6..10, centred at 8 —
+    // and that is the exact TRANSPOSE of the vertical arms (x 4..12, y 6..10), so the three
+    // directions are one drawing rotated, which is what this component claims to be.
+    // The left edge pill's hide arrow moves 0.59 device px toward its own centre.
+    export component ChevronGlyph inherits Path {
+        in property <bool> points-down: false; // v0.8.143 (C3): was `up`, which drew the opposite
+        in property <bool> left: false; // v0.8.119: horizontal arm (points LEFT: "collapse me leftward")
+        in property <brush> tint: Theme.text-dim;
+        width: 14px; height: 14px; viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+        MoveTo { x: root.left ? 10 : 4;  y: root.left ? 4  : (root.points-down ? 6 : 10); }
+        LineTo { x: root.left ? 6  : 8;  y: root.left ? 8  : (root.points-down ? 10 : 6); }
+        LineTo { x: root.left ? 10 : 12; y: root.left ? 12 : (root.points-down ? 6 : 10); }
+    }
+
+    // Shared magnifier glyph (lens circle + diagonal handle) — the minimised RAW/zoom panel and
+    // the watermark large-preview button draw the SAME icon (W3b, user request: one icon everywhere).
+    export component MagnifierIcon inherits Rectangle {
+        in property <bool> hot: false;
+        width: 22px; height: 22px;
+        Rectangle {
+            width: 13px; height: 13px; border-radius: 6.5px;
+            x: 2px; y: 2px;
+            border-width: 1.8px; border-color: root.hot ? Theme.text : Theme.text-dim;
+        }
+        // diagonal handle (Slint Rectangles can't rotate, so draw it as a Path line)
+        Path {
+            width: 22px; height: 22px; viewbox-width: 22; viewbox-height: 22;
+            stroke: root.hot ? Theme.text : Theme.text-dim; stroke-width: 1.9px;
+            MoveTo { x: 13; y: 13; }
+            LineTo { x: 19; y: 19; }
+        }
+    }
+
+    // ── v0.8.138 (X3): THE "…" MARK — "there is more of this panel than you are looking at". ────
+    // The info panel's header uses it to reach the FULL EXIF list from the simple and standard
+    // views, and to come back. No ellipsis existed anywhere in the app: the "…" TEXT character is
+    // the same tofu/baseline risk `CloseGlyph` was minted to avoid (and worse — a font's ellipsis
+    // sits ON the baseline, so it would hang low in a centred 28px button), so this is drawn, like
+    // every other mark in this file.
+    //
+    // A GLYPH, NOT A TOKEN. It takes `tint` as a brush and defaults to `Theme.text-dim` — the
+    // colour every other header glyph rests at. The palette is untouched by X3.
+    //
+    // L41, WHICH IS WHY EVERY NUMBER HERE IS EVEN: dots 2x2px on 4px gaps -> pitch 6, so the three
+    // sit at x = 0, 6, 12 and the block is 2 + 4 + 2 + 4 + 2 = 14px. Every coordinate, every size
+    // and the pitch are even, so at the owner's 150% scale they land on device x = 0, 9, 18 with a
+    // 3-device-px dot each — the three dots rasterise IDENTICALLY, which is the whole lesson X4
+    // learned the hard way on the filmstrip block one screen down. 14px is also the `ChevronGlyph`
+    // box exactly, and the two sit side by side in the EXIF header, so they read as one family.
+    // The dots are ROUND (radius 1 on a 2px square = a circle); `GridDotBlock`'s are square because
+    // it is drawing a grid of PHOTOGRAPHS, and this is drawing punctuation.
+    export component EllipsisGlyph inherits HorizontalLayout {
+        in property <brush> tint: Theme.text-dim;
+        width: 14px; height: 2px; spacing: 4px;
+        Rectangle { width: 2px; height: 2px; border-radius: 1px; background: root.tint; }
+        Rectangle { width: 2px; height: 2px; border-radius: 1px; background: root.tint; }
+        Rectangle { width: 2px; height: 2px; border-radius: 1px; background: root.tint; }
+    }
+
+    // Shared minimise mark (a drawn "−" bar, not a font glyph) — the EXIF fold, the RAW/zoom
+    // fold, and the watermark large view all use this one mark (W3b, user request).
+    //
+    // ── v0.8.138 (X1, owner report): ONE CANONICAL MINUS, PIXEL-TRUE. ──────────────────────────
+    // He put the EXIF panel's "−" beside the RAW/zoom panel's and asked whether they were
+    // "actually different or AA?". They were already the SAME component in the same 28x28 IconBtn,
+    // so the answer was AA — and the cause was this declaration plus the centring at each mount:
+    //   * a 1-LOGICAL-px bar has no whole-device-pixel rendering below 200% scale. At the owner's
+    //     150% it is 1.5 device rows, so the rasteriser splits it across two rows at whatever
+    //     weights the bar's subpixel origin dictates — and that origin differs per panel, because
+    //     each of these panels FLOATS at an x/y solved from the stage size and lands on a
+    //     different fractional offset. Same bar, two greys. 1.5px is the weight the dead
+    //     PanelHeader twin below intended and sits beside `Theme.icon-stroke` 1.4px, so the mark
+    //     now has ink to spare at every scale instead of living on the rounding boundary.
+    //   * the centring was `(28 - 11) / 2 = 8.5` and `(28 - 1) / 2 = 13.5` — a HALF-pixel origin
+    //     minted at the mount, which is the other half of the same defect. Every mount now FLOORS
+    //     to a whole logical px (L41: "every centring proven integer or floored").
+    //
+    // ── v0.8.191: WHAT THE FLOOR DID NOT BUY, AND WHAT DOES. ───────────────────────────
+    // The sentence that stood here — "so the bar starts on a logical-pixel boundary and rasterises
+    // identically wherever it is drawn" — was FALSE, and the 08-16 audit measured why. A whole
+    // LOGICAL origin is a whole DEVICE origin at 150% only when it is EVEN, and the floors land on
+    // 13 (28px box) and 19 (40px box), both odd — device 19.5 and 28.5. A 1.5px plain fill is 2.25
+    // device rows, so from a half-integer origin it covered 3 hard rows drawn direct and 2 through
+    // the restored window's offscreen texture (the L46 Y flip), while its cell-mate `CloseGlyph`
+    // — an anti-aliased Path stroke — sat soft and identical in both states beside it. The mark
+    // was the highest-contrast plain fill in the app (`text-dim` on the bar wash) and the owner has
+    // reported this glyph twice.
+    // SO IT IS THE SHARED `AaHairline` NOW, AT weight 1.5px: the same 11 × 1.5 box, the same floored
+    // mounts, the same nominal weight the owner ruled in v0.8.138 — drawn as an anti-aliased STROKE
+    // instead of an AA-off fill. It is flip-invariant BECAUSE it is a stroke (`draw_border_rectangle`
+    // is unconditional about that), not because of the floor; the floor stays because a fractional
+    // logical origin is still a defect of its own, and because it is what keeps the three mounts
+    // identical to each other. The over-hang is weight/2 = 0.75px at each end, so the 11px of ink
+    // the owner sees is 11px and not 10.25 — the length bug he reported on the filmstrip underline,
+    // avoided here by construction. `AaHairline`'s banner at the top of this file has the whole
+    // mechanism; nothing of it is restated here.
+    // The width stays 11px (odd) deliberately: it is the mark's LOOK, the owner has never
+    // complained about it, and the floor at each mount is what L41 asks of an odd box.
+    //
+    // AND THE CENTRING LIVES HERE, ONCE. Every mount used to repeat
+    // `x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2` at the call site,
+    // which is four places for one rule to be got wrong in and the reason two of them could differ
+    // at all. The component now centres ITSELF inside a declared square `box` (the button it sits
+    // in), so a mount says only which button it is — `MinimizeIcon { }` for the 28px IconBtns,
+    // `MinimizeIcon { box: 40px; }` for the watermark's 40px square — and there is exactly one
+    // floor expression in the codebase for exactly one minus mark.
+    export component MinimizeIcon inherits AaHairline {
+        in property <bool> hot: false;
+        in property <length> box: Theme.hit-primary;  // the square button this mark centres inside
+        weight: 1.5px;
+        width: 11px; height: root.weight;   // the box IS the weight on the short axis: ONE derivation
+        // L41 floors. 28px box → x = floor(8.5) = 8, y = floor(13.25) = 13;
+        //             40px box → x = floor(14.5) = 14, y = floor(19.25) = 19.
+        x: Math.floor((root.box - self.width) / 2 / 1px) * 1px;
+        y: Math.floor((root.box - self.height) / 2 / 1px) * 1px;
+        tint: root.hot ? Theme.text : Theme.text-dim;
+    }
+
+    // ONE canonical dismiss X (16-viewbox, drawn Path — the "×"/"✕" TEXT glyphs are tofu-risk in
+    // Inter and sat off-baseline). PanelHeader draws it 16px-in-28 (v0.8.138 / X2 — was 12, and the
+    // owner's users found it "too small… match the title text"); the toast / event-row 26px dismiss
+    // squares draw it 11px (their own ~0.43 glyph:button ratio, deliberately NOT swept). G7, v0.8.44.
+    export component CloseGlyph inherits Path {
+        in property <color> tint: Theme.text-dim;
+        viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+        MoveTo { x: 4; y: 4; } LineTo { x: 12; y: 12; }
+        MoveTo { x: 12; y: 4; } LineTo { x: 4; y: 12; }
+    }
+
+    // v0.8.4: rotate glyph redrawn as a smooth circular ARC (user reference: the classic
+    // redo icon — an open ring sweeping ~275° with a clean FILLED arrowhead at the top-right
+    // gap). The v0.8.0 MoveTo/LineTo polyline rendered as an angular, crunchy "C" at 13–14px
+    // (the ctx-menu pixelation the user photographed). Structure: a Rectangle wrapper holding
+    // TWO Paths, because one Path = one paint — the ring must be STROKED while the head is
+    // FILLED (filling an open arc would paint its chord like a pie slice). Stroke 1.3 → 1.6px
+    // (femtovg stroke-width is LOGICAL px × window scale, NOT viewbox-scaled — the geometry
+    // fits to width/height but the stroke weight stays as written).
+    // Geometry (16-viewbox, circle c=(8,8) r=5.2, screen y-down): gap centred at 315° spanning
+    // 85°; the CW ring runs 357.5° → 272.5° (large-arc=1 because 275° > 180°; sweep=1 =
+    // clockwise in y-down SVG coords); the head sits at the arc end (top) pointing along the
+    // CW travel tangent (+x, into the gap), its base covering the stroke butt.
+    export component RotateGlyph inherits Rectangle {
+        in property <color> tint: Theme.text;
+        Path {
+            width: 100%; height: 100%;
+            viewbox-width: 16; viewbox-height: 16;
+            stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+            commands: "M 13.2 7.77 A 5.2 5.2 0 1 1 8.23 2.8";
+        }
+        Path {
+            width: 100%; height: 100%;
+            viewbox-width: 16; viewbox-height: 16;
+            // v0.8.5: stroke-width MATCHES the ring even though the stroke is invisible -
+            // Slint fits each Path into (size - its OWN stroke-width) offset by stroke/2
+            // (i-slint-core items/path.rs fitted_path_events), so a 0-width head lived in a
+            // 13x13 box while the 1.6-width ring lived in 11.4x11.4 @ +0.8: the head drew
+            // +14% large and 0.52px above the arc end, mirrored L/R between CW and CCW -
+            // the pair read as two DIFFERENT designs. One shared transform = true mirror twins.
+            fill: root.tint; stroke: transparent; stroke-width: Theme.icon-stroke;
+            commands: "M 8 0.7 L 11.7 2.8 L 8 4.9 Z";
+        }
+    }
+
+    // v0.8.4: CCW = x-reflection about the viewbox midline (x' = 16 − x) — and UNLIKE the old
+    // polyline mirror (v0.8.1: "no sweep flags to flip"), an SVG arc carries its orientation
+    // IN the sweep flag: reflection reverses chirality, so sweep flips 1 → 0 (an endpoint-only
+    // mirror keeps turning CW and draws the ring bulging through the WRONG side). large-arc is
+    // metric (275° > 180°), reflection-invariant, stays 1. The head's winding reverses too —
+    // harmless for a single closed subpath under nonzero fill.
+    export component RotateGlyphCCW inherits Rectangle {
+        in property <color> tint: Theme.text;
+        Path {
+            width: 100%; height: 100%;
+            viewbox-width: 16; viewbox-height: 16;
+            stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+            commands: "M 2.8 7.77 A 5.2 5.2 0 1 0 7.77 2.8";
+        }
+        Path {
+            width: 100%; height: 100%;
+            viewbox-width: 16; viewbox-height: 16;
+            // v0.8.5: stroke-width MATCHES the ring even though the stroke is invisible -
+            // Slint fits each Path into (size - its OWN stroke-width) offset by stroke/2
+            // (i-slint-core items/path.rs fitted_path_events), so a 0-width head lived in a
+            // 13x13 box while the 1.6-width ring lived in 11.4x11.4 @ +0.8: the head drew
+            // +14% large and 0.52px above the arc end, mirrored L/R between CW and CCW -
+            // the pair read as two DIFFERENT designs. One shared transform = true mirror twins.
+            fill: root.tint; stroke: transparent; stroke-width: Theme.icon-stroke;
+            commands: "M 8 0.7 L 4.3 2.8 L 8 4.9 Z";
+        }
+    }
+
+    // Cull glyphs (vector, 16×16 viewbox) — a FLAG for pick (matches the title-bar Selection button)
+    // and a FILE-ARCHIVE box for reject. Drawn as strokes so they read crisply at badge size; set
+    // `col` to the wanted colour. Used on the filmstrip + Selection-panel badges and the PICK buttons.
+    // ── v0.8.196 (EFFICIENCY WAVE 2, §C — OWNER RULING 2026-09-02) — THE LEAF. ──────────────────
+    // *"for the 'speed indicator' I mean the one on the title bar; one potential way to do it is to
+    // shrink the length of this indicator so that the leaf can fit into the same exact width"* — so
+    // the title bar's cache/preload meter hosts this glyph at its leading edge while the efficiency
+    // posture is engaged, and its own track shortens by exactly the leaf plus one gap. The meter's
+    // OUTER footprint does not move: the 62 px cell, the 286 px `hudclip` reservation, the 40x44
+    // bar cells, the four tiers and every other number in the title-bar geometry contract are
+    // untouched by this round.
+    //
+    // L41 AND ITS ADDENDA, PAID: the drawing is an ANTI-ALIASED stroke, so it takes the EXACT centre
+    // rather than an even-grid snap (the even-snap rule is for plain fills), and the polyline is
+    // centred in its own viewbox — bbox x 3.5..12.5, y 3.5..12.5, centre (8, 8) on both axes, which
+    // is the viewbox's own centre. The MOUNT box is even (12 px) and its host offset is even too, so
+    // the mount chain's parity is whole from the bar cell down (L46). Marks are ≥1.5 logical px: the
+    // stroke is `Theme.icon-stroke` (1.4 px, LOGICAL — FemtoVG does not scale stroke by the viewbox)
+    // and no segment is shorter than 3 viewbox units ≈ 2.25 logical px at this mount size.
+    //
+    // The shape is a leaf outline — two mirrored polyline edges from base to tip — plus the midrib,
+    // which is the straight base→tip diagonal the two edges bow away from. Three-segment edges
+    // rather than curves for the reason every other glyph here is a polyline: this file's drawings
+    // are read and adjusted by coordinate, and a bezier's bbox is not its control points.
+    // **Owner veto: the drawing and the tint.**
+    // ── v0.8.196 FIX TAIL (skeptic B, O1 — RULED): THE LEAF IS FILLED. ─────────────────────
+    // The round's first cut was an OUTLINE: two mirrored polyline edges plus the midrib, three
+    // parallel 1.4 px strokes inside a 5.6 px band. The arithmetic was right and the RESULT was not
+    // — the glyph mounts at 12 px in a 16 viewbox, so its geometry scales by 0.75 while
+    // `Theme.icon-stroke` does not (FemtoVG strokes are LOGICAL px, `theme.slint`), leaving **0.72
+    // logical px of background** between the midrib and each edge. Three 1.4 px strokes with 0.72 px
+    // gaps merge under AA into a solid mark: the likely read at 100 % was a small green diagonal
+    // slash, not a leaf. Every other glyph in that bar row is drawn at viewbox scale 1.0.
+    //
+    // So the body is one CLOSED FILLED path and the stem is one stroke, which is what survives AA at
+    // this size and what most 12 px eco glyphs are. L41 still holds and is re-derived here: the fill
+    // is anti-aliased (only axis-aligned `Rectangle` fills take the non-AA path), so it takes the
+    // EXACT centre rather than an even-grid snap; the combined bbox is x 3.5…12.5 and y 3.5…12.5, so
+    // its centre is (8, 8) — the viewbox's own — on both axes; the mount box stays EVEN at 12 px; and
+    // the narrowest feature is now the body itself (≈4.2 logical px across) rather than a 0.72 px
+    // gap. **Owner veto: the drawing and the tint.**
+    export component LeafGlyph inherits Rectangle {
+        in property <color> tint: Theme.leaf;
+        // the blade: base (5, 11) → over the top → tip (12.5, 3.5) → back under → close
+        Path {
+            x: 0; y: 0; width: 100%; height: 100%;
+            viewbox-width: 16; viewbox-height: 16;
+            fill: root.tint; stroke: transparent; stroke-width: 0px;
+            MoveTo { x: 5; y: 11; } LineTo { x: 6; y: 6.5; } LineTo { x: 8.5; y: 4; }
+            LineTo { x: 12.5; y: 3.5; } LineTo { x: 11.5; y: 8; } LineTo { x: 9; y: 10.5; }
+            LineTo { x: 5; y: 11; } Close { }
+        }
+        // the stem, and the ONLY stroke in the drawing
+        Path {
+            x: 0; y: 0; width: 100%; height: 100%;
+            viewbox-width: 16; viewbox-height: 16;
+            stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+            MoveTo { x: 3.5; y: 12.5; } LineTo { x: 5; y: 11; }
+        }
+    }
+
+    export component FlagGlyph inherits Path {
+        in property <color> tint: Theme.text;
+        viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+        MoveTo { x: 4; y: 2.5; } LineTo { x: 4; y: 14; }
+        MoveTo { x: 4; y: 3; } LineTo { x: 13; y: 3; } LineTo { x: 10.5; y: 6; } LineTo { x: 13; y: 9; } LineTo { x: 4; y: 9; }
+    }
+
+    export component ArchiveGlyph inherits Path {
+        in property <color> tint: Theme.text;
+        viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+        // lid
+        MoveTo { x: 2.6; y: 3.4; } LineTo { x: 13.4; y: 3.4; } LineTo { x: 13.4; y: 6.4; } LineTo { x: 2.6; y: 6.4; } LineTo { x: 2.6; y: 3.4; }
+        // body (under the lid)
+        MoveTo { x: 3.7; y: 6.4; } LineTo { x: 3.7; y: 13; } LineTo { x: 12.3; y: 13; } LineTo { x: 12.3; y: 6.4; }
+        // drawer handle
+        MoveTo { x: 6.4; y: 9.3; } LineTo { x: 9.6; y: 9.3; }
+    }
+
+    // Broken-image glyph — a picture frame + mountain with a "not available" slash. Shown on a tile
+    // (filmstrip / Selection) and the stage for a recognised-but-undecodable source (unsupported badge).
+    export component UnsupportedGlyph inherits Path {
+        in property <color> tint: Theme.text-mute;
+        viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+        // picture frame
+        MoveTo { x: 2; y: 3; } LineTo { x: 14; y: 3; } LineTo { x: 14; y: 13; } LineTo { x: 2; y: 13; } LineTo { x: 2; y: 3; }
+        // mountain skyline
+        MoveTo { x: 2; y: 11; } LineTo { x: 6; y: 7; } LineTo { x: 9; y: 10; } LineTo { x: 11; y: 8; } LineTo { x: 14; y: 11; }
+        // diagonal slash
+        MoveTo { x: 3; y: 13.5; } LineTo { x: 13.5; y: 2.5; }
+    }
+
+    // v0.8.44 (G9): cloud outline (the Feather "cloud" path, scaled 24→16 viewbox) — the CALM glyph
+    // for a cloud-placeholder shot that simply hasn't downloaded yet (a transient, self-healing
+    // state; the broken-image glyph + amber stay reserved for genuine decode failures).
+    export component CloudGlyph inherits Path {
+        in property <color> tint: Theme.text-dim;
+        viewbox-width: 16; viewbox-height: 16;
+        stroke: root.tint; stroke-width: Theme.icon-stroke; fill: transparent;
+        commands: "M 12 6.67 L 11.16 6.67 A 5.33 5.33 0 1 0 6 13.33 L 12 13.33 A 3.33 3.33 0 0 0 12 6.67 Z";
+    }
+
+    // ── v1.0 MERGE [A-4] / owner default L3: THE SECOND LeafGlyph RETIRED HERE. ───────────────
+    // v0.9.60 (W2-4) drew a 14 px STROKED leaf outline for the branch's boot-latched battery-saver
+    // indicator. Both branches added a component with this exact name, so the union merge produced
+    // two `export component LeafGlyph` and the .slint compiler refused the file outright — the one
+    // hunk in this merge that a clean auto-merge made LOUDER rather than silent.
+    // The owner ruled ONE leaf, and it is the wave-2 one above: FILLED rather than stroked, because
+    // at the 0.75 viewbox scale a 12 px mount imposes, three 1.4 px strokes 0.72 px apart merge under
+    // AA into a green slash (v0.8.196 fix tail, skeptic B O1 — the same defect this stroked outline
+    // would have had at 14 px). Nothing mounts this one any more: its host cell retired with the
+    // boot latch, and `CacheMeter` mounts the survivor.
+
+    // v0.8.119 (owner report, B1-29): THE grid dot block - 3x3 filled 2px squares on 2px gaps
+    // (a 10px square). It existed as two hand-written copies, the title-bar SectionChip's (icon 2,
+    // hud.slint) and the left edge pill's (edges.slint), and the v0.8.55 dot shrink updated them
+    // INCONSISTENTLY: the chip went to 2px gaps / a 10px block, the pill kept 3px gaps / a 12px
+    // block, so the same control rendered a visibly chunkier icon at the screen edge than in the
+    // title bar. The owner caught the pair side by side. ONE component now, instantiated twice, so
+    // the two can no longer diverge - the only per-site input is the tint (the chip tracks its
+    // accent/dim `tone`; the pill is always text-mute).
+    export component GridDotBlock inherits VerticalLayout {
+        in property <brush> tint: Theme.text-mute;
+        spacing: 2px; width: 10px;
+        HorizontalLayout { spacing: 2px;
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+        }
+        HorizontalLayout { spacing: 2px;
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+        }
+        HorizontalLayout { spacing: 2px;
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+            Rectangle { width: 2px; height: 2px; background: root.tint; }
+        }
+    }
+
+    // ── v0.8.190: THE GRID GLYPH — the vertical rule + the 3×3 dots, ONE derivation, both hosts. ──
+    // hud.slint's `SectionChip` (icon 2) and edges.slint's `EdgePillLeft` each spelled the identical
+    // dot-origin formula, the rule element and the `GridDotBlock` mount, and the two rounds before
+    // this one had to keep the pair in lock-step by comment — the L7 drift this exact glyph family
+    // has already had twice (v0.8.119, v0.8.188). It is written ONCE here; a host says only which
+    // tint it wants, and the component fills the host by default.
+    //
+    // The rule is an `AaHairline` turned a quarter turn — the SAME walk as the filmstrip underline
+    // (its banner above carries the whole mechanism), so the app's two glyph lines cannot read at
+    // different weights.
+    //
+    // THE DERIVATION, which hud.slint has carried since v0.8.188 and which is now unduplicated: the
+    // dots must start on an EVEN logical column (2px dots = 3 whole device columns at 150%), so
+    // their true origin is floored to the even grid and the LAYOUT steps back by gap + rule to sit
+    // where that puts it. Content = rule 1 + gap 3 + dots 10 = 14px, so the 34px chip gives
+    // (34 − 14)/2 + 4 = 14 → even-floor 14, EXACT, and the 30px left pill (30 − 14)/2 + 4 = 12,
+    // EXACT: nothing is spent on centring at either host. y is exact at the chip ((26 − 10)/2 = 8)
+    // and floored at the pill, whose long axis puts (84 − 10)/2 = 37 on an exact tie — floor is
+    // deterministic where round is a language detail, and the resulting 1px is a recorded residue.
+    export component GridGlyph inherits Rectangle {            // fills the host; no background
+        in property <brush> tint: Theme.text-mute;   // defaulted — see `AaHairline` above
+        property <length> rule-w: 1px;
+        property <length> gap: 3px;
+        HorizontalLayout {
+            property <length> dot-origin:
+                Math.floor(((root.width - 10px - root.gap - root.rule-w) / 2
+                            + root.gap + root.rule-w) / 2px) * 2px;
+            x: self.dot-origin - root.gap - root.rule-w;
+            y: Math.floor((root.height - 10px) / 2 / 2px) * 2px;
+            height: 10px; spacing: root.gap;
+            rule := AaHairline { width: root.rule-w; vertical: true; tint: root.tint; }
+            GridDotBlock { tint: root.tint; }
+        }
+    }
+
+    // v0.8.119 (owner report, B1-29): THE filmstrip block - three hollow frames on 2px gaps over
+    // the horizontal ORIENTATION LINE, i.e. the edge the strip appears from.
+    // Hoisted for the same reason as GridDotBlock above: the title-bar SectionChip (icon 1,
+    // hud.slint) and the bottom edge pill (edges.slint) each drew their own, at DIFFERENT scales -
+    // 22px in the chip, 44px on the pill - so one control had two sizes depending on where you
+    // clicked it. One drawing, both hosts, at the title-bar size (owner: "make it the same size
+    // like the title bar icons for consistency"). The only per-site input is the tint.
+    // ── v0.8.138 (X4, owner report): THE MIDDLE SQUARE, AND WHY IT WAS THE ODD ONE. ────────────
+    // "the middle square looks weird and almost certainly an AA issue". It was — but not the
+    // half-CENTRE class this file usually catches; it was an odd PITCH, and the middle frame was
+    // the only one of the three that could show it.
+    //
+    // v0.8.119 shipped 5px frames on 2px gaps. Pitch 7 is ODD, so the frames sat at x = 0, 7, 14.
+    // At the owner's 150% display scale that maps to device x = 0, 10.5, 21: the first and third
+    // frames start on whole device columns and the MIDDLE ONE ALONE starts on a half. Its left
+    // border smeared across two device columns at half weight each while its right edge (x = 12
+    // logical = 18 device) stayed crisp — an asymmetrically fuzzy square between two clean
+    // siblings, which is exactly the thing his eye picked out of a 19px icon.
+    //
+    // THE PROOF BY CONTRAST IS `GridDotBlock`, TWO COMPONENTS ABOVE. It is 2px dots on 2px
+    // gaps — pitch 4, every coordinate even, integer device positions at 100 / 150 / 200% — and
+    // the owner has never had a word to say about the grid icon.
+    //
+    // So the block is re-pitched to all-even geometry like its sibling: frames 6x6px (border and
+    // radius unchanged), gaps 2px, pitch 8 -> x = 0, 8, 16; row height 6; the orientation line at
+    // y = 8; total width 3*6 + 2*2 = 22px. Every frame coordinate is even, so at 150% they land at
+    // device 0, 12, 24 — the three squares rasterise as triplets again.
+    //
+    // THE PRICE, STATED [VD]: the icon grows 19px -> 22px wide, because the only way to make a
+    // three-frame pitch even without changing the gap is to make the frames even. That is a real
+    // 3px of title-bar chip and edge pill, paid for a defect the owner reported by name. Both hosts
+    // re-derive their centring from 22 (see hud.slint / edges.slint) and both now land on an
+    // INTEGER logical origin, which 19 never did: (32 - 19) / 2 = 6.5 and (84 - 19) / 2 = 32.5 were
+    // half-pixel mounts, so the block's own parity was being spent before it was drawn.
+    // v0.8.139 HOTFIX: the hosts have since moved to 34 and 86, chosen so that (h - 22) is a
+    // multiple of 4 — i.e. so the block's true centre is itself EVEN and the mount can be exact and
+    // crisp at once (6 and 32). The 22 is what makes such a host width exist; the derivations live
+    // at the two mount sites.
+    //
+    // ── v0.8.190 (OWNER RULING 08-15): THE LINE IS THE SHARED `AaHairline`, AT A FIXED 1px. ──
+    // The owner judged v0.8.189's three comparison cells and chose the 1px ANTI-ALIASED spelling for
+    // both glyph lines, with the frames left at 1px; the toggles are retired and the values are
+    // fixed. THE WHOLE MECHANISM — why a bordered rect draws a hairline, why the AA'd spelling is
+    // invariant under the restored window's Y flip, why the v0.8.189 cell rendered two device
+    // columns SHORT and what fixes it, and why the vertical twin is this element rotated — lives at
+    // `AaHairline`'s banner above, ONCE. Read it there.
+    //
+    // BLOCK-H IS 9px AGAIN: 6 (frames) + 2 (spacing) + 1 (the line), the content height the owner
+    // SAW in the cell he chose. Both mount sites subtract `self.block-h`, so nothing moves from what
+    // he approved — including the 0.5px chip-mount centring residue that a 10px content height had
+    // briefly retired (26 − 9 = 17, so true centre 8.5 rounds to the even 8). That residue is his
+    // eyeball's price, recorded in the round doc, NOT a defect to buy back by padding the slot: a
+    // 2px slot would move the ink he judged.
+    // The FRAMES' outer 6px box is unchanged by their border width — Slint draws a border INWARD.
+    export component FilmFrameBlock inherits VerticalLayout {
+        in property <brush> tint: Theme.text-mute;
+        // 6 (frames) + 2 (spacing) + 1 (the line) — the content height, declared so the two mount
+        // sites centre over the real box rather than re-spelling its terms (an unsized layout takes
+        // its PARENT's height, which is how the block once measured 22x26 inside a 26px chip).
+        out property <length> block-h: 6px + 2px + 1px;
+        width: 22px; height: root.block-h; spacing: 2px;
+        frames := HorizontalLayout { spacing: 2px; height: 6px;
+            f0 := Rectangle { width: 6px; border-radius: 1px; border-width: 1px; border-color: root.tint; }
+            f1 := Rectangle { width: 6px; border-radius: 1px; border-width: 1px; border-color: root.tint; }
+            f2 := Rectangle { width: 6px; border-radius: 1px; border-width: 1px; border-color: root.tint; }
+        }
+        // The 22px width comes from the layout; the slot is 22 x 1 and the hairline over-hangs it by
+        // half a border on the long axis so the renderer's inset lands the ink's hard-cut ends on
+        // the slot's own edges — flush with f0's and f2's outer edges in device pixels.
+        line := AaHairline { height: 1px; tint: root.tint; }
+    }

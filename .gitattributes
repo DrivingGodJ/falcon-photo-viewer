@@ -1,0 +1,6 @@
+falcon/vendor/winit/** -text
+falcon/vendor/zune-jpeg/** -text
+falcon/native/assets/icons/*.json text eol=lf
+falcon/native/assets/icons/catalog.rs text eol=lf
+docs/licenses/*.json text eol=lf
+docs/licenses/upstream/*.txt text eol=lf

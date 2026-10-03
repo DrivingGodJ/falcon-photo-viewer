@@ -1,0 +1,118 @@
+// Opt-in Mac probe using Falcon controls and its normal rendering/input boundary.
+import { Button, LineEdit } from "std-widgets.slint";
+import { AaHairline, EllipsisGlyph } from "glyphs.slint";
+import { IconBtn, ActionBtn } from "controls.slint";
+import { Theme } from "theme.slint";
+import { GlassPanel } from "panels.slint";
+import { MenuItem, MenuHeader } from "menu.slint";
+
+export component MacExperimentBar inherits Window {
+    no-frame: true;
+    width: 780px; height: 44px;
+    background: Theme.base;
+    in-out property <int> clicks: 0;
+    in-out property <int> secondary-clicks: 0;
+    in-out property <int> scrolls: 0;
+    callback action(string);
+    callback popup();
+    callback styled-popup(float, float);
+    callback immersive();
+    callback refocus();
+    callback drag();
+    callback text-check(string);
+    AaHairline { y: 20px; height: 1px; width: 100%; tint: #70d2a0; }
+    AaHairline { y: 43px; height: 1px; width: 100%; tint: #70d2a0; }
+    HorizontalLayout {
+        spacing: 5px;
+        count-button := IconBtn {
+            width: 40px; height: 44px; radius: 0; bar: true;
+            clicked => { root.clicks += 1; root.action("styled-click"); }
+            Text { text: "+"; color: Theme.text; horizontal-alignment: center; vertical-alignment: center; }
+        }
+        menu-button := IconBtn {
+            width: 40px; height: 44px; radius: 0; bar: true;
+            clicked => { root.styled-popup(self.ax / 1px, 44); }
+            EllipsisGlyph { width: 16px; height: 16px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; tint: Theme.text; }
+        }
+        Text { text: "Slint " + root.clicks; color: Theme.text; vertical-alignment: center; }
+        VerticalLayout { alignment: center;
+            Button { text: "Native menu"; clicked => { root.popup(); } }
+        }
+        VerticalLayout { alignment: center;
+            input := LineEdit { placeholder-text: "Type / IME"; edited => { root.text-check(self.text); } }
+        }
+        event-box := Rectangle {
+            min-width: 150px; background: Theme.block;
+            Text { text: "Right " + root.secondary-clicks + " · Wheel " + root.scrolls; color: Theme.text; horizontal-alignment: center; vertical-alignment: center; }
+            TouchArea {
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down && e.button == PointerEventButton.right {
+                        root.secondary-clicks += 1; root.action("secondary-click");
+                    }
+                }
+                scroll-event(e) => { root.scrolls += 1; root.action("scroll"); accept }
+            }
+        }
+        VerticalLayout { alignment: center;
+            Button { text: "F"; clicked => { root.immersive(); } }
+        }
+        VerticalLayout { alignment: center;
+            Button { text: "Photo focus"; clicked => { root.refocus(); } }
+        }
+        Text {
+            text: "Drag"; color: Theme.text; vertical-alignment: center;
+            TouchArea { moved => { if self.pressed { root.drag(); } } }
+        }
+    }
+}
+
+// Main-surface popup: explicitly diagnostic, retaining Falcon's menu components.
+export component MacExperimentPopup inherits Rectangle {
+    in-out property <bool> open;
+    in property <length> anchor-x;
+    in property <length> anchor-y;
+    callback action(string);
+    visible: root.open;
+    init => { if root.open { popup-focus.focus(); } }
+    changed open => { if root.open { popup-focus.focus(); } }
+    TouchArea { clicked => { root.open = false; root.action("dismiss-outside"); } }
+    popup-focus := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape { root.open = false; root.action("dismiss-escape"); accept } else { reject }
+        }
+        panel := GlassPanel {
+            x: max(3px, min(root.anchor-x, root.width - self.width - 3px));
+            y: max(3px, min(root.anchor-y, root.height - self.height - 3px));
+            width: min(260px, root.width - 6px); height: 144px;
+            VerticalLayout {
+                spacing: 0px;
+                MenuHeader { text: "Falcon toolbar probe"; }
+                MenuItem { text: "Count + close"; edge-to-edge: true;
+                    clicked => { root.open = false; root.action("count-close"); }
+                }
+                MenuItem { text: "Disabled action"; enabled: false; edge-to-edge: true; }
+            }
+        }
+    }
+}
+
+export component MacExperimentStatus inherits Rectangle {
+    in property <string> build;
+    in property <string> status;
+    in property <string> log-path;
+    callback command(string);
+    background: #20252bee;
+    VerticalLayout {
+        padding: 6px; spacing: 3px;
+        Text { text: root.build; color: #70d2a0; font-size: 12px; }
+        Text { text: root.status; color: Theme.text; font-size: 12px; }
+        Text { text: root.log-path; color: Theme.text-dim; font-size: 11px; overflow: elide; }
+        HorizontalLayout { spacing: 5px;
+            ActionBtn { label: "Open logs"; clicked => { root.command("logs"); } }
+            ActionBtn { label: "Copy diagnostics"; clicked => { root.command("copy"); } }
+            ActionBtn { label: "Photo focus"; clicked => { root.command("focus"); } }
+            ActionBtn { label: "Hide"; clicked => { root.command("hide"); } }
+            ActionBtn { label: "Test F"; clicked => { root.command("f"); } }
+        }
+    }
+}

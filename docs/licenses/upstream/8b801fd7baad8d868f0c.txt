@@ -1,0 +1,2 @@
+    /// Parse a binary coded decimal number.
+    /// See <https://gitlab.freedesktop.org/freetype/freetype/-/blob/82090e67c24259c343c83fd9cefe6ff0be7a7eca/src/cff/cffparse.c#L183>

@@ -1,0 +1,7 @@
+# VerticalOrientation-17.txt
+# Date: 2016-10-20, 07:00:00 GMT [EM, KI, LI]
+# © 2016 Unicode®, Inc.
+# Unicode and the Unicode Logo are registered trademarks of
+# Unicode, Inc. in the U.S. and other countries.
+# For terms of use, see http://www.unicode.org/terms_of_use.html
+#

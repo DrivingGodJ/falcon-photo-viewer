@@ -1,0 +1,2 @@
+The tree structure itself is a heavily modified <https://github.com/causal-agent/ego-tree>
+License: ISC.

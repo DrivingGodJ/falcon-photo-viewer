@@ -1,0 +1,548 @@
+// v0.9.5 (ui.rs extraction series): the panel scaffolding (GlassPanel, SolidPanel,
+// SettingsGroup, SectionLabel, PanelHeader, HRule) extracted VERBATIM from the slint!
+// macro in src/ui.rs. `export` added — they were macro-file-local.
+
+import { Theme } from "theme.slint";
+import { AaHairline, CloseGlyph, MinimizeIcon } from "glyphs.slint";
+import { IconBtn } from "controls.slint";
+import { ExifRow } from "structs.slint";
+
+    export component GlassPanel inherits Rectangle {
+        // Mini-render of the full content area: grid + stage + filmstrip, excluding title bar.
+        in property <image> backdrop;
+        in property <length> sw;
+        in property <length> sh;
+        // Content origin in THIS panel host: window-hosted x=0, stage-hosted x=-stage-x.
+        // y is 44px for window-rooted panels and 0 for content/stage-rooted panels.
+        in property <length> oy;
+        in property <length> ox;
+        // HOVER-GLASS (2026-07-04, the two always-floating stage panels — EXIF + RAW/zoom, incl.
+        // their minimised forms): in the OPAQUE design they idle as NEUTRAL frosted glass (the
+        // blurred stage under a pure-gray tint — deliberately no cool/warm cast) and SOLIDIFY to
+        // the flat panel surface while the pointer is over them. `hot` is fed by the panel (its
+        // TouchAreas OR'd — Slint hover is exclusive, so the base swallow-area alone would drop
+        // out over child buttons). Crossfade: quick in (anim), softer out (anim-med).
+        in property <bool> hover-glass: false;
+        in property <bool> hot: false;
+        // ── v0.8.185 (D17, OWNER RULING 2026-08-14) — THE PANEL SHADOW IS RETIRED ───────────────
+        // "the drop shadow behind the context menu feels somehow distracting, so use a softened
+        // class of drop shadow like the A/B compare's control bar, and actually I think the heavy
+        // drop shadow can be fully retired for all panels and make this the heaviest shadow for
+        // all, while other even lighter shadows remains the same".
+        //
+        // So 12 / 4 / `Theme.shadow-control` — the class v0.8.184 gave the compare floating controls
+        // as an opt-in, and the class RankRow's dragged row has always cast — is now the app's
+        // HEAVIEST shadow, cast unconditionally by every GlassPanel host: both context menus (the
+        // owner's named trigger), every popup and floating panel, the compare bar and pin labels,
+        // both 40px minimised stubs and the immersive cull card. `SolidPanel` below casts the same
+        // shadow — and since v0.8.185 (W2) that is true BY CONSTRUCTION rather than by two people
+        // typing the same numbers: the geometry is `Theme.shadow-blur` / `Theme.shadow-dy`, bound by
+        // both families here and by the four other sites in the class (the toast card, the
+        // "Scanning…" pill, the tick-degraded banner and RankRow's dragged row). Editing the pair in
+        // theme.slint moves all six; there is no longer a copy to miss.
+        //
+        // The v0.8.184 `control-shadow` in-property and its five opt-in lines are DELETED rather
+        // than left defaulting true: the moment the default equals the opt-in the plumbing is dead,
+        // and a bool nobody sets is a bool that will one day be set by accident. 34 / 12 survives
+        // only as `Theme.shadow-panel`'s definition, kept for the mac branch and marked RETIRED.
+        // UNTOUCHED by the ruling ("other even lighter shadows remains the same"): the 9px selection
+        // glows (filmstrip tile + review tile, grid, settings RatePill), the 6px arm glows (HUD chip,
+        // widgets) and the 12 / 4 RankRow drag lift, which was already this exact class.
+        property <bool> glassy: root.hover-glass; // opaque is permanent (W2) — hover-glass alone decides
+        // Opaque mode: panels FLOAT (all corners rounded — the docked sharp corner is a glass-era
+        // affordance), the frosted-backdrop sample is hidden (Theme.base is already solid), and the
+        // hairline border is gone (Theme.border is transparent, width kept 0 for crispness).
+        // W2: all corners rounded (the docked sharp corner was a glass-era affordance) + no hairline border.
+        border-top-left-radius: Theme.radius;
+        border-top-right-radius: Theme.radius;
+        border-bottom-left-radius: Theme.radius;
+        border-bottom-right-radius: Theme.radius;
+        border-width: 0px;
+        border-color: Theme.border;
+        drop-shadow-blur: Theme.shadow-blur;
+        drop-shadow-color: Theme.shadow-control;
+        drop-shadow-offset-y: Theme.shadow-dy;
+        clip: true;
+        // v0.8.162: named so the geometry rig can measure the ONE invariant this whole mechanism
+        // rests on — every mounted backdrop sample must land exactly on the content rect.
+        bdrop := Image {
+            source: root.backdrop;
+            image-rendering: smooth;
+            image-fit: fill;
+            // the blurred stage sample only serves the hover-glass panels' idle frost now
+            visible: root.glassy;
+            x: root.ox - root.x;
+            y: root.oy - root.y;
+            width: root.sw;
+            height: root.sh;
+        }
+        // base tint: neutral translucent gray for the idle hover-glass state (the glass-mode
+        // Theme.base tint is cool by design — wrong for the neutral flat theme), else the panel fill.
+        Rectangle { width: 100%; height: 100%; background: root.glassy ? #1c1c1cc8 : Theme.base; } // #1c1c1cc8 = idle hover-glass frost tint (neutral ~78% gray) — intentional one-off, glass-only, no Theme token
+        // the solid surface fades IN over the glass while hot (and covers the blur completely at 1.0)
+        if root.glassy : Rectangle {
+            width: 100%; height: 100%; background: Theme.base;
+            opacity: root.hot ? 1.0 : 0.0;
+            animate opacity { duration: root.hot ? Theme.anim : Theme.anim-med; easing: ease; }
+        }
+        @children
+    }
+
+    // ── v1.0.0-rc (queue item 31, sheet 2.5) — THE REVIEW PANEL'S HOVER PREVIEW CARD. ──────────
+    //
+    // A NAMED component, so the geometry rig can find it by type name and assert a real unmount
+    // (the `tiplayer` lesson: an anonymous window-root Rectangle is unreachable from
+    // `find_by_element_type_name`, and four mirror properties had to be exported to measure it).
+    //
+    // WHAT IT IS NOT, and each of these is load-bearing:
+    //   * NO TouchArea and NO FocusScope. A surface in the pointer's path would steal the very
+    //     hover that keeps it alive, and a focus taker would kill Esc and the arrow scrub. The
+    //     tree's own display-only surfaces say the same thing (`tiplayer`: "DISPLAY-ONLY: no
+    //     TouchArea (it can never steal pointer events)").
+    //   * NO `opacity:` and NO `animate`. An Opacity item over more than one child is an offscreen
+    //     layer that blits at its raw fractional device origin and bilinearly resamples everything
+    //     inside it (ledger L48) — the exact softness this feature exists to remove — and a fade
+    //     would put the photograph through one on every appearance. The owner's h4 ruling is "no
+    //     fade" for this reason.
+    //   * NO `clip:` and no radius OF ITS OWN. The rounded rim belongs to the `GlassPanel` inside;
+    //     the photograph sits INSET on its own ground, so it never reaches a corner and needs no
+    //     clip to keep it out of one. (The `GlassPanel` itself is a clip+radius layer host — every
+    //     one in the app is — which is why this component's x, y, width and height are all snapped
+    //     onto whole device pixels: `support::snap_dev` for the size, the `sfx` idiom below for the
+    //     origin, the same spelling the modal dialogs use.)
+    //   * NO ternary on any class-selecting property (`border-*`, `radius`, `clip`, `drop-shadow-*`)
+    //     anywhere in it — ledger L47: Slint resolves an element's native class from the mere
+    //     PRESENCE of a binding, so `cond ? N : 0` silently changes the draw path in every state.
+    //     The one conditional thing here, the "Loading…" pill, is a conditional SIBLING.
+    //
+    // `hover-glass` stays at its default FALSE: a `GlassPanel` that does not sample the backdrop
+    // renders flat `Theme.base` with the ruled radius and the D17 shadow, costs nothing, and does
+    // NOT have to join `blur-sampler-mounted` — the list whose omission shipped three times
+    // (v0.8.162 / v0.8.163 / v0.8.169). The owner asked for "the same rounded corner and shadow",
+    // not the frost, and a photograph is about to cover the card anyway.
+    export component HoverPreview inherits Rectangle {
+        in property <length> win-h: 100000px;   // the window hands its size down (a component root
+        in property <length> cy: 0px;           // cannot read `parent` in its own bindings)
+        in property <length> box-w: 0px;        // computed by support::hover_box, already snapped
+        in property <length> box-h: 0px;
+        in property <image> img;
+        in property <bool> loading: false;
+        in property <float> sf: 1.0;            // win-sf: device px per logical px
+        property <float> sfx: max(root.sf, 0.5);
+        width: root.box-w;
+        height: root.box-h;
+        // THE X IS SNAPPED, NOT THE BARE 511. At 125 % the card's left edge would land on device
+        // 638.75 and at the owner's 150 % on 766.5 — half a device pixel, on a layer host, which is
+        // the L48 smear this whole component is arranged to avoid. Same `round(v·s)/s` the modal
+        // dialogs use. (DEVIATION from the spec's literal `x: 511px`, recorded in §C.)
+        x: Math.round(511 * self.sfx) / self.sfx * 1px;
+        // THE Y: the hovered tile's own measured centre, clamped at RENDER between the title bar and
+        // the filmstrip band — `clamp(v, lo, max(lo, hi))`, `FloatingExif`'s idiom, whose `max(...)`
+        // keeps the range non-empty on a window too short to hold the card (ledger L23/L24: the
+        // clamp re-solves on a resize or a scale change, so the card can never be stranded) — and
+        // then snapped like the x.
+        property <length> raw-y: root.cy - root.box-h / 2;
+        property <length> clamped-y: clamp(self.raw-y, 52px, max(52px, root.win-h - 110px - root.box-h));
+        y: Math.round(self.clamped-y / 1px * self.sfx) / self.sfx * 1px;
+        GlassPanel {
+            width: 100%; height: 100%;
+            // The rim, then the photo ground. `Theme.stage` is the token that means "photo ground"
+            // (the compare halves letterbox on the naked stage colour); `image-fit: contain` is the
+            // filmstrip/grid rule — native aspect, no crop — and the box is already the picture's
+            // own shape, so the letterbox is at most a rounding pixel.
+            Rectangle {
+                x: Theme.space-1h; y: Theme.space-1h;
+                width: parent.width - 2 * Theme.space-1h;
+                height: parent.height - 2 * Theme.space-1h;
+                background: Theme.stage;
+                Image { source: root.img; image-fit: contain; width: 100%; height: 100%; }
+            }
+        }
+        // The compare half's own "Loading…" pill, verbatim — 26px, Theme.block + Theme.radius + a
+        // 1px border-strong, font-sm/600 in text-dim, centred. A conditional SIBLING, never a
+        // ternary on a class-selecting property (L47). It is shown only while a browse decode for
+        // THIS shot is genuinely in flight, so the word is never a lie (Nielsen H1).
+        if root.loading : Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: hpill.preferred-width + 26px; height: 26px;
+            border-radius: Theme.radius;
+            background: Theme.block;
+            border-width: 1px; border-color: Theme.border-strong;
+            hpill := Text {
+                x: 13px; text: "Loading…";
+                color: Theme.text-dim; font-size: Theme.font-sm; font-weight: 600;
+                vertical-alignment: center; height: parent.height;
+            }
+        }
+    }
+
+    // Opaque (non-glass) panel chrome for MODAL dialogs sitting over a scrim (confirm / delete sheets).
+    // One place for the modal fill + border + radius so every modal matches (Step 5b).
+    export component SolidPanel inherits Rectangle {
+        background: Theme.base; // flat design: modals share the base surface
+        border-radius: Theme.radius;
+        border-width: 0px;
+        border-color: Theme.border;
+        // v0.8.80 (2B, owner ruling) — its VALUES SUPERSEDED by the 08-14 owner ruling (D17): "the
+        // heavy drop shadow can be fully retired for all panels and make this [the softened control
+        // class] the heaviest shadow for all". What 2B ruled — that the modal sheets cast the SAME
+        // blur/offset/colour as GlassPanel — is untouched and is why this block moved with it: the
+        // shared values are now 12 / 4 / Theme.shadow-control (CM-transformed since v0.8.48). EVERY
+        // SolidPanel site is a scrim-centred modal (confirm / rotation-reminder / welcome / delete-
+        // preset), so one elevation still reads correct at all four, and the scrim carries the
+        // separation from the photo that the blur used to over-serve. Codebase precedent for the
+        // three-property form: the toast card (main_window.slint) casts the same shadow WITH children
+        // and NO clip — GlassPanel's clip serves its frosted-backdrop Image sampling, not the shadow.
+        drop-shadow-blur: Theme.shadow-blur;
+        drop-shadow-color: Theme.shadow-control;
+        drop-shadow-offset-y: Theme.shadow-dy;
+        @children
+    }
+
+    // Grouped-card wash for a Settings section — a titled control + its sub-tunings read as one unit.
+    // Replaces the hand-rolled `Rectangle{group-bg + border}` cards (Step 5b).
+    export component SettingsGroup inherits Rectangle {
+        // v0.8.44 (G12): the shared titled-card rhythm lives HERE — set `title` and the card
+        // renders its own title row (font-body, 12px sides, 7px below) inside the standard
+        // pt16 / pb12 / sp9 column, so the tuner cards (resume-cap / Fast View / drag-cone /
+        // reveal-linger / GPU backend) stop re-hardcoding the same six literals. title == ""
+        // (Adaptive Hi-Res, file associations, output gamut — cards whose first row is a
+        // ToggleRow, or which hang the 12px side padding on their own wrapper) keeps the raw
+        // pass-through: the column then contributes NO padding/spacing → byte-identical.
+        in property <string> title: "";
+        border-radius: Theme.radius-ctrl; // V1 (v0.8.2): match the standalone ToggleRow card (radius-ctrl 9px) so the inner row hover (6px, inset 3px) is concentric (9-3=6); was Theme.radius 13px (overturns H3's card tier for settings groups)
+        background: Theme.block;
+        border-width: 0px;
+        border-color: Theme.border;
+        VerticalLayout {
+            padding-top: root.title == "" ? 0px : 16px;
+            padding-bottom: root.title == "" ? 0px : 12px;
+            spacing: root.title == "" ? 0px : 9px;
+            if root.title != "" : HorizontalLayout {
+                padding-left: 12px; padding-right: 12px; padding-bottom: 7px;
+                Text { text: root.title; color: Theme.text; font-size: Theme.font-body;
+                       vertical-alignment: center; horizontal-stretch: 1; }
+            }
+            @children
+        }
+    }
+
+    // Uppercase section caption inside a panel (INPUT / PERFORMANCE / DISPLAY …). ONE tier so every
+    // section header restyles together (was hand-typed at font-sm/600 with a text-dim/text-mute split).
+    export component SectionLabel inherits Text {
+        color: Theme.text-mute;
+        font-size: Theme.font-sm;
+        font-weight: 600;
+    }
+
+    // Standard panel title row: title (title-size / 600) + an optional close(X) / minimize(−) button.
+    // ONE canonical 16-viewbox X so every panel's dismiss glyph matches (fixes Settings' bespoke
+    // 11-viewbox X and the Speed popup's minus-drawn-as-Close bug). mode 0=close / 1=minimize / 2=none.
+    export component PanelHeader inherits HorizontalLayout {
+        in property <string> title;
+        in property <string> value;   // optional bold trailing value (e.g. the Speed popup's live fps)
+        in property <string> pill;    // optional description chip after the title (the Figma value-first header)
+        in property <int> mode: 0;
+        callback dismiss;
+        spacing: Theme.space-2;
+        phtitle := Text {
+            text: root.title;
+            color: root.value == "" ? Theme.text : Theme.text-dim;
+            font-size: Theme.title-size; font-weight: 600;
+            vertical-alignment: center; horizontal-stretch: (root.value == "" && root.pill == "") ? 1 : 0;
+        }
+        if root.pill != "" : VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 20px; border-radius: 10px; background: Theme.block;
+                width: pillt.preferred-width + 14px;
+                pillt := Text { text: root.pill; color: Theme.text-mute; font-size: Theme.font-md;
+                                x: 7px; vertical-alignment: center; }
+            }
+        }
+        if root.pill != "" : Rectangle { horizontal-stretch: 1; }
+        if root.value != "" : Text {
+            text: root.value; color: Theme.text; font-size: Theme.title-size; font-weight: 600;
+            vertical-alignment: center; horizontal-stretch: 1;
+        }
+        // v0.8.44 (G7): optional header extras (e.g. the Events panel's Undo/Clear pills) slot in
+        // between the title and the dismiss X. Headers without children are byte-identical.
+        @children
+        if root.mode != 2 : phclose := IconBtn {
+            width: Theme.hit-primary; height: Theme.hit-primary;
+            clicked => { root.dismiss(); }
+            // ── v0.8.138 (X2, owner report): THE × GROWS TO THE TITLE SIZE. ────────────────────
+            // "too small, make it bigger to match the title text of these panels" — users, relayed
+            // by the owner. The title beside it is `Theme.title-size` 15px, and the glyph was drawn
+            // in a 12px box, so the dismiss mark read as a footnote on a heading.
+            //
+            // THE BOX IS 16px, NOT 15px, AND THAT IS AN L41 DECISION, NOT A ROUNDING. 15-in-28
+            // centres at (28 - 15) / 2 = 6.5px — this resize would have MINTED a half-pixel origin
+            // of exactly the kind X1 above is spending a whole item removing, and on the app's most
+            // repeated glyph. 16-in-28 centres at (28 - 16) / 2 = 6px exactly: integer, even, and
+            // one logical px larger than the title text rather than one smaller. The BUTTON is
+            // untouched at `Theme.hit-primary` 28px, so nothing about clicking this changes, and
+            // 16 < 28 means no header row can grow (the row's height is the IconBtn's, and the
+            // 15px Text is shorter than both).
+            // STROKE stays `Theme.icon-stroke` 1.4px — its own token comment certifies that weight
+            // for 13-16px glyphs, which is exactly the range this move lands in.
+            // SCOPE: this component only. The toast / event-row 26px dismiss squares keep their
+            // 11px glyph and their ~0.43 ratio; they are a different surface at a different size
+            // and the owner's report was about PANEL headers.
+            if root.mode == 0 : CloseGlyph {
+                x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
+                width: 16px; height: 16px;
+            }
+            // v0.8.138 (X1): the minimise arm draws the SHARED `MinimizeIcon` instead of a private
+            // 11x1.5px Rectangle. That twin had no caller (mode was 0 at all five PanelHeader
+            // sites), so it was a second minus mark drifting quietly out of step with the one three
+            // panels actually show — it is where the 1.5px weight X1 adopts came from. Routed
+            // rather than deleted: the capability is real and now costs one line that cannot drift.
+            if root.mode == 1 : MinimizeIcon { }
+        }
+    }
+
+    // Flush full-width 1px horizontal rule (section separators in panels).
+    // v0.8.191: it inherits `AaHairline`, not `Rectangle`. The sentence that stood here said it
+    // "behaves identically to the inline `HRule { }` it replaces" because "a component inheriting
+    // Rectangle participates in a layout exactly like a bare Rectangle" — which is now the wrong
+    // premise for the right conclusion. The true fact is broader: Slint's LAYOUT properties bind
+    // on ANY element, a user component included, so `HRule { vertical-stretch: 0; }` at the two
+    // Settings mounts still binds exactly as it did against a builtin base. That is asserted, not
+    // assumed, in `every_panel_rule_and_menu_separator_is_the_shared_hairline`.
+    // ── v0.8.191 (H7, the app-wide hairline sweep): the SHARED `AaHairline`, drawn once. ────────
+    // This rule has SEVEN mounts and every one of them sits inside a GlassPanel — a clip + radius,
+    // i.e. an offscreen layer in BOTH window states — so its device row was decided by a
+    // panel-LOCAL y and was permanently different from mount to mount: one device row here, two
+    // there, in the same frame, at the same nominal weight. That is the AA-off plain-fill tie
+    // (L46 addendum), and an anti-aliased stroke does not have it at any phase. The slot is
+    // byte-identical to the plain fill it replaces (1px tall, layout-stretched); only the ink
+    // changed. The whole mechanism lives at glyphs.slint's `AaHairline` banner.
+    export component HRule inherits AaHairline {
+        height: 1px;
+        tint: Theme.divider;
+    }
+
+    // v0.8.65 (C3, owner rule): bottom-edge fade for panels whose scrollable body hard-clips at the
+    // panel's surface (Settings / Selection / Events). A transparent→panel-colour gradient in the
+    // panel's OWN colour — Theme.base with an alpha-0 stop derived FROM the token (the star-preview
+    // rule: with-alpha on the transformed token keeps both stops hue-locked to the colour-managed
+    // surface; no new token, no CM bypass). The 0deg gradient anchors the opaque stop at the BOTTOM
+    // edge (the G2 edge-hover scrim grammar). PURE PAINT: no TouchArea, so wheel/clicks pass through
+    // to the Flickable underneath — the caller overlays it AFTER the scroll body (paint order) and
+    // drives `more` ("content actually continues below") so short content never wears a permanent
+    // smudge. Slint layouts don't clip — callers size it against the scroll viewport explicitly.
+    export component PanelBottomFade inherits Rectangle {
+        in property <bool> more: true;
+        height: 28px;
+        background: @linear-gradient(0deg, Theme.base 0%, Theme.base.with-alpha(0.0) 100%);
+        opacity: root.more ? 1.0 : 0.0;
+        animate opacity { duration: Theme.anim; easing: ease; }
+    }
+
+    // ── v0.8.159 (B2 mechanism 1, OWNER RULING Q19): THE EXPANDED EXIF LIST, ONE COMPONENT. ──────
+    // "layout IDENTICAL to the expanded view of the current exif panel" — so it is not a layout
+    // that LOOKS identical, it is the same one. The markup below is main_window.slint's
+    // `info-view == 2` block moved here VERBATIM (v0.8.116's fade, v0.8.117's clamp, v0.8.118's
+    // height cap, the 7px row spacing, the 16px k/v gutter, the eliding value cell) with exactly
+    // two host assumptions lifted into parameters, which is what makes it safe to reuse (L7):
+    //
+    //   • `avail` — the docked host computed `root.stage-h - 230px` from the STAGE and from its own
+    //     chrome. A floating panel has neither, so the budget is the HOST's to state.
+    //   • `interactive` — the docked host gates drag-scroll on `!immersive` (its M6 input gate).
+    //
+    // Everything else — the Flickable's viewport arithmetic, the `more` predicate, the fade's
+    // min(28px, …) size and max(0px, …) clamp — is IDENTICAL for both hosts and stays inside.
+    // Its Flickable keeps the name `exflick`, so the rig rows written against the docked panel
+    // still find it (as `ExifRowsView::exflick`), which is also the proof that the docked panel is
+    // now RENDERING this component and not a survivor of the old inline copy.
+    export component ExifRowsView inherits Rectangle {
+        in property <[ExifRow]> rows;
+        in property <bool> interactive: true;
+        in property <length> avail: 100000px;
+        height: exflick.height;
+        exflick := Flickable {
+            width: parent.width;
+            interactive: root.interactive;
+            height: exbox.preferred-height < root.avail ? exbox.preferred-height : root.avail;
+            viewport-height: exbox.preferred-height;
+            viewport-width: self.width;
+            exbox := VerticalLayout {
+                width: parent.width;
+                spacing: 7px;
+                for row in root.rows : HorizontalLayout {
+                    spacing: 16px;
+                    Text { text: row.k; color: Theme.text-mute; font-size: Theme.font-md; horizontal-stretch: 1; }
+                    // Unrounded original values (the folded grid rounds; this view is the truth) —
+                    // a pathologically long one elides instead of clipping.
+                    Text { text: row.v; color: Theme.text; font-size: Theme.font-md; horizontal-alignment: right; overflow: elide; }
+                }
+            }
+        }
+        // Declared AFTER the Flickable so it paints above it; pure paint (no TouchArea), so
+        // drag-scroll and the wheel still reach the body.
+        PanelBottomFade {
+            x: exflick.x; width: exflick.width;
+            height: min(28px, exflick.height);
+            y: max(0px, exflick.y + exflick.height - self.height);
+            more: exflick.viewport-height + exflick.viewport-y > exflick.height + 1px;
+        }
+    }
+
+    // ── v0.8.159 (B2, OWNER RULING Q19): THE FLOATING, DRAGGABLE EXIF PANEL. ─────────────────────
+    // "a floating, DRAGGABLE panel with an × close top-right (like any other panel), containing
+    // just the image's full EXIF … Opens PINNED to the right-clicked photo, pin icon next to the
+    // filename; releasing the pin makes it follow the current image."
+    //
+    // GRAMMAR, all reused, nothing minted: GlassPanel skin (the app's floating-surface material,
+    // with the same hover-glass solidify the docked EXIF panel has); `Theme.space-4` = 16px of
+    // panel padding (v0.8.160 Y8: this line used to call it "18px-class" — it is 16, which is what
+    // the `avail` arithmetic at the mount site has always subtracted); the × is `PanelHeader`'s
+    // exact dismiss button — a 28px `Theme.hit-primary`
+    // IconBtn around a 16px CloseGlyph; the filename wears the docked panel's own header tier
+    // (title-size / 600, eliding). THE PIN is the app's ONE pin signifier, ComparePinLabel's dot:
+    // filled + accent when pinned, hollow + text-mute when not. Its geometry is re-cut for L41 —
+    // a 12px dot in the 28px button centres at (28 − 12) / 2 = 8, integer and even, where the
+    // compare label's 11px dot would have landed on 8.5 in this host.
+    //
+    // NO RESIZE AFFORDANCE, no persistence, and NO modal behaviour: the panel is the user's own
+    // state floating over the app, so it is not in the D1a popup gate. What it DOES take is the
+    // swallow (declared first, under everything): clicks and drags stop here. Unconsumed wheel
+    // events pass to the photo, as on the other small overlays (owner choice, 2026-10-02).
+    export component FloatingExif inherits GlassPanel {
+        in property <string> name;
+        in property <bool> pinned;
+        in property <[ExifRow]> rows;
+        in property <float> px;     // stored position (logical px, window coords) — Rust's copy
+        in property <float> py;
+        in property <length> avail; // the scroll body's height budget, stated by the host
+        in property <length> top-limit: 0px; // the clamp's top: never over the title bar
+        // The clamp's box. A component ROOT cannot read `parent` in its own bindings, so the window
+        // hands its size down — which is the honest shape anyway: the panel is clamped to the
+        // WINDOW, not to whatever container happens to host the `for`.
+        in property <length> win-w: 100000px;
+        in property <length> win-h: 100000px;
+        // v0.8.160 (Y7): the pin's two sentences, handed down from the window root so ONE copy of
+        // each exists — the root's own L22 clear compares against the same two properties.
+        in property <string> tip-pinned;
+        in property <string> tip-following;
+        callback close();
+        callback toggle-pin();
+        callback moved(float, float); // the CLAMPED landing position, published on release
+        // The live drag offset. It exists for exactly one gesture and is zeroed the instant the
+        // release is published, so the only durable copy of a panel's position is Rust's (L43: a
+        // session latch with no way back is the class; this one is not state at all between drags).
+        property <length> ddx: 0px;
+        property <length> ddy: 0px;
+        width: min(308px, max(120px, root.win-w - 36px));
+        height: fxcol.preferred-height;
+        // L23/L24: the RENDER clamps, so a window resize or a display-scale change re-solves the
+        // position and a panel can never be stranded off screen — while `px`/`py` keep exactly what
+        // was dragged. `max(...)` on the upper bound keeps the range non-empty on a tiny window.
+        x: clamp(root.px * 1px + root.ddx, 8px, max(8px, root.win-w - root.width - 8px));
+        y: clamp(root.py * 1px + root.ddy, root.top-limit, max(root.top-limit, root.win-h - root.height - 8px));
+        hover-glass: true;
+        hot: fxswallow.has-hover || fxdrag.has-hover || fxpin.hovered || fxclose.hovered;
+        // Clicks and drags stop here. The EXIF list above gets first chance to scroll;
+        // unused wheels pass through this small overlay to the photo behind it.
+        fxswallow := TouchArea {}
+        fxcol := VerticalLayout {
+            padding: Theme.space-4; spacing: 11px;   // the docked panel's own column
+            // ── the header strip: filename (elided) · pin · × ─ and the DRAG HANDLE.
+            HorizontalLayout {
+                spacing: 2px;
+                Rectangle {
+                    horizontal-stretch: 1;
+                    // The drag handle. Declared before the label so the label paints over it; a
+                    // TouchArea with no `clicked` arm consumes nothing but the press-drag.
+                    //
+                    // WHY THE ANCHOR IS `pressed-x` AND NOT A PER-EVENT `last`: this TouchArea
+                    // MOVES WITH THE PANEL, so a delta measured against the previous event's local
+                    // position double-counts the move it just caused. `pressed-x` is captured once
+                    // at press and never re-solved, so `mouse-x − pressed-x` is always the pointer's
+                    // travel since the press MINUS the offset already applied — which is exactly
+                    // the increment left to apply.
+                    fxdrag := TouchArea {
+                        mouse-cursor: move;
+                        moved => {
+                            if (self.pressed) {
+                                root.ddx += self.mouse-x - self.pressed-x;
+                                root.ddy += self.mouse-y - self.pressed-y;
+                            }
+                        }
+                        pointer-event(e) => {
+                            if (e.kind == PointerEventKind.up) {
+                                // Publish the CLAMPED landing (root.x/y are the clamped bindings),
+                                // so the session's "last dragged position" can never be a point
+                                // outside the window. Rust updates the row synchronously inside
+                                // this call, so zeroing the offset next does not flash.
+                                root.moved(root.x / 1px, root.y / 1px);
+                                root.ddx = 0px; root.ddy = 0px;
+                            }
+                        }
+                    }
+                    Text {
+                        width: 100%; height: 100%;
+                        text: root.name;
+                        color: Theme.text;
+                        font-size: Theme.title-size; font-weight: 600;
+                        vertical-alignment: center; overflow: elide;
+                    }
+                }
+                // THE PIN, beside the filename exactly as the ruling asks. Pressed = pinned to this
+                // photograph; released = the panel follows the current image.
+                fxpin := IconBtn {
+                    width: Theme.hit-primary; height: Theme.hit-primary;
+                    active: root.pinned;
+                    // v0.8.160 (Y7): a dot is a signifier, not an instruction — the tip is
+                    // STATE-DERIVED and names both the state and what a click does (L20's
+                    // per-state honesty on a toggle). IconBtn's `changed tip` re-publishes on the
+                    // flip, so clicking while hovering swaps the sentence under the pointer.
+                    tip: root.pinned ? root.tip-pinned : root.tip-following;
+                    clicked => { root.toggle-pin(); }
+                    Rectangle {
+                        // L41: 12px in 28px → x = y = 8, integer AND even; 1.5px is the ledger's
+                        // minimum mark weight. ComparePinLabel's 11px dot would centre on 8.5 here.
+                        width: 12px; height: 12px; border-radius: 6px;
+                        x: (parent.width - 12px) / 2; y: (parent.height - 12px) / 2;
+                        background: root.pinned ? Theme.accent : transparent;
+                        border-width: 1.5px;
+                        border-color: root.pinned ? Theme.accent : Theme.text-mute;
+                    }
+                }
+                fxclose := IconBtn {
+                    width: Theme.hit-primary; height: Theme.hit-primary;
+                    // L39: this arm INVOKES and does nothing else. The close is Rust's — it owns
+                    // the list, and a Slint-side dismissal beside the invoke is the double-arm class.
+                    clicked => { root.close(); }
+                    CloseGlyph {
+                        x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
+                        width: 16px; height: 16px;
+                    }
+                }
+            }
+            HRule { }
+            ExifRowsView {
+                rows: root.rows;
+                interactive: true;
+                avail: root.avail;
+            }
+        }
+    }
+
+    // v0.8.120 (design-sweep O38): the same rule on a HORIZONTAL seam. The owner's panel-bottom
+    // gradient ruling exists because a scrollable body that hard-clips gives no sign that content
+    // continues; a body that PANS sideways and clips gives no sign either, and the welcome panel
+    // does exactly that below its 1028px hug width. Sibling of PanelBottomFade in every respect —
+    // same 28px band, same token-derived transparent→panel-colour pair, same `more` opacity gate,
+    // same PURE PAINT contract (no TouchArea, so wheel/clicks reach the Flickable underneath, and
+    // the caller overlays it AFTER the scroll body and sizes it against the viewport). The 270deg
+    // angle puts the OPAQUE stop at the RIGHT edge, mirroring 0deg's opaque-at-the-bottom.
+    export component PanelRightFade inherits Rectangle {
+        in property <bool> more: true;
+        width: 28px;
+        background: @linear-gradient(270deg, Theme.base 0%, Theme.base.with-alpha(0.0) 100%);
+        opacity: root.more ? 1.0 : 0.0;
+        animate opacity { duration: Theme.anim; easing: ease; }
+    }

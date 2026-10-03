@@ -1,0 +1,829 @@
+// v0.9.5 (ui.rs extraction series): the HUD / cull affordances (HudChip, CullButton,
+// DropZone, ComparePinLabel, CullActionRow) extracted VERBATIM from the slint! macro
+// in src/ui.rs. `export` added — they were macro-file-local.
+
+import { Theme, Tip } from "theme.slint";
+import { GlassPanel } from "panels.slint"; // v0.8.163 (§7 item 5): ComparePinLabel's base is the house glass
+import { CacheBar, Star, StarBulkPill } from "widgets.slint";
+import { FlagGlyph, ArchiveGlyph, GridGlyph, FilmFrameBlock, LeafGlyph } from "glyphs.slint";
+
+    // v0.9.59 (OWNER RULING 08-02, item S4b): the title-bar CACHE-STATUS METER, extracted VERBATIM
+    // from main_window.slint's left button row so it can mount on EITHER side of the bar without a
+    // second copy of its geometry. The owner moved it, on macOS only, to sit immediately left of the
+    // notification bell ("so the left-right side is slightly more balanced - for windows, keep as
+    // is"), and two hand-copies of a 62px split-bar would be one edit away from drifting.
+    //
+    // One fixed-width bar split into a BEHIND (left) and AHEAD (right) half. The split point moves
+    // with position in the folder (each half's width ∝ shots available to cache that way), the total
+    // width is constant, and each half fills toward the centre in traffic-light colour as decoding
+    // catches up — so a cold jump drops to red and visibly climbs to green, and near a folder edge
+    // the short side is simply "fewer shots that way" (not "under-cached") [status visibility].
+    //
+    // The host owns the MOUNT GATE (`cache-meter-show && hudclip.ctrl-show`) and the hover latch, so
+    // the L22 cleanup on the ctrl-show hide edge keeps working from exactly where it always did.
+    export component CacheMeter inherits Rectangle {
+        in property <float> len-before;
+        in property <float> len-after;
+        in property <float> frac-before;
+        in property <float> frac-after;
+        in property <bool> hit: true;                      // M6 input gate (host passes !immersive)
+        // v0.8.196 (WAVE 2, §C) x v1.0 MERGE: the efficiency posture's PUBLISHED bit, mount-gating the
+        // leaf (L4 — an `if`, never a `visible:`). Passed by BOTH hosts, so the two anchors are one body.
+        in property <bool> leaf;
+        // has-hover + the meter's WINDOW-SPACE centre x, for the hoisted tooltip twin at the root.
+        callback hover-changed(bool, length);
+        // ── v0.8.196 (WAVE 2, §C + THE MERGE SEAM): NAMED, BECAUSE THIS REGION IS THE MAC BRANCH'S
+        // F1-1 HAZARD. Its 44 px literals are what the Phase-2 F1-1 fix rewrites, so every width this
+        // wave adds is spelled ONCE here and every offset below is derived from these names — a merge
+        // has one place to touch rather than five arithmetic sites. `meter-w` is the pre-existing 62,
+        // unchanged and unchangeable by this round: it is the OUTER footprint the title-bar geometry
+        // contract pins (Windows: 2px lead-in + 5·40 buttons + 62 = 264 ≤ the frozen 286 `hudclip`
+        // reservation; macOS: 62 + 40 = 102 ≤ 110 in the right group).
+        property <length> meter-w: 62px;
+        property <length> leaf-box: 12px;   // EVEN, ≤16 — see glyphs.slint LeafGlyph
+        // v0.8.196 fix tail (skeptic B, R1): the CacheBar's own minimum pill (`widgets.slint`: the inner
+        // fill is `max(parent.height, …)` and the track is 8 px tall), spelled here because the FLOOR has
+        // to be computed against the track actually in force. See `mf` below.
+        property <length> min-fill: 8px;
+        width: root.meter-w;
+        // ── v0.8.196 FIX TAIL (skeptic A, O7): THE LEAF'S LEAD IS STRUCTURAL. ────────────────
+        // The round first spelled it as a second ternary on the posture bit, so an always-mounted
+        // `visible:`-gated glyph would have left the track at its full width and NOTHING would have
+        // reddened (the rig cannot see an invisible element — M16). A HorizontalLayout makes the mount
+        // and the lead ONE fact: a glyph that exists takes its 12 px and the layout's 4 px spacing out
+        // of the track, whether it is painted or not, so `visible:` fails the track-width row.
+        HorizontalLayout {
+            x: 0; y: 0; width: 100%; height: 100%;
+            spacing: Theme.space-1;   // exists only when there are two children
+            // The glyph, mount-gated on the published posture bit (L4).
+            //
+            // v1.0.0-rc TAIL (OWNER FIELD BUG, skeptic-B round): THE COMMENT THAT USED TO SIT HERE WAS
+            // FALSE, AND THE OWNER SAW IT. It said "the layout centres it on the 44 px row — (44 − 12)
+            // / 2 = 16"; a Slint `HorizontalLayout` does NOT centre a child that declares its own
+            // height on the cross axis, so the glyph rendered at **y = 0**, hard against the top of
+            // the cell, beside a bar that is centred. The rig row that guarded the mount asserted
+            // `ly % 2.0 == 0.0` — and 0 is even, so it passed on the defect. An even coordinate is not
+            // a centred one, and the row now measures the CENTRE (see
+            // `the_efficiency_leaf_is_centred_on_the_meters_own_row`).
+            //
+            // The fix is the house wrapper idiom this very file already uses two components down (the
+            // `HudChip` icons, v0.8.188 L41/L46): a full-height cell of exactly `leaf-box` width, with
+            // the glyph floored to its centre inside it. The STRUCTURAL LEAD IS UNCHANGED — the cell
+            // is still 12 px and the layout still takes 12 + spacing out of the track, so the A-O7
+            // falsifier (`visible:` instead of `if` leaves the track at full width) still reds — and
+            // the floor keeps the mount on a whole logical pixel if the 44 px row ever changes:
+            // (44 − 12) / 2 = 16, even, over a cell whose own x is even (L46).
+            if root.leaf : Rectangle {
+                width: root.leaf-box; horizontal-stretch: 0;
+                leafglyph := LeafGlyph {
+                    width: root.leaf-box; height: root.leaf-box;
+                    x: 0; y: Math.floor((parent.height - self.height) / 2 / 1px) * 1px;
+                }
+            }
+            // THE TRACK. `clip` is the belt to the floor's braces (skeptic B, R1): a CacheBar's inner
+            // fill is floored at its own 8 px height for ANY non-zero fraction, so a half narrower than
+            // that painted PAST the meter's 62 px cell — 2.4 px past it, in the near-folder-edge state a
+            // user is in at every folder open. Painting and hit-testing both stop at the track now.
+            track := Rectangle {
+                horizontal-stretch: 1;
+                clip: true;
+                property <bool> both: root.len-before > 0.0 && root.len-after > 0.0;
+                // collapse the centre gap when one side is empty (a folder edge → one full bar)
+                property <length> gap: self.both ? Theme.space-1h : 0px;
+                property <length> track-w: self.width - self.gap;
+                // v0.8.196 fix tail (skeptic B, R1): the floor is 8 PX AGAINST THIS TRACK, not a fraction
+                // of a bar whose width changed underneath it. `tick::step_cache_meter`'s `MIN_LEN` is a
+                // 0.14 SHARE tuned to the 56 px released track ("~8 px of the 62 px bar"); the leaf takes
+                // the track to 40, where the same share is 5.6 px — a blob whose fill reads 100 % full at
+                // 5 % cached and overhangs the cell. The share still keeps a half visible; this keeps it
+                // LEGIBLE, in pixels.
+                property <length> mf: min(root.min-fill, self.track-w / 2);
+                property <length> lw: self.both
+                    ? max(self.mf, min(self.track-w - self.mf, self.track-w * root.len-before))
+                    : (root.len-before > 0.0 ? self.track-w : 0px);
+                property <length> rw: self.both
+                    ? self.track-w - self.lw
+                    : (root.len-after > 0.0 ? self.track-w : 0px);
+                // v0.8.113 — THE CONTRACT THESE TWO GATES DEPEND ON: exactly one of the two lengths may
+                // be 0, and only at a FOLDER EDGE. `step_cache_meter` guarantees it never publishes
+                // 0 + 0 (a collapsed prefetch window is a PAUSE, and the meter holds its last steady
+                // reading through one — see support::meter_available). Before that guarantee existed,
+                // every settle of a HEIC browse published 0 + 0, both gates went false, and the whole
+                // indicator unmounted and remounted: the owner's "disappears and flashes back". Do NOT
+                // "fix" that class of bug here — a zero denominator is a feed defect, and hiding it
+                // behind a visible: toggle would churn layout.
+                if root.len-before > 0.0 : CacheBar {
+                    x: 0; y: (parent.height - self.height) / 2;
+                    bar-w: parent.lw; frac: root.frac-before; anchor-right: true;
+                }
+                if root.len-after > 0.0 : CacheBar {
+                    x: parent.lw + parent.gap; y: (parent.height - self.height) / 2;
+                    bar-w: parent.rw; frac: root.frac-after;
+                }
+                // current-photo marker: a small dot in the gap at the divider between the behind/ahead
+                // halves — "you are here". Only when both halves exist (at a folder edge the divider is
+                // at the bar end, so there's nothing to straddle).
+                if track.both : Rectangle {
+                    width: 5px; height: 5px; border-radius: 2.5px;
+                    background: Theme.text;
+                    x: track.lw + (track.gap - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+        cmta := TouchArea {
+            enabled: root.hit;
+            // v0.8.120 (design-sweep Y74): report the meter's window-space CENTRE for the hoisted
+            // tooltip twin at the window root. Read on THIS TouchArea — an x=0, full-size child —
+            // never on a positioned component root (the v0.8.45 absolute-position rule; the same
+            // read point HudChip's `ax` uses).
+            changed has-hover => {
+                root.hover-changed(self.has-hover, self.absolute-position.x + self.width / 2);
+            }
+        }
+        // v0.8.120 (design-sweep Y74): the bespoke in-bar tooltip that used to live HERE is gone. It
+        // was a child of the meter inside the title bar's left button row, i.e. painted at window
+        // y=47 UNDER the Settings panel (x 3..363), the Browse-speed popup (x 44..484) and the
+        // Selection panel — all of which mount later in the tree — so hovering the meter with any of
+        // them open produced nothing and read as "the meter has no tooltip". Its replacement is an
+        // always-mounted display-only twin at the window root, beside `tiplayer`.
+    }
+
+    // Title-bar HUD chip (C1): the path / pick-count / reject-count chips share ONE grammar —
+    // a 26px well pill with a hairline border, an optional leading cull glyph and a dim label.
+    // `icon` 0 = none / 1 = flag (picks) / 2 = archive (rejects). `clicked` is wired per call site.
+    export component HudChip inherits Rectangle {
+        in property <int> icon: 0;
+        in property <string> label;
+        in property <bool> hit: true; // M6 (v0.8.19): input gate — false = clicks/hover pass through (fading title bar)
+        in property <string> tip: ""; // G11 (v0.8.44): optional delayed-tooltip label, reported to the shared Tip channel
+        // v0.8.58 (owner): SHOT-INVARIANT FRAME templates — when widest-a is set, the chip's
+        // width fits the WIDER of the two template renderings (+4px slack), NOT the live label.
+        // Inter's digits are PROPORTIONAL (Slint 1.17 exposes no tabular-figures/font-features
+        // API — checked i-slint-core's Text), so a re-rendered counter ("29/65" → "30/65")
+        // changes the text width by fractions of a px, and a content-hugging chip re-flowed the
+        // whole centred title-bar cluster every shot — the residual flicker after the v0.8.57
+        // pill tiers. TWO templates because "which digit renders widest" is a font metric no
+        // call site should hardcode: callers pass all-0s and all-8s of the right shape and the
+        // chip measures both. The label CENTRES inside the fixed frame — a sub-px glyph wobble
+        // INSIDE a still frame is the accepted design; frame movement is not. widest-a == ""
+        // (the default) keeps the historic content-hugging width, byte-identical.
+        in property <string> widest-a: "";
+        in property <string> widest-b: "";
+        property <bool> stable: root.widest-a != "";
+        callback clicked;
+        // v0.8.49: the chip's window-space anchor X for the sort menu — read off the x=0 TouchArea
+        // (the v0.8.45 rule: absolute-position on a layout-positioned component ROOT double-counts
+        // its own x; the TouchArea child is the proven-safe read point, exactly like Tip.cx below).
+        out property <length> ax: hudta.absolute-position.x;
+        height: 26px; border-radius: Theme.radius-sm;
+        // stable = template width + the layout's 16px side padding + the icon cell (13px + 5px
+        // spacing) when present + 4px slack; else the layout's preferred = the historic hug.
+        width: root.stable
+            ? max(ma.preferred-width, mb.preferred-width) + 16px + (root.icon != 0 ? 18px : 0px) + 4px
+            : content.preferred-width;
+        background: hudta.has-hover ? Theme.well-hover : Theme.well;
+        border-width: 1px; border-color: Theme.border-strong; // v0.8.18: restored the v0.8.10 constant border-strong hairline (the v0.8.14 hover-null reverted with the lift family)
+        animate background { duration: Theme.anim; easing: ease; }
+        // hidden measurers — the label's exact font spec; text metrics are visibility-independent
+        ma := Text { visible: false; text: root.widest-a; font-size: Theme.font-md; font-weight: 600; }
+        mb := Text { visible: false; text: root.widest-b; font-size: Theme.font-md; font-weight: 600; }
+        content := HorizontalLayout {
+            padding-left: Theme.space-2; padding-right: Theme.space-2; spacing: 5px;
+            // v0.8.188 (L41/L46 sweep): a 13px glyph centred by `alignment: center` in this 26px
+            // chip is a HALF-logical mount — (26 − 13)/2 = 6.5, absolute y 15.5, device 23.25 at
+            // 150%. The wrapper becomes a declared 13px cell and the glyph floors itself inside it
+            // exactly as `MinimizeIcon` does (glyphs.slint): 6, and with the row origin now even
+            // (main_window.slint's `hudrow`, y = 10) the absolute is 16 -> device 24.0, whole.
+            if root.icon == 1 : Rectangle {
+                width: 13px; horizontal-stretch: 0;
+                FlagGlyph { tint: Theme.text-dim; width: 13px; height: 13px;
+                            x: 0; y: Math.floor((parent.height - self.height) / 2 / 1px) * 1px; }
+            }
+            if root.icon == 2 : Rectangle {
+                width: 13px; horizontal-stretch: 0;
+                ArchiveGlyph { tint: Theme.text-dim; width: 13px; height: 13px;
+                               x: 0; y: Math.floor((parent.height - self.height) / 2 / 1px) * 1px; }
+            }
+            // horizontal centre + stretch: inert while hugging (no spare width), centres the live
+            // text inside a stable frame (v0.8.58).
+            Text { text: root.label; color: Theme.text-dim; font-size: Theme.font-md;
+                   font-weight: 600; vertical-alignment: center;
+                   horizontal-alignment: center; horizontal-stretch: 1; }
+        }
+        hudta := TouchArea {
+            enabled: root.hit;
+            mouse-cursor: pointer;
+            // G11 (v0.8.44): tooltip hover report (same owner-side observer as IconBtn's). The chips
+            // sit inside hudclip (clip: true) — an in-place tip below the bar would be clipped, so
+            // the shared window-root layer renders it instead. v0.8.45 (Fix 2): cx reads SELF (x=0
+            // TouchArea), not root — the layout-positioned-root double-count (see IconBtn's note).
+            changed has-hover => {
+                if (root.tip != "") {
+                    if (self.has-hover) { Tip.text = root.tip; Tip.cx = self.absolute-position.x + root.width / 2; }
+                    else if (Tip.text == root.tip) { Tip.text = ""; }
+                }
+            }
+            clicked => { root.clicked(); }
+        }
+    }
+
+    // v0.8.52 (owner fix 4): title-bar SECTION INDICATOR — shows AND toggles a UI section
+    // (filmstrip / folder grid). The HudChip family verbatim (26px, well fill + hover lift,
+    // hairline, Tip channel, M6 hit gate) with the title-bar panel buttons' ACTIVE grammar
+    // (Theme.accent-soft — the IconBtn active wash token).
+    // v0.8.54 (owner refinement, his screenshots): the glyphs gain an ORIENTATION LINE — the
+    // edge the section appears from — and more minimal geometry, ONE icon family with the
+    // show pills (edges.slint carries the pill-scale twins): icon 1 = filmstrip — three
+    // hollow 6px frames over a HORIZONTAL line (the bottom edge); icon 2 = grid — a VERTICAL
+    // line on the left (the left edge) + 3×3 small FILLED square dots. v0.8.190 (owner ruling
+    // 08-15): both rule-lines are the shared 1px anti-aliased `AaHairline` — the drawing he
+    // picked out of the v0.8.189 comparison, with its length bug fixed. The mechanism lives at
+    // that component's banner in glyphs.slint, once; do not restate it here.
+    // Everything tones accent when ON.
+    export component SectionChip inherits Rectangle {
+        in property <int> icon: 1;   // 1 = filmstrip / 2 = grid
+        in property <bool> on: false;
+        in property <bool> hit: true; // M6: input gate (fading title bar)
+        in property <string> tip: "";
+        callback clicked;
+        // v0.8.139 HOTFIX (owner report): 32 → 34. See the mount banner below — the HOST WIDTH IS
+        // THE FREE VARIABLE, and 34 is the value that puts both icons' true centre on the even grid.
+        width: 34px; height: 26px; border-radius: Theme.radius-sm;
+        background: root.on ? Theme.accent-soft : (scta.has-hover ? Theme.well-hover : Theme.well);
+        border-width: 1px; border-color: Theme.border-strong;
+        animate background { duration: Theme.anim; easing: ease; }
+        property <color> tone: root.on ? Theme.accent : Theme.text-dim;
+        // filmstrip: three hollow frames + the horizontal line UNDERNEATH (the strip's bottom edge)
+        // v0.8.119 (B1-29 (c)): the SHARED block (glyphs.slint) - the bottom edge pill draws this
+        // same instance now instead of its own 44px copy.
+        //
+        // ── v0.8.138 (X4): THE MOUNT ARITHMETIC, RE-DERIVED FROM 22px AND FLOORED. ─────────────
+        // The block went 19px -> 22px to make its internal pitch even (the odd-pitch defect the
+        // owner reported; see glyphs.slint for the full derivation). This host had a half-pixel
+        // origin of its own the whole time and it is worth naming, because it is the mount half of
+        // the same class: (32 - 19) / 2 = 6.5px, so the block was ALREADY starting on a half
+        // logical px before its frames' odd pitch got to add its own. The new numbers:
+        //   x = (32 - 22) / 2 = 5px           <- integer, was 6.5
+        //   y = (26 - 6 - 2 - 1.4) / 2 = 8.3  <- floored to 8px
+        // The y cannot be integer by construction because the block's height carries the 1.4px
+        // stroke, so it takes L41's other arm and floors. Floored rather than rounded, and floored
+        // at BOTH axes rather than only the one that needs it today, so a future chip resize cannot
+        // reintroduce a half-pixel mount silently.
+        //
+        // ── v0.8.139 (AA/H4): INTEGER WAS NOT ENOUGH — THE FLOOR GOES TO THE EVEN GRID. ────────
+        // X4 landed both twins on whole LOGICAL pixels, which is what it claimed. At 150% that is
+        // not the same as whole DEVICE pixels: an odd logical integer is already a half device
+        // pixel. Post-X4 this host mounted at (5, 8) -> device (7.5, 12.0) and the bottom edge pill
+        // at (31, 9) -> device (46.5, 13.5). Horizontally the twins agreed (both .5) but ALL THREE
+        // frames smeared together in both; vertically they were still exactly half a device pixel
+        // apart, which is H4's reported symptom — the title-bar copy weighting its lower boundary
+        // rows and the pill copy its upper ones, so the same icon read top-heavy in one place and
+        // bottom-heavy in the other. Snapping both axes to the even grid fixed the rasterisation.
+        //
+        // ── v0.8.139 HOTFIX (OWNER REPORT): SNAPPED, AND VISIBLY OFF-CENTRE. ───────────────────
+        // "the icons are not centered in the buttons" — and they were not. Even-snapping a host
+        // whose true centre is ODD can only ever move the icon AWAY from centre: at 32px wide this
+        // block's true origin was 5 and the even floor gave 4, so the filmstrip sat 1px left in a
+        // 32px chip (4/6 margins). AA's banner called that "THE PRICE, STATED" and argued it could
+        // not be fixed "by resizing the block" — which is true of the BLOCK and was the wrong
+        // variable. The two hosts' HEIGHTS are what can never share a parity; nothing forced their
+        // WIDTHS, and the owner has now authorised moving them: "you can also try slightly changing
+        // the width of the button if it would make it easier to center while maintaining sharpness".
+        //
+        // THE RULE, replacing the trade: THE HOST DIMENSION IS CHOSEN SO THAT TRUE CENTRE LANDS ON
+        // THE EVEN GRID. Centring a block of width b in a host of width h is exact-and-even exactly
+        // when (h − b) ≡ 0 (mod 4). Here b = 22, so h ≡ 22 ≡ 2 (mod 4): 34 qualifies, 32 does not.
+        // The chip goes 32 → 34 and this mount becomes exact, with no price to state:
+        //   x = round-even((34 − 22) / 2) = round-even(6)   = 6   <- TRUE CENTRE, exactly (was 4)
+        //   y = round-even((26 − 6 − 2 − 1.4) / 2) = re(8.3) = 8   <- 0.3 high; see below
+        // Device at 150%: (9.0, 12.0) — both whole, so the snap costs nothing it used to cost.
+        //
+        // WHY ROUND-TO-EVEN AND NOT FLOOR-TO-EVEN: the y cannot be exact by construction (the
+        // block's height carries the 1.4px stroke), so it is the one coordinate still being snapped
+        // and it should be snapped to the NEAREST even, not the lower one. That matters at the twin,
+        // not here: 8.3 rounds and floors alike to 8, while the pill's 9.3 floored to 8 (1.3px high,
+        // part of what the owner is seeing) and rounds to 10 (0.7px low). The expression stays
+        // BYTE-IDENTICAL at both hosts, which is the property the twin rows certify — one arithmetic,
+        // two host dimensions. No input here is a .5 tie, so the rounding mode is not load-bearing.
+        //
+        // ── v0.8.188 (L46, OWNER REPORT: "the filmstrip icon looks off when maximized"): ─────────
+        // Everything above is TRUE AND WAS NOT ENOUGH, because every number in it is measured from
+        // `parent`, and the parent was itself landing on a half device row. This chip sat at y = 9
+        // in the 44px bar (an `alignment: center` over 26px), so the exact-and-even 8 computed here
+        // arrived at ABSOLUTE 17 — device 25.5 at 150%, a half row, permanently. A snapped mount
+        // inside an unsnapped parent inherits the parent's phase; the local arithmetic can be
+        // perfect and still land wrong. The row's own origin is now snapped ONCE, on both axes, at
+        // main_window.slint's `hudrow` (chip y = 10, x even), so this mount's 8 composes:
+        //   block absolute y = 10 + 8 = 18 -> device 27.0; the line at 18 + 6 + 2 = 26 -> device 39.0
+        // The subtraction also stops guessing the block's height: `self.block-h` is the number the
+        // component itself declares (9px = 6 + 2 + 1 after the one-weight ruling), so a future
+        // change to the glyph cannot leave this arithmetic behind. Output is unchanged at BOTH
+        // hosts — re(8.5) = 8 here, re(9.5) = 10 at the edge pill, exactly what 9.4 produced.
+        if root.icon == 1 : FilmFrameBlock {
+            x: Math.round((parent.width - 22px) / 2 / 2px) * 2px;
+            y: Math.round((parent.height - self.block-h) / 2 / 2px) * 2px;
+            tint: root.tone;
+        }
+        // grid: the vertical rule on the LEFT (the dock's left edge) + 3×3 filled square dots.
+        // ── v0.8.190: ONE DERIVATION, AND IT IS NOT HERE ANY MORE. ────────────────────────
+        // This host and edges.slint's `EdgePillLeft` each carried a byte-identical copy of the
+        // dot-origin arithmetic, the rule element and the `GridDotBlock` mount, kept in step by
+        // comment — the L7 shape this glyph pair has drifted on twice (v0.8.119, v0.8.188). The
+        // derivation now lives ONCE in glyphs.slint's `GridGlyph`, which fills its host and
+        // solves its own centring from the host's box, so a mount says only which tint it wants.
+        // Measured output is byte-identical to the 1px cell the owner judged; the numbers are
+        // pinned in `the_grid_rule_is_the_film_lines_walk_transposed`, not restated here.
+        // The TouchArea below is unaffected: a Rectangle child never takes input.
+        if root.icon == 2 : GridGlyph { tint: root.tone; }
+        scta := TouchArea {
+            enabled: root.hit;
+            mouse-cursor: pointer;
+            // the shared delayed-tooltip report (HudChip's observer, verbatim)
+            changed has-hover => {
+                if (root.tip != "") {
+                    if (self.has-hover) { Tip.text = root.tip; Tip.cx = self.absolute-position.x + root.width / 2; }
+                    else if (Tip.text == root.tip) { Tip.text = ""; }
+                }
+            }
+            clicked => {
+                // v0.8.53 (hotfix, audit ORANGE): a SectionChip tip is DYNAMIC — the click flips
+                // the section state and the binding with it ("Hide…" ⇄ "Show…"), so the unhover
+                // guard above (which only clears a tip it STILL owns) could never reclaim the
+                // pre-flip string and a stale, now-wrong tooltip lingered. Clear the latch NOW,
+                // BEFORE root.clicked() flips the state — the ownership compare still matches.
+                if (Tip.text == root.tip) { Tip.text = ""; }
+                root.clicked();
+            }
+        }
+    }
+
+    // EXIF pick/reject toggle (Figma "dim rest → SOLID active"): a soft tint at rest, the full solid
+    // colour + light text when engaged. `danger` picks the reject (red + archive glyph) vs pick (blue +
+    // flag glyph) family; `on` is the engaged state; caller sets width + wires `toggled`.
+    export component CullButton inherits Rectangle {
+        in property <string> label;
+        in property <bool> danger: false;
+        in property <bool> on: false;
+        out property <bool> hovered: ta.has-hover; // exposed so the panel's hover-glass can OR it in
+        in property <bool> hit: true; // M6 (v0.8.19): input gate — false = input passes through (fading immersive chrome)
+        // v0.8.133 (the visual wave, C): this button would act on N photographs. Section 4's rule for
+        // a bulk-armed control is GLOW ONLY, never a rim ("cleaner", owner verbatim) — so the state
+        // rides a drop-shadow and nothing else moves. 6px is this surface's measured radius: the
+        // button sits inside the EXIF panel's 16px padding with the panel's own glass beyond it, so
+        // the halo has room, and 6/26 = 0.23 puts it in the same ratio family as the tile (0.13), the
+        // corner badges (0.18) and the star carrier (0.28).
+        in property <bool> glow: false;
+        // v0.8.133 (C.4 iii, ledger L5): the button HUGS its label above a floor, instead of the two
+        // hard 70/86px literals it carried. While armed the label is counted AND directed ("Unflag
+        // 12"), which no fixed width can hold: at 276px of row budget the old literals left the row
+        // 1px of slack, so the first three-digit selection ran the stars off the glass. The floors
+        // ARE the old literals, so the single-photo row is byte-identical.
+        in property <length> min-w: 70px;
+        callback toggled;
+        property <color> tone: root.danger ? Theme.danger : Theme.accent;
+        property <color> fill: root.danger ? Theme.danger-soft : Theme.accent-soft;
+        in property <color> fill-hover: root.fill; // D10: explicit hover step for the soft rest
+        // v0.8.135 (W3) - THE ARMED REST FILL IS OPAQUE, and that is the whole fix for "the armed
+        // row looks washed out". `fill` is a TRANSLUCENT tint (accent-soft 16% / danger-soft 24%),
+        // and the 6px 55%-white halo this button casts while armed renders BEHIND it - so the halo's
+        // own core shone straight through the button's face and greyed the glyph and the label with
+        // it. The hover step is already an OPAQUE flatten of that same tint over the panel's base
+        // (`fill-hover` = accent-hover-flat / danger-hover-flat, the v0.8.48 tokens), which is the
+        // hover grammar the owner endorsed - so while armed-and-off the button simply RESTS at it.
+        // No rim, no new token, one expression: armed OR hovered means the opaque flatten.
+        //
+        // ── v0.8.136 (V2, owner report) — ...AND THEN HOVER HAD NOWHERE LEFT TO GO. ───────────────
+        // Moving the armed REST onto `fill-hover` moved it onto the state the pointer used to
+        // produce, so with a selection live the two counted buttons answered a hover with nothing at
+        // all: "these buttons now have no hover state when some photos are selected" (owner
+        // verbatim). A control that would write to twelve photographs is the LAST one allowed to go
+        // quiet under the pointer.
+        //
+        // ── v0.8.137 (W4) — THE THIRD CORRECTION, AND THE LAST ONE THIS NEEDS. ────────────────────
+        // v0.8.136 answered it by promoting the armed hover to `tone` (the ON state's own fill) and
+        // stepping the halo 55 -> 85. The owner's fourth feel-test rejects the whole shape of that
+        // answer, not its values: "I simply want identical hover effects for both normal (no
+        // selection) and bulk (some photos selected) mode, not a new hover effect that is
+        // inconsistent with the rest of the app."
+        //
+        // So the rule is one sentence, and it is the app's, not this button's: A HOVER IS THE REST
+        // FACE WASHED BY Theme.hover. Unarmed, rest is `fill` (the soft tint) and hover is
+        // `fill-hover` (its opaque flatten). v0.8.137 gave the armed state its own SHIFTED-UP
+        // version of that pair; v0.8.138 (X6, below) deletes the shift, because shifted up is
+        // brighter and brighter is what the owner went on to name.
+        //
+        // Three things v0.8.136 did are therefore undone, each for the same reason:
+        //  - `solid` is `root.on` ALONE again. The ON tone is a fact about the photographs ("all 12
+        //    already carry this mark"); letting a pointer produce it made the strongest state in the
+        //    button reachable by hovering, which no other control here does.
+        //  - the glyph and the label re-key on `on`, because they follow the tone that means ON.
+        //  - the HALO DOES NOT STEP. It is constant at glow-select while armed. A halo step is a
+        //    hover effect normal mode does not have, which is precisely what he asked to remove;
+        //    the halo says "plural", and how many photographs this button would write to does not
+        //    change when the pointer arrives.
+        //
+        // WHY THE RIM STAYS KEYED ON `on` ALONE: armed-off-hovered and armed-on-at-rest are close in
+        // tone, and the 1px divider rim is what tells them apart — it means "this group ALREADY
+        // carries the mark", a fact about the photographs, never a fact about the pointer. (The
+        // label says it too: "Unflag 12" is only ever composed for a set that is entirely flagged.)
+        // The section-4 "glow only, never a rim" ruling is about the BULK state, which is still
+        // carried by the halo alone; this rim predates the selection round and is unchanged.
+        //
+        // ── v0.8.138 (X6) — THE OWNER'S COMPLETE MODEL, WHICH RETIRES THE LADDER ABOVE. ──────────
+        // "the glow should not make the whole button brighter or darker, simply just add the glow,
+        // and other parts should be the same in terms of hover and styling."
+        //
+        // Every previous answer here, including v0.8.137's, kept a two-rung ladder: the armed pair
+        // was the unarmed pair SHIFTED UP. Shifted up is brighter, and brighter is the thing he has
+        // now named directly. So there is no armed ladder any more. An armed button is styled
+        // IDENTICALLY to a normal one — same rest, same hover, same glyph, same label treatment,
+        // same rim — and arming adds exactly two things: THE HALO, and THE COUNTED LABEL.
+        //
+        // The one honest complication is opacity, not colour. `fill` is a translucent tint, and a
+        // 55%-white halo renders BEHIND this button's face, so an armed button wearing the
+        // translucent rest shows the halo's core through itself and lifts — which is the v0.8.135
+        // defect and, read literally, the "brighter" in his sentence. So the armed rest is
+        // `fill-soft-flat`: the OPAQUE FLATTEN of the very same tint over the same base (theme.slint
+        // / X6). Same rendered pixel on this button's guaranteed-solid host, no halo bleed. The
+        // difference is a rendering fact, not a visual state.
+        //
+        // HOVER IS NOW ONE FACE, `fill-hover`, ARMED OR NOT — which is what makes the whole
+        // expression below shorter than what it replaces, and is the clearest evidence the model is
+        // right: the rule needed no armed arm at all.
+        property <bool> solid: root.on;
+        // The armed REST face — the opaque twin of `fill`. Derived here rather than passed in, for
+        // the reason `tone` and `fill` are: it is a pure function of `danger`, never a caller's
+        // decision. (This replaces v0.8.137's `fill-armed-hover`, deleted with its two tokens.)
+        property <color> fill-soft-flat: root.danger ? Theme.danger-soft-flat : Theme.accent-soft-flat;
+        height: 26px; border-radius: Theme.radius-sm;
+        // v0.8.136 (V1): the hug is PUBLISHED, and `width` is now just a mirror of it. The EXIF
+        // panel sizes itself from this row's line-1 need, and a need summed from the buttons'
+        // laid-out `width` would close a loop through the panel that produced that width. `hug` is a
+        // pure function of the label (a content-derived `preferred-width` plus this component's own
+        // padding), computed in the layout-info pass and never read back from it — so the panel can
+        // depend on it and the arithmetic still has exactly one home.
+        out property <length> hug: max(root.min-w, brow.preferred-width + 2 * Theme.space-2);
+        width: root.hug;
+        // v0.8.138 (X6): ONE hover face for both modes — the armed arm survives only in the REST
+        // term, and only to swap a translucent tint for its opaque twin. Written in this order
+        // deliberately: hover is decided BEFORE arming is consulted, so the expression itself says
+        // "the pointer's answer does not depend on the selection".
+        background: root.solid ? root.tone
+                  : (ta.has-hover ? root.fill-hover
+                                  : (root.glow ? root.fill-soft-flat : root.fill));
+        border-width: 1px;
+        border-color: root.on ? (Theme.divider) : transparent;
+        // v0.8.137 (W4): CONSTANT while armed — the halo counts photographs, not pointers.
+        drop-shadow-color: root.glow ? Theme.glow-select : transparent;
+        drop-shadow-blur: 6px;
+        drop-shadow-offset-y: 0px;
+        animate background, drop-shadow-color { duration: Theme.anim; easing: ease; }
+        // v0.8.14 (Item 3): press-lift on the colored Flag/Reject buttons (black shadow; colour carries meaning, shadow carries pressability)
+        brow := HorizontalLayout {
+            alignment: center; spacing: Theme.space-1h;
+            VerticalLayout { alignment: center;
+                // v0.8.136 (V2) / v0.8.137 (W4): the glyph and the label ride `solid`, which is
+                // `on` again — a tone-coloured label on its own tone is invisible, so the ON fill
+                // and the label treatment stay one decision.
+                // v0.8.138 (X6): and there is no armed branch here to check any more. `solid` is
+                // `root.on` and nothing else, so the glyph tint, the label colour and the rim are
+                // literally the same expressions armed and unarmed — which is the "other parts
+                // should be the same in terms of hover and styling" half of the owner's ruling,
+                // satisfied by there being nothing to satisfy.
+                if root.danger : ArchiveGlyph { width: 14px; height: 14px; tint: root.solid ? Theme.text-on-accent : root.tone; }
+                if !root.danger : FlagGlyph { width: 14px; height: 14px; tint: root.solid ? Theme.text-on-accent : root.tone; }
+            }
+            Text { text: root.label; color: root.solid ? Theme.text-on-accent : root.tone;
+                   font-size: Theme.font-md; font-weight: 600; vertical-alignment: center; }
+        }
+        ta := TouchArea { enabled: root.hit; clicked => { root.toggled(); } }
+    }
+
+    // Big centred A/B drop target shown while dragging a Selection tile onto the Compare halves.
+    // `active` = the cursor is over this zone (accent highlight); caller sets geometry + letter/caption.
+    export component DropZone inherits Rectangle {
+        in property <bool> active;
+        in property <string> letter;
+        in property <string> caption;
+        border-radius: Theme.radius; // H3: card-class corner (was a 16px literal)
+        background: root.active ? Theme.accent-soft : Theme.wash-rest;
+        border-width: root.active ? 2px : 1px;
+        border-color: root.active ? Theme.accent : Theme.border-strong;
+        VerticalLayout {
+            alignment: center; spacing: 4px;
+            Text { text: root.letter; color: root.active ? Theme.accent : Theme.text;
+                   font-size: Theme.display-xl; font-weight: 700; horizontal-alignment: center; }
+            Text { text: root.caption; color: Theme.text-mute; font-size: Theme.font-md; horizontal-alignment: center; }
+        }
+    }
+
+    // Compare A/B pin-toggle label: pin dot + letter (accent when focused) + elided name + optional
+    // rating number/star + flag/reject glyph. Click toggles this half's pin. Caller sets x/y (they
+    // depend on the compare container geometry) + `name-max` (the elision cap).
+    // ── v0.8.163 (§7 item 5 [VD]): THE LABELS ARE PART OF THE SAME FLOATING SURFACE. ─────────────
+    // The ruling names "the base of the A/B compare's floating top control panel"; these two pills
+    // flank that bar at the same y, in the same 34px/Theme.radius chrome, and are read as one
+    // arrangement — so they take the same glass. (Veto = drop `inherits GlassPanel` back to
+    // `Rectangle` and restore the `background:` line below; nothing else here depends on it.)
+    //
+    // WHAT THE GLASS COSTS AND WHAT REPLACES IT: the pill's own `background` (well → well-hover on
+    // hover) is dead under GlassPanel's tint, so the HOVER STEP is the house glass's own — `hot`
+    // fades the solid panel surface in over the frost while the pointer is on the pill, which is
+    // the docked EXIF panel's exact behaviour and needs no new hover output from anything. Unlike
+    // the control bar (whose `hot` is deliberately false — its children own the hover), this
+    // component has exactly ONE touch surface, `cplta`, so there is no exclusive-hover flicker to
+    // avoid. The pin border, the pulse weight, the mute opacity and the whole `row` are untouched.
+    export component ComparePinLabel inherits GlassPanel {
+        in property <bool> pinned;
+        in property <string> letter;
+        in property <bool> focused;
+        in property <string> name;
+        in property <int> rating;
+        in property <bool> flagged;
+        in property <bool> rejected;
+        // v0.8.126 (R7 / audit N10+N20): the label takes its SLOT, not a name budget. C2's 116px
+        // badge grew the control bar by ~82px, and both labels solved their x AND their name
+        // budget from that same width with a `max(40px, ...)` floor - so below a stage of ~620px
+        // the floor bound, the label became wider than the gutter left for it, and label A's x
+        // went NEGATIVE and was clipped by the stage. What got cut was its LEFT edge: the pin dot
+        // and the letter, i.e. exactly the signifier C4 made load-bearing ("unpin one to move it"
+        // while the dot you must click is off screen). Break-even was a 560px window - the
+        // supported minimum - so this was reachable on a laptop, and reachable below ~1000px with
+        // the grid dock open.
+        //
+        // The fix is structural rather than another hand-picked constant: the host passes the
+        // gutter, the label never exceeds it, and the NAME absorbs whatever is left over
+        // (horizontal-stretch, ledger L1) instead of being budgeted against a re-tuned literal.
+        // A's x is therefore >= 0 and B's right edge <= the stage at every width, by construction.
+        in property <length> slot: 100000px;
+        // v0.8.126 (judge-first b / the regress question): MUTE while this half's pixels are gone.
+        // C1's rule is that a half's pixels and its labels cannot disagree, and it delivers that by
+        // CLEARING the pixels - which left the strongest identity signal on screen (name, rating
+        // digit, flag glyph) at full strength over an absent photograph. The pill says "Loading";
+        // this says the same thing about the identity beside it.
+        in property <bool> muted: false;
+        // v0.8.126 (judge-first d / audit N25): a both-pinned refusal PULSES this border. The
+        // component already carries an accent border and an `animate`, so the answer appears where
+        // the eyes are - on two images side by side - rather than only in the far corner.
+        in property <bool> pulse: false;
+        // ── v0.8.158 (B1c, OWNER RULING Q24): the same-photo warning. When A and B resolve to the
+        // SAME shot the NAME turns Theme.warn (#ffc24b — the app's one warning yellow, the value
+        // the rating star also carries by the v0.7.0 unification; `warn` is the token whose MEANING
+        // is "warning", so it is the one this reads from). BOTH labels are handed the flag by the
+        // host, never one: a warning that appears on one side reads as a fact about that side.
+        // Name only, not the whole chip: the pin dot and the A/B letter are identity, and the
+        // sentence being told is about the FILE the two halves share.
+        in property <bool> warn: false;
+        callback toggle;
+        clip: true; // a slot narrower than the chrome trims the RIGHT edge, never the pin dot
+        opacity: root.muted ? 0.45 : 1.0;
+        animate opacity { duration: Theme.anim; easing: ease; }
+        width: min(row.preferred-width, root.slot); height: 34px;
+        // FIX-F: opaque hover-aware fill (HUD-chip grammar) — supersedes the D2 translucent overlay
+        // Rectangle (removed). Concentric with the ctlbar: outer radius 13, matched height 34.
+        // v0.8.163 (§7 item 5): the fill and the radius are GlassPanel's now (all four corners at
+        // Theme.radius — the same value this line set), and the hover step is `hot` below.
+        hover-glass: true;
+        hot: cplta.has-hover;
+        border-width: root.pulse ? 3px : 1px; // v0.8.126 (N25): the refusal's anchored signal
+        border-color: root.pinned ? Theme.accent : Theme.border-strong; // v0.8.18: restored the v0.8.10 constant border-strong (pinned accent kept; the v0.8.14 hover-null reverted with the lift family)
+        // v0.8.163: `background` is no longer bound (the glass owns the fill), so only the border
+        // weight animates here — the hover crossfade is GlassPanel's own `animate opacity`.
+        animate border-width { duration: Theme.anim; easing: ease; }
+        row := HorizontalLayout {
+            padding-left: 9px; padding-right: Theme.space-2h; padding-top: 4px; padding-bottom: 4px; spacing: Theme.space-1h;
+            Rectangle { width: 11px; // cell stretches to the row height; dot centred inside
+                Rectangle { width: 11px; height: 11px; border-radius: 5.5px;
+                            y: (parent.height - self.height) / 2;
+                            background: root.pinned ? Theme.accent : transparent;
+                            border-width: 1.5px; border-color: root.pinned ? Theme.accent : Theme.text-mute; } }
+            Text { text: root.letter; color: root.focused ? Theme.accent : Theme.text-mute; font-weight: 700; font-size: Theme.font-md; vertical-alignment: center; }
+            // v0.8.126 (R7): the name is the ELASTIC cell - it absorbs the slot's remainder and
+            // elides into it, so no literal has to be re-tuned when the bar's width changes again.
+            Text { text: root.name; color: root.warn ? Theme.warn : Theme.text; font-size: Theme.font-md; vertical-alignment: center;
+                   overflow: elide; horizontal-stretch: 1; min-width: 0px; }
+            if root.rating > 0 : Text { text: root.rating; color: Theme.star; font-size: Theme.font-md; vertical-alignment: center; } // P9: compact rating = gold digit (star reserved for the 5-star control)
+            // pick/reject use the app-wide FlagGlyph/ArchiveGlyph grammar (was bare ✓/✕ text)
+            if root.flagged : VerticalLayout { alignment: center; FlagGlyph { tint: Theme.accent; width: 13px; height: 13px; } }
+            if root.rejected : VerticalLayout { alignment: center; ArchiveGlyph { tint: Theme.danger; width: 13px; height: 13px; } }
+        }
+        cplta := TouchArea { mouse-cursor: pointer; clicked => { root.toggle(); } }
+    }
+
+    // v0.8.35: the EXIF panel's bottom action row — Flag + Reject pills LEFT, the interactive
+    // 5-star rating RIGHT — extracted verbatim from the EXIF panel so BOTH that panel and the new
+    // immersive bottom-right reveal card render the identical row (same components, props, colours,
+    // sizes, behaviour). `hit` gates every control (EXIF panel: !immersive; reveal card: chip-revealed);
+    // `hot` = OR of all hover states, consumed by the EXIF panel's hover-glass and the card's keep-alive.
+    // Callbacks forward to root's set-flag / set-reject / set-rating (the existing cull choke points,
+    // which re-arm the immersive linger). Supersedes the v0.8.33 display-only CullChip (deleted): the
+    // owner wanted the EXIF panel's real interactive row, not a bespoke twin.
+    // VERTICAL CENTRING (the reported bug, fixed by pure reuse): every element is 26px tall — the two
+    // CullButtons (height: 26px) and the star VerticalLayout (height: 26px, alignment: center) — and a
+    // HorizontalLayout vertically centres fixed-height children, so glyphs, labels and stars all share
+    // the row's 13px mid-line. (The old CullChip used a bare star HorizontalLayout with no 26px centring
+    // wrapper, so its star baseline diverged from the glyph — the twice-failed corner.)
+    // ── v0.8.133 (the visual wave, C) — ...AND THE ROW JOINS THE BULK GRAMMAR ────────────────────
+    // Section 4's principle is "ANY control that would act on N photographs glows white exactly while
+    // it would". Until this wave the only surfaces that obeyed it were the Review panel's own tiles —
+    // i.e. the surface you can only reach by opening the panel. This row is the one cull control that
+    // is ALWAYS on screen, so it is where a photographer with a live selection actually reaches, and
+    // it silently acted on one photograph.
+    //
+    // WHAT ARMS IT: `bulk-armed`, pushed by the host from Rust's `bulk_actions_allowed` — the
+    // EXPLICIT-SURFACE predicate (count > 0, not compare, not immersive). Deliberately NOT the
+    // keyboard's `bulk_keys_allowed`: that one keeps `sel_open`, because a bare keystroke over a
+    // closed panel must stay single-photo (the owner's N1). This row is not a bare keystroke — it
+    // glows, and its labels say the number and the direction — so it does not need the panel open to
+    // be honest. See THE PREDICATE SPLIT in main.rs.
+    //
+    // WHAT IT SHOWS WHILE ARMED: the GROUP's state, never the current photograph's. A Flag button
+    // reading "off" because the photo on the stage is unflagged, above a group that is entirely
+    // flagged, would invert the meaning of the press. Both button states and the star fill come from
+    // the same uniform-state reading Rust composes the labels from, so the button, its label and the
+    // write it performs are three readings of one fact (`bulk-uniform-rating` is -1 for a mixed
+    // spread, which fills no star — honest, and exactly what "mixed" looks like).
+    //
+    // WHAT IT DISPATCHES: `bulk-mark` / `bulk-rate`, the same two Slint doors the keyboard and the
+    // context rows use (L26 — one dispatch body, every invoker mirroring one gate). The star sends
+    // its RAW index; direction is decided once, Rust-side, from the group's uniform state (F-P6).
+    // v0.8.133 (C): the five-star cell, lifted out of `CullActionRow` so the row can put it on
+    // EITHER of its two lines (see the hand-split below) without declaring the stars twice. Pure
+    // extraction — same 19px box, same 3px pitch, same shared-preview reading, same `hit` gate.
+    //
+    // ── v0.8.136 (V3): the root is a RECTANGLE, and that is the whole structural cost of the plural
+    // signal. It must sit behind/under the cluster WITHOUT moving a star or changing a height, which
+    // means absolute positioning, which a layout root cannot host. So the component keeps its exact
+    // outer contract — a 26px-tall cell that a HorizontalLayout treats as fixed — and the old
+    // VerticalLayout moves one level in, still centring `starbox` at exactly the y it always had.
+    // `starbox.preferred-width` is the HudChip pattern above (content-derived, no feedback from the
+    // assigned width).
+    //
+    // ── v0.8.137 (W2): the signal is a PILL BEHIND THE CLUSTER, and its padding is in the cell's
+    // width in BOTH states. The cell is `107 + 2 x space-2` = 123px wide always — the 8px flanks are
+    // the pill's horizontal padding, and they are reserved whether or not the pill is painted,
+    // because the alternative is five stars stepping 8px sideways every time a selection appears.
+    // The pill fills the cell exactly (0,0,100%,26px): 26px is the CullButton height, so the armed
+    // star cell and the two armed cull buttons beside it are three pills of one height on one line.
+    // The cluster is 19*22/24 = 17.42 tall, centred, so the pill clears the glyph row by 4.29px top
+    // and bottom; its 6px halo blooms into the EXIF panel's 16px padding, well inside the clip.
+    // (W5 rides here quietly: the corrected star path lifts the glyph ink one viewbox unit — ~0.6px
+    // at box 19 — off the cluster box's bottom edge, so the visual clearance under the ink grows
+    // slightly. No number here is derived from the ink; every one is derived from the Star BOX.)
+    component CullStarCell inherits Rectangle {
+        in property <bool> hit: true;
+        in property <int> rating: 0;
+        // v0.8.136 (V3): was `glow` (per-star halo, retired). It means what it always meant —
+        // "these stars would rate N photographs" — and drives the one pill instead of five haloes.
+        in property <bool> armed: false;
+        out property <int> hov: starbox.hov;
+        callback pressed(int);
+        height: 26px; // match the buttons — keeps the 19px stars centred, never clipped
+        width: starbox.preferred-width + 2 * Theme.space-2; // 107px cluster + the pill's flanks
+        // Declared FIRST so it paints BEHIND the stars (Slint paints in declaration order).
+        pill := StarBulkPill {
+            armed: root.armed;
+            x: 0px; y: (parent.height - self.height) / 2;
+            width: 100%; height: 26px;
+        }
+        VerticalLayout {
+            alignment: center;
+            // The pill's flanks, spent as real padding so `starbox` stays exactly 107px wide inside
+            // a 123px cell (a HorizontalLayout handed 123px of room would have spread the stars).
+            padding-left: Theme.space-2; padding-right: Theme.space-2;
+            starbox := HorizontalLayout {
+                spacing: 3px;
+                property <int> hov: s1.hov ? 1 : s2.hov ? 2 : s3.hov ? 3 : s4.hov ? 4 : s5.hov ? 5 : 0;
+                s1 := Star { hit: root.hit; index: 1; box: 19px; rating: root.rating; preview: starbox.hov; clicked => { root.pressed(1); } }
+                s2 := Star { hit: root.hit; index: 2; box: 19px; rating: root.rating; preview: starbox.hov; clicked => { root.pressed(2); } }
+                s3 := Star { hit: root.hit; index: 3; box: 19px; rating: root.rating; preview: starbox.hov; clicked => { root.pressed(3); } }
+                s4 := Star { hit: root.hit; index: 4; box: 19px; rating: root.rating; preview: starbox.hov; clicked => { root.pressed(4); } }
+                s5 := Star { hit: root.hit; index: 5; box: 19px; rating: root.rating; preview: starbox.hov; clicked => { root.pressed(5); } }
+            }
+        }
+    }
+
+    export component CullActionRow inherits VerticalLayout {
+        in property <int> rating;
+        in property <bool> flagged;
+        in property <bool> rejected;
+        in property <bool> hit: true;   // input gate (EXIF panel: !immersive; reveal card: chip-revealed)
+        // THE ARMED INPUTS. `bulk-flag-on` / `bulk-reject-on` cannot be derived from the labels (Slint
+        // has no string inspection) and must not be smuggled through `flagged` / `rejected`, which
+        // mean "the CURRENT photograph" everywhere else in the app — so they are their own
+        // properties and the switch happens here, once, in `shown-*`.
+        in property <bool> bulk-armed: false;
+        in property <string> bulk-flag-label: "";     // support::bulk_btn_label — "Flag 12" / "Unflag 12"
+        in property <string> bulk-reject-label: "";
+        in property <int> bulk-uniform-rating: -1;    // -1 = mixed spread ⇒ no star filled
+        in property <bool> bulk-flag-on: false;       // every selected photograph already carries the flag
+        in property <bool> bulk-reject-on: false;
+        // The star cell is MOUNT-GATED onto one line or the other, and a conditional element cannot
+        // be referenced from a sibling expression — so its hover reaches `hot` through a property
+        // both mounts write. LEDGER L22: a mount edge is an unmount edge. The armed flip destroys
+        // whichever cell the pointer was on, and a destroyed TouchArea never fires `changed hov`, so
+        // the latch is cleared on that edge or the EXIF panel's hover-glass (and the immersive card's
+        // keep-alive) would stay lit for ever off a cell that no longer exists.
+        property <bool> stars-hot: false;
+        changed bulk-armed => { root.stars-hot = false; }
+        // v0.8.135 (W3): ...and the WRAP edge is the real mount edge now (the arming edge only
+        // implies it). Same L22 reasoning, same unconditional clear.
+        changed wrap => { root.stars-hot = false; }
+        out property <bool> hot: flagbtn.hovered || rejbtn.hovered || root.stars-hot;
+        callback set-rating(int);
+        callback set-flag(bool);
+        callback set-reject(bool);
+        callback bulk-mark(int);   // 0 = flag, 1 = reject — the uniform-state toggle over the selection
+        callback bulk-rate(int);   // the RAW star index; the ask + the direction live in Rust
+        property <int> shown-rating: root.bulk-armed ? root.bulk-uniform-rating : root.rating;
+        property <bool> shown-flag: root.bulk-armed ? root.bulk-flag-on : root.flagged;
+        property <bool> shown-reject: root.bulk-armed ? root.bulk-reject-on : root.rejected;
+        // ── THE HAND-SPLIT (ledger L3: there is no wrap primitive — rows hug and split by hand) ──
+        // MEASURED, not assumed. The row's budget is its own width — 276px at both mounts (the
+        // 308px panel minus its 2x16px padding). Single-photo it needs 275 and always has. ARMED,
+        // the two labels grow a verb and a count, and the rig measured the overflow directly: at a
+        // 999-photo selection the star cluster ran 12px past the glass even with the widths hugging,
+        // and each further digit costs ~14px more. No arrangement of one line survives four digits
+        // without shrinking the stars, which the ruling forbids — so the row splits.
+        //
+        // v0.8.135 (W3) — IT SPLITS ON THE MEASUREMENT, NOT ON THE ARMING. v0.8.133 gated the two
+        // lines on `bulk-armed` alone, so "Flag 3" / "Unflag 8" — which fit on one line with ~70px
+        // to spare — were pushed onto two anyway, and the row grew a whole line the moment anything
+        // was selected. `line1-need` is what one line actually costs: the two buttons at their hug
+        // widths (each is `max(min-w, label + 2*space-2)`, a pure function of its own label — no
+        // layout feedback), the star CELL's constant width, and the three 12px gaps between the four
+        // cells. Wrap only when that exceeds the row.
+        //
+        // ...AND THE GAP IS 12px WHILE ARMED, not 4. Each armed button casts a 6px halo; at a 4px
+        // gap the two haloes met and read as one lozenge behind both pills, which is the "container
+        // box" the section-4 grammar forbids. 12 >= 6 + 6 keeps them separate at every count — and
+        // v0.8.137's star pill casts the identical 6px halo, so the same 12px holds the third one
+        // off the reject button. It is CONDITIONAL because the unarmed row casts no haloes at all:
+        // widening its gaps would grow the panel by 24px to separate three things that are not
+        // glowing. `btn-gap` feeds both the layout and the measurement below, so the two can never
+        // disagree.
+        //
+        // ── v0.8.136 (V1, owner report) — THE NEED IS PUBLISHED, AND THE PANEL OBEYS IT. ─────────
+        // "make the width of the panel adapt to these buttons" (owner verbatim). v0.8.135's answer
+        // to a line that does not fit was to fold it; the owner's answer is to widen the glass it
+        // has to fit inside, and he is right — the EXIF panel is a floating, right-anchored card
+        // with the whole stage to its left, so growing it costs nothing and folding a four-cell row
+        // onto two lines costs a whole line of panel height plus a layout that reads as broken. So
+        // `line1-need` becomes an OUT property, the EXIF panel binds its own width to it (see
+        // main_window.slint), and the hand-split below survives ONLY as the safety it should always
+        // have been: it fires when the panel is capped by a narrow stage and cannot grow the rest of
+        // the way, which is the one case where there is genuinely nowhere to put the stars.
+        //
+        // THE HALF-PIXEL: the panel's width is `need + 2*16`, so the row's width comes back as
+        // `(need + 32) - 32` through f32 layout arithmetic and is allowed to land one ULP below
+        // `need`. A bare `>` would then fold a row that fits exactly, every time, for no reason
+        // anybody could see. 0.5px is far below any real overflow (the smallest one this row can
+        // produce is a whole extra digit, ~14px) and far above the rounding it exists to absorb.
+        // v0.8.137 (W2): the star CELL, not the star cluster. The cluster is still 5x19 + 4x3 = 107,
+        // but the plural pill's 8px flanks are reserved in both states (see CullStarCell) so the
+        // cell a HorizontalLayout has to find room for is 123. Written as the cell's own arithmetic
+        // rather than a 123 literal, so the two sites move together if the pill's padding ever does.
+        property <length> star-cell-w: 107px + 2 * Theme.space-2;
+        property <length> btn-gap: root.bulk-armed ? 12px : 4px;
+        out property <length> line1-need: flagbtn.hug + rejbtn.hug + root.star-cell-w + 3 * root.btn-gap;
+        property <bool> wrap: root.bulk-armed && root.line1-need > root.width + 0.5px;
+        spacing: Theme.space-2;
+        HorizontalLayout {
+            spacing: root.btn-gap;
+            // Colour-coded per the Figma (dim rest → SOLID active): the flag is ALWAYS blue and reject
+            // ALWAYS red — a soft tint at rest, the full solid colour + light text when engaged.
+            flagbtn := CullButton {
+                hit: root.hit;
+                min-w: 70px;
+                label: root.bulk-armed ? root.bulk-flag-label : "Flag";
+                on: root.shown-flag; glow: root.bulk-armed;
+                fill-hover: Theme.accent-hover-flat; // v0.8.48: the v0.8.17 Fix-C opaque flatten of accent-soft-hover over the EXIF panel's guaranteed-solid Theme.base (hot ORs flagbtn.hovered) is the accent-hover-flat TOKEN now, recomputed by Rust from the TRANSFORMED accent/base — stays pixel-identical to the translucent composite in any output gamut, still artifact-safe if a lift returns. Rest fill stays translucent.
+                toggled => { if (root.bulk-armed) { root.bulk-mark(0); } else { root.set-flag(!root.flagged); } }
+            }
+            rejbtn := CullButton {
+                hit: root.hit;
+                min-w: 86px;
+                label: root.bulk-armed ? root.bulk-reject-label : "Reject";
+                danger: true; on: root.shown-reject; glow: root.bulk-armed;
+                fill-hover: Theme.danger-hover-flat; // v0.8.48: the v0.8.17 Fix-C opaque flatten of danger-soft-hover over Theme.base is the danger-hover-flat TOKEN now (transformed-ingredient recompute) -- same rationale as Flag.
+                toggled => { if (root.bulk-armed) { root.bulk-mark(1); } else { root.set-reject(!root.rejected); } }
+            }
+            Rectangle { horizontal-stretch: 1; min-width: 0px; }
+            if !root.wrap : CullStarCell {
+                hit: root.hit; rating: root.shown-rating; armed: root.bulk-armed;
+                changed hov => { root.stars-hot = self.hov > 0; }
+                pressed(v) => { if (root.bulk-armed) { root.bulk-rate(v); } else { root.set-rating(root.rating == v ? 0 : v); } }
+            }
+        }
+        if root.wrap : HorizontalLayout {
+            Rectangle { horizontal-stretch: 1; min-width: 0px; } // the stars sit under the buttons' right edge
+            CullStarCell {
+                hit: root.hit; rating: root.shown-rating; armed: true;
+                changed hov => { root.stars-hot = self.hov > 0; }
+                // The RAW index: which star was pressed. The DIRECTION of a bulk rating is decided
+                // once, Rust-side, from the group's uniform state (F-P6) — never from one surface.
+                pressed(v) => { root.bulk-rate(v); }
+            }
+        }
+    }

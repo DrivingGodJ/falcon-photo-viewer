@@ -1,0 +1,518 @@
+// v0.9.5 (ui.rs extraction series): the segmented controls (SegPill, Seg, CustomSeg)
+// extracted VERBATIM from the slint! macro in src/ui.rs. `export` added — they were
+// macro-file-local.
+
+import { Theme } from "theme.slint";
+
+    // THE segmented selector — a pill track with a SLIDING accent handle under the selected cell.
+    // Generalises the old 2-way SegToggle to N options (also absorbs the per-cell Seg3), so 2- and
+    // 3-way selectors share the same sliding-switch feel. Click a cell to pick it.
+    export component SegPill inherits Rectangle {
+        in property <[string]> opts;   // 2+ labels
+        in property <int> sel;
+        callback changed(int);
+        out property <bool> hovered: ta.has-hover; // exposed so hover-glass panels can OR child hovers
+        in property <bool> hit: true; // M6 (v0.8.19): input gate — false = input passes through (fading immersive chrome)
+        property <int> n: max(1, root.opts.length);
+        property <int> hov-seg: ta.has-hover ? Math.max(0, Math.min(root.n - 1, Math.floor(ta.mouse-x / (root.width / root.n)))) : -1;
+        // FIX-E: port Seg's canonical drag-select (click-and-drag) into SegPill.
+        property <int> drag-seg: -1;   // last segment emitted this drag (dedup)
+        property <int> press-seg: -1;  // segment under the press (committed on a clean tap)
+        property <bool> committed: false; // a horizontal drag-select already fired this gesture
+        function seg-at(mx: length) -> int {
+            return Math.max(0, Math.min(root.n - 1, Math.floor(mx / (root.width / root.n))));
+        }
+        // v0.8.38 (G8 / 6c): SegPill DELIBERATELY keeps the 2px contiguous-cell model - a tight 2-way
+        // toggle (compare "Browse|Zoom", the RAW/finished switch) whose handle fills its cell edge-to-edge,
+        // NOT the tier sliders' 3px inter-pill rhythm (Seg/CustomSeg). It is never shown beside them.
+        height: 26px;
+        // H2 (v0.7.2): unified with Seg/CustomSeg — recessed well track @ radius-ctrl, inset
+        // radius-sm handle (the 2px inset it already had — now the system-wide P2 inset).
+        border-radius: Theme.radius-ctrl;
+        background: Theme.well;
+        border-width: 1px; border-color: Theme.border-strong; // F3: M3 hairline (as OptionChip) — visible over dark photos
+        Rectangle {
+            width: (parent.width - 4px) / root.n;
+            height: parent.height - 4px;
+            border-radius: Theme.radius-sm;
+            background: Theme.accent;
+            x: 2px + root.sel * self.width;
+            y: 2px;
+            animate x { duration: Theme.anim-fast; easing: ease-out; } // P4: unified with Seg/CustomSeg (the slider feel)
+        }
+        // per-cell hover wash on the handle geometry (H2 — SegPill had no hover feedback)
+        for o[i] in root.opts : Rectangle {
+            width: (parent.width - 4px) / root.n;
+            height: parent.height - 4px;
+            x: 2px + i * self.width;
+            y: 2px;
+            border-radius: Theme.radius-sm;
+            background: (root.hov-seg == i && root.sel != i) ? Theme.hover : transparent;
+        }
+        // Position each label on the SAME per-cell geometry as the sliding handle (x: 2px + i·cellw,
+        // width cellw) — not a stretch layout — so every label is exactly centred on its pill cell.
+        for o[i] in root.opts : Text {
+            text: o;
+            width: (parent.width - 4px) / root.n;
+            x: 2px + i * self.width;
+            height: 100%;
+            horizontal-alignment: center; vertical-alignment: center;
+            color: i == root.sel ? Theme.text-on-accent : Theme.text-dim;
+            font-size: Theme.font-sm; font-weight: 700;
+        }
+        ta := TouchArea {
+            enabled: root.hit;
+            moved => {
+                if (self.pressed
+                    && Math.abs(self.mouse-x - self.pressed-x) > Math.abs(self.mouse-y - self.pressed-y)
+                    && root.seg-at(self.mouse-x) != root.drag-seg) {
+                    root.drag-seg = root.seg-at(self.mouse-x);
+                    root.changed(root.drag-seg);
+                    root.committed = true;
+                }
+            }
+            pointer-event(e) => {
+                if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                    root.press-seg = root.seg-at(self.mouse-x);
+                    root.drag-seg = root.press-seg;
+                    root.committed = false;
+                // v0.8.95 (v0.8.94-audit V2): BUTTON-GATE the commit arm (the down-arm already is) and
+                // refuse a press-seg no left press ever set. The engine delivers `Up` for ANY button,
+                // so a plain RIGHT-click on a freshly-mounted control (the Settings sheet remounts at
+                // press-seg = -1 on every open) committed cell -1: the accent pill slid out under
+                // `clip: true` with NO cell highlighted, and a real value was written behind it.
+                } else if (e.kind == PointerEventKind.up && e.button == PointerEventButton.left) {
+                    if (!root.committed && root.press-seg >= 0) { root.changed(root.press-seg); }
+                }
+            }
+        }
+    }
+
+    // Plain segmented row — the SAME Figma geometry as CustomSeg (h34 r9 container, r8 full-height
+    // cells, ONE sliding accent pill) but without the leading Custom cell: the mode pickers
+    // (Settings "Quality | Speed"). Figma node 83:248: active = SOLID accent + #f7f7f7 Medium text,
+    // inactive = transparent + #c3c3c3 SemiBold — NO outline (the old OptionChip pair here showed
+    // an accent border, the "outlined active" misread the user flagged). Click- and DRAG-selects
+    // (WHEN the drag commits is opt-in per instance — see `deferred-commit` below).
+    export component Seg inherits Rectangle {
+        in property <[string]> opts;
+        in property <int> sel;
+        in property <brush> bg: Theme.well; // recessed track (H2, v0.7.2) — the input-family look, visible on base AND block
+        // v0.8.96 (owner ruling, 2026-07-26): COMMIT-ON-RELEASE. Supersedes v0.8.94's `drag-select:
+        // false` opt-out, which made ONE row in the app non-draggable — "inconsistent with the rest
+        // of the app". Every Seg drags now; this flag changes only WHEN the drag's value is written.
+        //
+        // FALSE (default, every pre-existing call site — byte-for-byte unchanged): the drag emits
+        // `changed()` per crossed cell, live.
+        // TRUE: the drag TRACKS the finger exactly the same way — `drag-seg` follows, the accent pill
+        // and hover wash render on it (see `shown-sel`) — but emits NOTHING mid-gesture; `changed()`
+        // fires EXACTLY ONCE, on the LEFT-button release, with the final cell. That is what the
+        // Settings "Info panel" seg needs: its middle cell (Minimised) writes the per-folder panel
+        // memory, so a live drag On → Off wrote "minimised" on the way past and the folder kept it —
+        // a state the gesture explicitly said to leave behind, discoverable only on a later visit.
+        // The panel also no longer strobes through the crossed states mid-drag.
+        //
+        // EDGE SEMANTICS (decided v0.8.96; mechanism corrected by the v0.8.96 mini-audit, C1).
+        // Releasing OUTSIDE the component still commits the last crossed cell — standard drag
+        // semantics, and the RETAINED GRAB is what makes it true on the shipped winit backend: the
+        // pointer that leaves the window with a button held gets NO `Exit` (event_loop.rs gates that
+        // on `!self.pressed`), and the OS pointer capture delivers the release back to this window as
+        // an ordinary `Up`. A drag that wanders off the row, off the sheet, even off the window still
+        // lands on the cell it was let go over. The window-exit "cancel" the earlier draft of this
+        // note named is therefore UNREACHABLE here — it was never the risk.
+        // The real one commits nothing and is routine: the enclosing Settings Flickable STEALING the
+        // grab. Same steal the `moved`-handler note below describes (a vertical scroll that merely
+        // started on this row), seen from the other end — >8px on the Flickable's scroll axis
+        // (vertical; its viewport-width equals its width, so the horizontal axis never captures)
+        // within 500ms of the press and i-slint-core intercepts: this TouchArea is sent `Exit`, so
+        // `pressed` clears and `pointer-event` fires `PointerEventKind.cancel` (button `other` —
+        // the left-gated commit arm would refuse it regardless), the row drops off the grab stack and
+        // the eventual `Released` never reaches it. A hand that drifts 9px down while sliding across
+        // the row does exactly that, which is why `shown-sel` falls back to `sel` on `!ta.pressed`:
+        // the pill snaps home and the highlight tells the truth about the value that was NOT written.
+        in property <bool> deferred-commit: false;
+        // v1.0.0-rc (queue item 31) — THE P5 MUTE, on `Seg` this time.
+        //
+        // `CustomSeg` was given this property by the export-format tail (§R-B B-O1) and `Seg` was
+        // not, so a host that needs to say "this row does not apply yet" had nothing to say it with.
+        // FALSE means here exactly what it means there and on `IconBtn`, whose doc defines the app's
+        // vocabulary — "`enabled`, the P5 mute, which dims and still swallows": `changed` is
+        // swallowed at the one funnel every pointer path reaches, the hover wash stops, and the
+        // control DRAWS its dead state BY COLOUR — never by an `opacity:` binding, because this
+        // element has many children and an Opacity item over more than one child is an offscreen
+        // layer (ledger L48; the export sheet's Quality row carries the full reasoning). The VALUE
+        // is untouched: a dead row still shows the cell the user picked, which is the whole reason
+        // its host keeps it mounted rather than unmounting it (L4/L49 — an `if` here would jump
+        // every row below it on each flip of the switch above).
+        in property <bool> enabled: true;
+        // The dead-state palette in one place, as the token's own alpha (v0.8.191 H10's move).
+        property <color> lbl-on: root.enabled ? Theme.text : Theme.text.with-alpha(0.35);
+        property <color> lbl-off: root.enabled ? Theme.text-dim : Theme.text-dim.with-alpha(0.35);
+        callback changed(int);
+        property <int> n: max(1, root.opts.length);
+        // v0.8.40 (FIX 3): the 3px rule (as CustomSeg) — track edges 3px, inter-pill gaps 3px. segw is
+        // the pill STRIDE (pill width + one 3px gap): pill i = [i*segw + 3px, +(segw - 3px)]; the strides
+        // tile width - 3px, leaving exactly 3px at each edge. Hit boundaries sit at the gap centres.
+        property <length> segw: (root.width - 3px) / root.n;
+        property <int> drag-seg: -1;   // last segment emitted this drag (dedup)
+        property <int> press-seg: -1;  // segment under the press (committed on a clean tap)
+        property <bool> committed: false; // a horizontal drag-select already fired this gesture
+        // v0.8.96: THE RENDERED selection. In deferred-commit mode the caller's `sel` cannot move
+        // mid-drag (nothing is written until release), so the pill would sit still under the finger —
+        // the v0.8.94 complaint in its other form. While a LEFT press is in flight the pill, the
+        // wash's "not the selected cell" test and the label colour all read `drag-seg` instead, so
+        // the handle glides under the finger exactly like a live drag-select row; release then writes
+        // that same cell and `sel` catches up with no visible jump. `ta.pressed` is LEFT-BUTTON ONLY
+        // in Slint (set in TouchArea's `Pressed` arm before the pointer-event callback runs, cleared
+        // on left release / Exit), so `drag-seg` is always the ≥ 0 value this gesture's own down-arm
+        // set — a right-press can never park this on the -1 that renders as "no cell selected"
+        // (v0.8.95 V2). Non-deferred instances evaluate to plain `root.sel` — byte-identical.
+        // v1.0.0-rc (item 31 TAIL, 09-07): `root.enabled &&` LEADS this condition, and the same
+        // term gates the `pointer-event` down arm below. The P5 mute this round minted on `Seg`
+        // was copied from `CustomSeg`, which has NEITHER `shown-sel` NOR `deferred-commit` — so
+        // the consequence did not exist where the grammar was minted (ledger L7: a property
+        // copied between components must be traced through every reader in the RECEIVING one).
+        // Without it, a press held on a DIMMED row slid the accent pill under the finger and
+        // swapped both label colours: the mute swallowed the WRITE at the commit funnel and
+        // answered the finger anyway. The term goes on the RENDER path as well as on the down
+        // arm, because gating the down arm alone would leave this reading a STALE `drag-seg`
+        // while pressed — -1 on a freshly-mounted row, i.e. the pill off the left edge under
+        // `clip: true`, which is the v0.8.95 V2 shape.
+        //
+        // NO RIG ROW CAN SEE THIS, AND BOTH SKEPTICS PROVED THEIR OWN INSTRUMENTS BLIND: each
+        // measured the pill's x while the button was held, each with a LIVE control leg, and the
+        // pill did not move in EITHER leg (A: `DEAD rest 91.00 -> held 91.00 | LIVE rest 91.00
+        // -> held 91.00`; B repeated it with `animate x` at 0 ms and then deleted, same result)
+        // — the rig does not advance an animated `x` under a synthetic press without a render.
+        // The evidence for this term is therefore the SOURCE READ, stated as such, and the
+        // owner's eye is the instrument (sheet 3.1j: hold the mouse on "At once" while the
+        // switch above it is off — the pill must not slide).
+        property <int> shown-sel: (root.enabled && root.deferred-commit && ta.pressed) ? root.drag-seg : root.sel;
+        property <int> hov-seg: (root.enabled && ta.has-hover) ? root.seg-at(ta.mouse-x) : -1;
+        function seg-at(mx: length) -> int {
+            return Math.max(0, Math.min(root.n - 1, Math.floor((mx - 1.5px) / root.segw)));
+        }
+        height: 34px;
+        // Square outer clipping uses a scissor, not a resampled text layer.
+        // The rounded clip below contains decoration only; labels stay sharp even
+        // when a scrolling Settings row lands between device pixels.
+        clip: true;
+        paint := Rectangle {
+            width: 100%; height: 100%;
+            border-radius: Theme.radius-ctrl;
+            background: root.bg;
+            clip: true;
+            // the sliding accent pill — glides between cells (the slider feel; the floating-handle look
+            // is the Figma-mirror accident the user chose to keep). v0.8.40 (FIX 3): 3px off every track
+            // edge + radius-ctrl - 3 so the pill's rounding nests inside the track's radius-ctrl.
+            // v0.8.96: named `pill` so the headless rig can MEASURE where the handle actually is — that
+            // is the only observable proof a deferred-commit drag still moves the highlight under the
+            // finger (nothing is written until release, so no Rust-side property can show it).
+            pill := Rectangle {
+                width: root.segw - 3px; height: parent.height - 6px; border-radius: Theme.radius-ctrl - 3px;
+                x: root.shown-sel * root.segw + 3px; // v0.8.40 (FIX 3): 3px edges AND 3px inter-pill gaps (segw = pill + gap stride)
+                y: 3px;
+                background: root.enabled ? Theme.accent : Theme.accent.with-alpha(0.35);
+                animate x { duration: Theme.anim-fast; easing: ease-out; }
+            }
+            // v0.8.40 (FIX 3): washes + labels positioned ABSOLUTELY on the pill geometry (as CustomSeg) —
+            // equal-stretch layout cells couldn't give the EDGE pills their 3px track gap while keeping the
+            // 3px inter-pill gaps. Each wash is its pill's exact rect; each label centres on its pill.
+            for o[i] in root.opts : Rectangle {
+                x: i * root.segw + 3px; y: 3px;
+                width: root.segw - 3px; height: parent.height - 6px; border-radius: Theme.radius-ctrl - 3px;
+                background: (root.hov-seg == i && root.shown-sel != i) ? Theme.hover : transparent; // P4: instant hover (unified with SegPill + CustomSeg)
+            }
+        }
+        for o[i] in root.opts : Text {
+            text: o;
+            color: i == root.shown-sel ? root.lbl-on : root.lbl-off;
+            // SemiBold on the accent-filled active cell (user rule: text on a blue/purple fill = 600);
+            // inactive cells are already 600, so the row reads uniformly SemiBold.
+            font-size: Theme.font-md; font-weight: 600;
+            x: i * root.segw + 3px + (root.segw - 3px - self.width) / 2; y: (parent.height - self.height) / 2;
+        }
+        // Commit on a clean TAP (up) or a HORIZONTAL drag-select — NOT on raw pointer-down. Committing
+        // on down let a vertical scroll gesture that merely STARTED on this row silently flip the value
+        // before the enclosing Settings Flickable stole the drag for scrolling (audit U4). A
+        // horizontal-dominant drag still slides the pill per segment (the slider feel); a vertical drag
+        // falls through to the Flickable.
+        ta := TouchArea {
+            moved => {
+                if (root.enabled && self.pressed
+                    && Math.abs(self.mouse-x - self.pressed-x) > Math.abs(self.mouse-y - self.pressed-y)
+                    && root.seg-at(self.mouse-x) != root.drag-seg) {
+                    root.drag-seg = root.seg-at(self.mouse-x);
+                    // v0.8.96: the finger-tracking above is UNCONDITIONAL (that is what makes the pill
+                    // follow on a deferred row); only the WRITE is gated. A deferred row leaves
+                    // `committed` false, so the release arm below is its single commit path.
+                    if (!root.deferred-commit) {
+                        root.changed(root.drag-seg);
+                        root.committed = true;
+                    }
+                }
+            }
+            pointer-event(e) => {
+                // v1.0.0-rc (item 31 TAIL, 09-07): `&& root.enabled`, so a dead row seeds
+                // NOTHING — see `shown-sel` above for why both halves are needed.
+                if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left && root.enabled) {
+                    root.press-seg = root.seg-at(self.mouse-x);
+                    root.drag-seg = root.press-seg;
+                    root.committed = false;
+                // v0.8.95 (v0.8.94-audit V2): BUTTON-GATE the commit arm (the down-arm already is) and
+                // refuse a press-seg no left press ever set. The engine delivers `Up` for ANY button,
+                // so a plain RIGHT-click on a freshly-mounted control (the Settings sheet remounts at
+                // press-seg = -1 on every open) committed cell -1: the accent pill slid out under
+                // `clip: true` with NO cell highlighted, and a real value was written behind it.
+                } else if (e.kind == PointerEventKind.up && e.button == PointerEventButton.left) {
+                    // v0.8.96: ONE emission per gesture, either way. Live rows commit the press cell
+                    // here only when no `moved` already fired (`committed`); deferred rows always land
+                    // here and commit `drag-seg` — which the down-arm seeded with `press-seg`, so a
+                    // no-move press commits the tapped cell exactly as before. The `press-seg >= 0`
+                    // guard is the V2 right-click refusal, unchanged.
+                    // v1.0.0-rc (item 31): THE SWALLOW. `IconBtn` gates its `clicked`; this is
+                    // the same gate on the one funnel BOTH pointer paths reach — a clean tap lands
+                    // here, and a drag-select leaves `committed` true and lands here too — so a dead
+                    // row emits nothing at all.
+                    if (root.enabled && !root.committed && root.press-seg >= 0) {
+                        root.changed(root.deferred-commit ? root.drag-seg : root.press-seg);
+                    }
+                }
+            }
+        }
+    }
+
+    // THE slider — a pill track with stops + a draggable accent handle. Merges the export tier slider
+    // (discrete stops; a round knob OR rounded-rect stops incl. a Full-res stop; a name+intent line on
+    // top) and the scrub-speed slider (continuous handle; device-limit veil + marker; a hover-value
+    // bubble). Flags: `rect` = rect stops; `continuous` = float drag (emits changed-frac, caller snaps);
+    // `hover-bubble` = the top value bubble; `limit-frac` ≥ 0 = the device-max veil + marker (restored on CustomSeg, v0.7.5). `stops` is the
+    // per-stop value array (drives the stop count / dots / rect text / round-handle text / bubble text);
+    // `labels`/`hints` = the optional top name line; `handle-label` overrides the handle text (live fps).
+    // Segmented tier row with a leading "Custom" segment — the Figma experimental control that
+    // replaced the floating-handle sliders for tier picks (Settings Size/Target + the export
+    // Opacity/Size/Output/Quality rows). Geometry from the Figma nodes: container h34 r9, equal
+    // full-height segments r8; active = accent fill + light text; inactive label text-dim SemiBold.
+    // Clicking Custom turns the segment into an inline number input; Enter commits via
+    // `custom-committed` (the CALLER validates in Rust — garbage is rejected — and must restore
+    // keys.focus()). `custom > 0` = a committed custom value, shown highlighted in the segment;
+    // picking any named stop clears it (caller sets the backing value).
+    export component CustomSeg inherits Rectangle {
+        in property <[string]> stops;          // the named stop labels (Custom is built in)
+        in property <int> index;               // active named stop (when custom == 0)
+        in property <int> custom: 0;           // > 0 = custom value active
+        in property <string> suffix: "";       // rendered after the custom value, e.g. "%"
+        in property <brush> bg: Theme.well; // recessed track (H2, v0.7.2) — visible on base AND block
+        // OPTIONAL slider overlay (used by the speed popup; -1 = off so every other CustomSeg is unchanged):
+        in property <float> indicator-frac: -1.0; // blue value-line at this frac over the stop CENTERS (a custom value's position)
+        in property <float> limit-frac: -1.0;     // device-max: light veil beyond this frac + a marker line (v0.7.5 restore; -1 = off)
+        in property <bool> instant: false;        // commit on pointer-DOWN (snappier) — only safe OUTSIDE a Flickable
+        // v1.0.0-rc EXPORT FORMAT tail (§R-B B-O1): THE P5 MUTE, WITH THE REFUSAL THAT BELONGS TO IT.
+        // `IconBtn`'s doc defines the app's vocabulary — "`enabled`, the P5 mute, which dims and still
+        // swallows" — and this component had no such property, so the export sheet's first attempt to
+        // say "this row does not apply" dimmed a control that went on writing values behind the dim.
+        // FALSE means here exactly what it means on IconBtn: `picked` and `custom-committed` are
+        // swallowed (the commit funnel and the drag arm are gated, as IconBtn gates `clicked`), the
+        // hover wash stops (a disabled IconBtn shows no wash either), and the control DRAWS its dead
+        // state — by COLOUR, never by an `opacity:` binding, because this element has many children and
+        // an Opacity item over more than one child is an offscreen layer (ledger L48; the export sheet's
+        // Quality row carries the full reasoning). The VALUE is untouched: `index`/`custom` stay the
+        // caller's and a dead row still shows the stop the user picked, which is the whole reason its
+        // host keeps it mounted. An edit in flight when this goes false is ABANDONED through the
+        // component's own `abandon-edit` — the empty commit every caller already handles, which is what
+        // restores keyboard focus from the now-invisible TextInput (a silent cancel would strand it).
+        in property <bool> enabled: true;
+        // The dead-state palette in one place: the same 0.35 the P5 mute composites to, expressed as the
+        // token's own alpha so no Opacity item is created (v0.8.191 H10's move).
+        property <color> lbl-on: root.enabled ? Theme.text : Theme.text.with-alpha(0.35);
+        property <color> lbl-off: root.enabled ? Theme.text-dim : Theme.text-dim.with-alpha(0.35);
+        changed enabled => { if (!root.enabled) { root.abandon-edit(); } }
+        callback picked(int);
+        callback custom-committed(string);
+        property <bool> editing: false;
+        property <int> seg-count: root.stops.length + 1;   // segments = stops + the leading Custom
+        property <int> drag-seg: -1;                        // last segment emitted this drag (dedup)
+        property <int> press-seg: -1;                       // segment under the press (acted on a clean tap)
+        property <bool> committed: false;                   // a horizontal drag-select already fired this gesture
+        property <int> hov-seg: (root.enabled && ta.has-hover) ? root.seg-at(ta.mouse-x) : -1;
+        // segment under x: 0 = Custom, 1..N = stop (stop index = seg − 1), clamped in-range.
+        function seg-at(mx: length) -> int {
+            return mx < root.custom-w ? 0
+                 : Math.max(1, Math.min(root.seg-count - 1, 1 + Math.floor((mx - root.custom-w) / root.stopw)));
+        }
+        // Abandoning an edit by picking a stop: clear the stale text AND emit an EMPTY commit —
+        // the callers reject "" and restore keys.focus(), so keyboard nav comes back immediately
+        // and a stray Enter can't re-apply the abandoned value (focus would otherwise stay on
+        // the now-invisible TextInput — TouchArea presses don't move Slint keyboard focus).
+        function abandon-edit() {
+            if (root.editing) {
+                ci.text = "";
+                root.editing = false;
+                root.custom-committed("");
+            }
+        }
+        height: 34px;
+        // Keep text and TextInput outside rounded clipping layers (see Seg).
+        clip: true;
+        // THE sliding accent pill — ONE handle that GLIDES between cells (the speed-slider feel the
+        // per-cell background crossfade lacked: dragging now visibly pulls a single handle across
+        // the row, like SegPill). While editing it parks on the Custom cell and morphs into a
+        // RAISED block input chip behind the inline TextInput (the track itself is the dark well now).
+        property <int> active-seg: root.editing ? 0 : (root.custom > 0 ? 0 : root.index + 1);
+        // v0.8.40 (FIX 3): THE 3px RULE on every boundary (user-annotated screenshot): track-edge ->
+        // pill = 3px on ALL FOUR sides AND pill -> pill = 3px. Pill widths are explicit. The Custom pill
+        // keeps its v0.8.38 weighting (1.5x a stop pill; still deliberately wider — it holds the 6-char
+        // "Custom" label AND typed values like "500"/"7.5%"), floored at 55px (= the old 58px cell minus
+        // its side insets) so the label never clips; the stop pills share the remainder equally.
+        // Tiling: 3 + custom-pw + 3 + N*stop-pw + (N-1)*3 + 3 == width  (N = stops.length).
+        property <length> custom-pw: max(55px, (root.width - 6px - 3px * root.stops.length) * 1.5 / (root.stops.length + 1.5));
+        property <length> stop-pw: (root.width - 6px - 3px * root.stops.length - root.custom-pw) / max(1, root.stops.length);
+        // Hit CELLS keep the old names (seg-at + every stride below is unchanged) and put their
+        // boundaries at the gap CENTRES: custom cell = 3px edge + pill + half-gap; stop cell = half-gap
+        // + pill + half-gap. A stop pill's centre == its cell centre, so the indicator/limit overlays'
+        // stop-centre formula (custom-w + (frac*(N-1) + 0.5)*stopw) needs no change.
+        property <length> custom-w: root.custom-pw + 4.5px;
+        property <length> stopw: root.stop-pw + 3px;
+        paint := Rectangle {
+            width: 100%; height: 100%;
+            border-radius: Theme.radius-ctrl;
+            background: root.bg;
+            clip: true;
+            Rectangle {
+                // v0.8.40 (FIX 3): 3px on every boundary - track edge -> pill 3px (all four sides), pill ->
+                // pill 3px; radius-ctrl 9 - 3 = 6. Custom + stop pills differ in width, so the WIDTH animates too.
+                width: root.active-seg == 0 ? root.custom-pw : root.stop-pw;
+                height: parent.height - 6px; border-radius: Theme.radius-ctrl - 3px;
+                x: root.active-seg == 0 ? 3px : root.custom-w + (root.active-seg - 1) * root.stopw + 1.5px;
+                y: 3px;
+                background: root.editing ? Theme.block : (root.enabled ? Theme.accent : Theme.accent.with-alpha(0.35));
+                border-width: root.editing ? 1px : 0px;
+                border-color: Theme.border-strong;
+                // SNAP (0ms) when transitioning INTO the edit state so the dark input well is already
+                // in place under the inline TextInput; glide (anim-fast) on ordinary stop picks/drags.
+                // Without this, pressing Custom from a far stop showed the TextInput for ~100ms while
+                // the well was still sliding across + crossfading blue→dark (audit YELLOW #1).
+                animate x, width { duration: root.editing ? 0ms : Theme.anim-fast; easing: ease-out; }
+                animate background { duration: root.editing ? 0ms : Theme.anim; easing: ease; }
+            }
+            // labels + hover wash (visual only — ALL input is the single `ta` surface below so the
+            // control is CLICK- and DRAG-selectable like a slider). Figma 83:231: active text #f7f7f7
+            // Medium(500), inactive #c3c3c3 SemiBold(600), 12px.
+            // v0.8.38 (G8): labels + hover washes positioned ABSOLUTELY on the weighted pill geometry (an
+            // equal-cell HorizontalLayout couldn't give Custom its extra width). v0.8.40 (FIX 3): each wash
+            // sits exactly on its pill's rect (3px edges / 3px gaps; radius-ctrl 9 - 3 = 6).
+            Rectangle { // Custom cell hover wash
+                x: 3px; y: 3px; width: root.custom-pw; height: parent.height - 6px; border-radius: Theme.radius-ctrl - 3px;
+                background: (root.hov-seg == 0 && root.active-seg != 0) ? Theme.hover : transparent;
+            }
+            for s[i] in root.stops : Rectangle { // stop-cell hover wash
+                x: root.custom-w + i * root.stopw + 1.5px; y: 3px;
+                width: root.stop-pw; height: parent.height - 6px; border-radius: Theme.radius-ctrl - 3px;
+                background: (root.hov-seg == i + 1 && root.active-seg != i + 1) ? Theme.hover : transparent;
+            }
+        }
+        Text { // Custom label (or the committed custom value)
+            visible: !root.editing;
+            text: root.custom > 0 ? root.custom + root.suffix : "Custom";
+            color: root.custom > 0 ? root.lbl-on : root.lbl-off;
+            font-size: Theme.font-md; font-weight: 600;
+            x: 3px + (root.custom-pw - self.width) / 2; y: (parent.height - self.height) / 2;
+        }
+        for s[i] in root.stops : Text { // stop label, centred on its pill
+            text: s;
+            color: root.active-seg == i + 1 ? root.lbl-on : root.lbl-off;
+            font-size: Theme.font-md; font-weight: 600;
+            x: root.custom-w + i * root.stopw + 1.5px + (root.stop-pw - self.width) / 2; y: (parent.height - self.height) / 2;
+        }
+        // blue value-line — where a CUSTOM fps lands among the number stops (the continuous position indicator)
+        if root.indicator-frac >= 0.0 || root.limit-frac >= 0.0 : Rectangle {
+            width: 100%; height: 100%;
+            border-radius: Theme.radius-ctrl;
+            clip: true;
+            if root.indicator-frac >= 0.0 : Rectangle {
+                x: root.custom-w + (root.indicator-frac * (root.stops.length - 1) + 0.5) * root.stopw - 1.5px;
+                width: 3px; height: 100%; border-radius: 1.5px;
+                background: Theme.accent;
+            }
+            // device-max — the region beyond the hardware's sustainable browse rate reads FROSTED: a light
+            // veil (wash-rest, ~8% white — visible on the near-black well now that the old #00000066 darkening
+            // isn't) from the limit frac to the right edge, plus a mute marker line at the limit. This foreground clip
+            // keeps the rounded corners. (v0.7.5 restore of the pre-v0.4.0 device-limit indicator.)
+            if root.limit-frac >= 0.0 : Rectangle {
+                x: root.custom-w + (root.limit-frac * (root.stops.length - 1) + 0.5) * root.stopw;
+                width: root.width - self.x; height: 100%;
+                background: Theme.wash-rest;
+            }
+            if root.limit-frac >= 0.0 : Rectangle {
+                x: root.custom-w + (root.limit-frac * (root.stops.length - 1) + 0.5) * root.stopw - 1px;
+                width: 2px; height: 100%;
+                background: Theme.text-mute;
+            }
+            // ONE surface: press a segment OR drag across the stops (slider-like — this is the fix for
+            // "the sliders aren't draggable"). `ci` sits ON TOP over the Custom segment so text editing
+            // still works while this stays live for the stop segments. Commit on a clean TAP (up) or a
+            // HORIZONTAL drag-select — NOT on raw down: committing on down let a vertical scroll gesture that
+            // merely started on a tier row silently pick a stop / open the Custom editor before the enclosing
+            // Settings Flickable stole the drag for scrolling (audit U4).
+        }
+        function act-on(seg: int) {
+            // §R-B B-O1: THE SWALLOW. IconBtn gates its `clicked`; this is the same gate on the one
+            // funnel every pointer path reaches (a clean tap, the `instant` down-arm), so a dead row
+            // emits nothing and opens no inline editor. The drag arm below is gated in its own guard.
+            if (!root.enabled) { return; }
+            if (seg == 0) {
+                // Custom → inline edit (ci is layered above this surface)
+                ci.text = root.custom > 0 ? root.custom + "" : "";
+                root.editing = true;
+                ci.focus();
+            } else {
+                root.abandon-edit();
+                root.picked(seg - 1);
+            }
+        }
+        ta := TouchArea {
+            width: 100%; height: 100%;
+            moved => {
+                // horizontal-dominant drag-select across stops; skip the Custom seg; a vertical drag
+                // falls through to the Flickable for scrolling.
+                if (root.enabled && self.pressed
+                    && Math.abs(self.mouse-x - self.pressed-x) > Math.abs(self.mouse-y - self.pressed-y)
+                    && root.seg-at(self.mouse-x) >= 1 && root.seg-at(self.mouse-x) != root.drag-seg) {
+                    root.drag-seg = root.seg-at(self.mouse-x);
+                    root.abandon-edit();
+                    root.picked(root.drag-seg - 1);
+                    root.committed = true;
+                }
+            }
+            pointer-event(e) => {
+                if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                    root.press-seg = root.seg-at(self.mouse-x);
+                    root.drag-seg = root.press-seg;
+                    root.committed = false;
+                    // OUTSIDE a Flickable (the speed popup) we can act on DOWN for an immediate response;
+                    // the default up-commit stays for the Settings sliders where a vertical scroll starting
+                    // on a tier row must NOT silently fire (audit U4).
+                    if (root.instant) { root.act-on(root.press-seg); root.committed = true; }
+                // v0.8.95 (v0.8.94-audit V2): BUTTON-GATE the commit arm (the down-arm already is) and
+                // refuse a press-seg no left press ever set. The engine delivers `Up` for ANY button,
+                // so a plain RIGHT-click on a freshly-mounted control (the Settings sheet remounts at
+                // press-seg = -1 on every open) acted on cell -1 — here that is the Custom cell's
+                // neighbour arithmetic, i.e. `picked(-2)`, from a gesture that never pressed anything.
+                } else if (e.kind == PointerEventKind.up && e.button == PointerEventButton.left) {
+                    if (!root.committed && root.press-seg >= 0) { root.act-on(root.press-seg); }
+                }
+            }
+        }
+        // inline number input over the Custom segment — declared AFTER `ta` so it is ON TOP and only
+        // grabs pointer/keys while `editing`; caller validates (rejects garbage) + restores keys.focus.
+        ci := TextInput {
+            visible: root.editing;
+            x: 3px; width: root.custom-pw; height: 100%; // v0.8.40 (FIX 3): centred on the Custom PILL (custom-w is the wider hit cell)
+            vertical-alignment: center; horizontal-alignment: center;
+            color: Theme.text; font-size: Theme.font-md;
+            input-type: number; single-line: true;
+            accepted => { root.custom-committed(self.text); root.editing = false; }
+            // losing focus cancels an abandoned edit so a later Enter can't re-commit it (audit fix)
+            changed has-focus => { if (!self.has-focus) { root.editing = false; } }
+        }
+    }

@@ -1,0 +1,3 @@
+    /// Transform character space coordinate to device space.
+    ///
+    /// Based on <https://gitlab.freedesktop.org/freetype/freetype/-/blob/80a507a6b8e3d2906ad2c8ba69329bd2fb2a85ef/src/psaux/pshints.c#L331>

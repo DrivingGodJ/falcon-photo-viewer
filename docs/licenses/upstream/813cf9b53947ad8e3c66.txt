@@ -1,0 +1,4 @@
+//taken from ttf_parser https://docs.rs/ttf-parser/latest/src/ttf_parser/tables/glyf.rs.html#1-677
+/// Resolves coordinate arrays length.
+///
+/// The length depends on *Simple Glyph Flags*, so we have to process them all to find it.

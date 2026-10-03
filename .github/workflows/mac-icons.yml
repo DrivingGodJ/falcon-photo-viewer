@@ -1,0 +1,22 @@
+name: macOS icon diagnostics (no app build)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  icons:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture native icon encoding and pixel differences
+        run: python3 -B scripts/mac-icon-probe.py "${{ runner.temp }}/falcon-icon-diagnostics"
+      - name: Retain original and native icon frames even when verification fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: falcon-icon-diagnostics-${{ github.run_number }}
+          path: ${{ runner.temp }}/falcon-icon-diagnostics/
+          if-no-files-found: error

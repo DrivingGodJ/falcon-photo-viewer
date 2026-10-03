@@ -1,0 +1,2 @@
+/// Converts the linear samples with the sRGB transfer curve.
+// Fast linear to sRGB conversion, ported from libjxl.

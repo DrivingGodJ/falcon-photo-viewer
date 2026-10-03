@@ -1,0 +1,174 @@
+[package]
+name = "falcon-native"
+version = "1.0.11"
+description = "Falcon — native (Slint + wgpu) photo culler"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "falcon"
+path = "src/main.rs"
+
+# AppKit must run on the process main thread. The usual parallel test harness
+# cannot exercise view adoption; this native event-loop test runs before release.
+[[test]]
+name = "mac_hosted_view"
+path = "tests/mac_hosted_view.rs"
+harness = false
+required-features = ["mac-native-tests"]
+
+[features]
+# Isolated diagnostic identity/profile. Ordinary Mac builds use the same native toolbar.
+mac-chrome-experiment = ["mac-native-tests"]
+# Test-only entry point: ordinary Windows checks must not build a Mac launcher.
+mac-native-tests = []
+
+[dependencies]
+# Native GUI, FemtoVG-on-wgpu renderer (the only Slint renderer that supports the
+# zero-copy wgpu texture import — proven in Phase 0). wgpu 29 matches falcon-gpu.
+slint = { version = "1.17", default-features = false, features = [
+    "compat-1-2",
+    "backend-winit",
+    "renderer-femtovg-wgpu",
+    "unstable-wgpu-29",
+    # Runtime font registration (fontique) — lets us BUNDLE Inter (SIL OFL) and register it at startup so
+    # the app renders in the same font as the Figma design system, on any machine, with no OS install.
+    "unstable-fontique-010",
+    # v0.9.11 (native traffic lights): BackendSelector::with_winit_window_attributes_hook — the macOS
+    # transparent-titlebar/fullSizeContentView creation attributes ride this hook. No new crates
+    # (i-slint-backend-winit is already a direct dep); the hook itself is cfg'd to macOS, so Windows
+    # gets the identical selector.
+    "unstable-winit-030",
+] }
+i-slint-backend-winit = { version = "1.17", default-features = false }
+falcon-decode = { path = "../crates/falcon-decode" }
+# Optional GPU JPEG decode (NVIDIA nvJPEG, CUDA dlopen'd at runtime). Builds + runs
+# CUDA-free — NvjpegContext::new() returns None and the full-res path uses the CPU.
+falcon-nvjpeg = { path = "../crates/falcon-nvjpeg" }
+# GPU RAW develop (demosaic + colour on the GPU, ~0.7 ms). Its own wgpu device,
+# created lazily on the decode worker only when RAW mode is used.
+falcon-gpu = { path = "../crates/falcon-gpu" }
+# SDR gamut transforms (source gamut → user-selected output gamut) for colour-managed display.
+falcon-color = { path = "../crates/falcon-color" }
+rayon = "1"
+# Enumerate installed system fonts (family names + file paths) for the Text-watermark font picker.
+# Pure-Rust, no native deps; we only use it to list families + locate each one's file.
+fontdb = "0.23"
+# Settings + per-photo ratings persistence (small JSON files in the per-OS config dir).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Native folder picker (Windows IFileDialog / macOS Cocoa / Linux portal) — the
+# "Open folder" affordance so the app runs on any machine without a hardcoded path.
+rfd = "0.15"
+# Send culled files to the OS Recycle Bin (recoverable) for "Empty ./Rejected" (#24) — the
+# recoverable discard tail of the cull. Cross-platform (Windows Shell / macOS / freedesktop).
+trash = "5"
+
+# Query the GPU's video-memory budget (DXGI) so the texture caches scale to the actual
+# VRAM — bigger cards cache more (smoother), small/busy cards stay safe. Windows-only.
+[target.'cfg(windows)'.dependencies]
+# v0.8.148 (E5): the D3D11VA hardware HEIC lane (E3). Windows-only because the backend is
+# D3D11VA; the Mac trunk is already hardware-fast through Image I/O and is untouched by this
+# epic. It is INSTALLED, never called directly: `hwheic` puts a function pointer into
+# falcon-decode's hook slot at boot, because falcon-hwdec DEPENDS ON falcon-decode and the
+# dependency cannot run both ways. Every failure on this lane is a per-file decline to WIC.
+falcon-hwdec = { path = "../crates/falcon-hwdec" }
+windows = { version = "0.62", features = [
+    "Win32_Graphics_Dxgi",
+    # DWM corner backstop (v0.8.10): DwmSetWindowAttribute corner-preference + border-color.
+    "Win32_Graphics_Dwm",
+    # v0.8.25 style-bit probe (GetWindowLongPtrW GWL_STYLE): the decorated-frame-flash
+    # diagnostic behind FALCON_DEBUG_CHROME — proved winit's fullscreen exit transiently
+    # restores WS_CAPTION (the "bright corner" root cause).
+    "Win32_UI_WindowsAndMessaging",
+    # Auto-detect the monitor's assigned ICC for the custom output gamut (#76): the modern per-display
+    # association (QueryDisplayConfig → ColorProfileGetDisplayDefault — what Windows Settings' Color
+    # profile dropdown writes, per-user aware), with GetDC + GetICMProfileW as the fallback.
+    "Win32_Graphics_Gdi",
+    "Win32_UI_ColorSystem",
+    "Win32_Foundation",
+    "Win32_Devices_Display",
+    # v0.8.29 boot instrumentation: GetProcessTimes/GetCurrentProcess — the "process-create -> main()"
+    # pre-main span (AV scan / loader / hydration) that heads falcon.log for the slow-launch field report.
+    "Win32_System_Threading",
+    # A Shell DLL must match native Explorer, even when Falcon runs under emulation.
+    "Win32_System_SystemInformation",
+    # v0.8.82 log centralization: SHGetKnownFolderPath(FOLDERID_Downloads) — the Downloads
+    # fallback for the exe-dir log home (never a hardcoded %USERPROFILE%\Downloads) + the
+    # CoTaskMemFree the returned path allocation requires.
+    "Win32_UI_Shell",
+    "Win32_System_Com",
+    # v1.0.0-rc (queue item 27, sheet 2.1 B3 b): ITEMIDLIST, which SHParseDisplayName /
+    # SHOpenFolderAndSelectItems / ILFree are all typed in terms of — without this feature the three
+    # functions themselves are configured out of Win32_UI_Shell, which is what the compiler reports.
+    # The acceptance gate is the PE import-table walk: the only NEW imports this feature may add are
+    # shell32!SHParseDisplayName, shell32!SHOpenFolderAndSelectItems and shell32!ILFree.
+    "Win32_UI_Shell_Common",
+    # v0.8.195 (EFFICIENCY MODE, A): GetSystemPowerStatus + SYSTEM_POWER_STATUS — the ONE power API
+    # this round takes. It links **kernel32.dll** and has shipped since Windows 2000, so it is safe
+    # as an ORDINARY STATIC IMPORT and the v0.8.193 §1F Windows-10 loader trap does not apply to it.
+    # Deliberately NOT PowerRegisterForEffectivePowerModeNotifications, which lives in the same
+    # windows-crate module but is powrprof.dll / build 17763 and would have to be bound by name.
+    # The acceptance gate is a PE import-table walk of the staged exe: the only NEW import this
+    # feature may add is kernel32!GetSystemPowerStatus.
+    "Win32_System_Power",
+] }
+# v0.8.193 (§1F): mscms.dll's ColorProfileGetDisplayDefault / ColorProfileGetDisplayUserScope are
+# documented "minimum Windows 10 build 20348" — newer than every consumer Windows 10 (22H2 = 19045).
+# As STATIC imports (which is what the windows crate's `link!` produces, and what the v0.8.192 exe's
+# import table was measured to contain) the loader fails the process before main() on any such box:
+# Falcon would not start at all. They are resolved by name at first use instead — same dlopen
+# discipline falcon-nvjpeg uses for the CUDA DLLs, and the same crate.
+libloading = "0.8"
+# Put file(s) on the Windows clipboard as CF_HDROP (context-menu "Copy JPG / Copy RAW / Copy both"),
+# so the user can paste them into Explorer / email / an import dialog. Pure-Rust, no cmake.
+clipboard-win = "5"
+# Per-user HKCU file-association registration (W1/D5): ProgId + OpenWithProgids + Capabilities so
+# Falcon appears in Explorer's Open-With and Windows' Default-Apps. Pure-Rust registry access.
+winreg = "0.55"
+
+# Embed the app icon + version metadata into the .exe (Explorer / taskbar / Properties).
+# Windows-only; the build.rs call is a no-op (and failures are non-fatal) elsewhere.
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+cc = "1"
+
+# macOS (v0.9.7, Phase 6): the Mac arms of the capability/OS seams. `flock` (LOCK_EX|LOCK_NB) for the
+# single-instance advisory lock (support::claim_primary_instance) — the Mac analogue of the Windows
+# named mutex. VRAM sizing reuses falcon_decode::total_ram_bytes() (its own sysctl arm), so no direct
+# sysctl call is needed here. Not pulled on Windows/Linux.
+[target.'cfg(target_os = "macos")'.dependencies]
+# The native Mac toolbar opts in per hidden toolbar window; other windows keep upstream behavior.
+winit = { version = "=0.30.13", default-features = false, features = ["falcon-macos-hosted-view"] }
+libc = "0.2"
+# v0.9.15 (B-spike): the Apple-Events "odoc" delegate arm (macos_open.rs) — graft
+# `application:openURLs:` onto winit's live NSApplication delegate so Finder "Open With → Falcon" /
+# associated-file double-clicks reach the app. These are the SAME objc2 0.5 / objc2-*-0.2 versions
+# winit 0.30.13 already resolves (see Cargo.lock), so they add no new crate to the build graph. The
+# `NSApplication` feature transitively enables the objc2-foundation NSArray/NSString/NSURL bindings
+# the callback parses.
+objc2 = "0.5"
+# v0.9.16 (Round B): + NSFileManager (mac_assoc's app_display_name — localized "Preview"-style names
+# via displayNameAtPath) and NSWorkspace (bundle-id → app URL). Same crates/versions, features only.
+# v0.9.18 (Mac delete-recovery): + NSError so NSFileManager::trashItemAtURL:resultingItemURL:error:
+# is generated (the objc2 binding gates it on `all(feature="NSError", feature="NSURL")`). Feature-only
+# on the already-resolved objc2-foundation 0.2 — NO new crate in the graph.
+objc2-foundation = { version = "0.2", features = ["NSArray", "NSString", "NSURL", "NSFileManager", "NSError"] }
+objc2-app-kit = { version = "0.2", features = ["NSApplication", "NSWorkspace"] }
+
+# v0.8.45 (Fix 2): headless UI-geometry tests — the testing platform (no event loop, no GPU)
+# plus i-slint-core for synthetic pointer dispatch (process_mouse_input) and change-handler
+# flushing. TEST-ONLY: resolver = "2" keeps these out of the shipping build.
+[dev-dependencies]
+i-slint-backend-testing = "=1.17.0"
+i-slint-core = "=1.17.0"
+# v0.8.167: block on wgpu's adapter/device futures in the live-GPU publish rows
+# (`support::publish_tests`). Test-only, and the same version falcon-gpu's own suites use.
+pollster = "0.4"
+# v1.0.0-rc PNG EXPORT (queue item 35): the round's end-to-end row mints a TRANSPARENT PNG source
+# and drives `export_web_run` headless over it. TEST-ONLY -- the shipped binary reads and writes PNG
+# through `falcon-decode`, which owns the dependency; this is here so the row can build the source
+# file it needs without a committed binary fixture. Same version falcon-decode pins, already in the
+# lock, pure Rust.
+png = "0.17"

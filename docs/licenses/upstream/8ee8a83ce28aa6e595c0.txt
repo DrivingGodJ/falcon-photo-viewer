@@ -1,0 +1,2 @@
+    // The code below is derived from fontTools's fontTools.pens.momentsPen, which is in turn generated
+    // by running sympy on the Green's theorem integral expressions.

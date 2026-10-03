@@ -1,0 +1,182 @@
+// v0.9.5 (ui.rs extraction series): the right-click context-menu pieces (MenuItem,
+// MenuSep) extracted VERBATIM from the slint! macro in src/ui.rs. `export` added —
+// they were macro-file-local.
+
+import { Theme } from "theme.slint";
+import { Chip } from "widgets.slint";
+import { AaHairline, RotateGlyph, RotateGlyphCCW } from "glyphs.slint";
+
+    // A single row in the right-click context menu (hover-highlit, design-system styled).
+    export component MenuItem inherits Rectangle {
+        in property <bool> edge-to-edge: false;
+        in property <string> text;
+        in property <bool> enabled: true;   // false → dimmed + inert (e.g. Copy RAW with no RAW)
+        in property <int> icon: 0;          // v0.8.1: 0 none / 1 rotate CW / 2 rotate CCW — vector, left of the label (Path-icon grammar)
+        in property <string> shortcut;      // v0.8.28: OPTIONAL trailing shortcut-peek chip label ("Del", "Shift+R", …); "" → no chip (mirrors the leading-icon slot)
+        in property <bool> checked: false;  // v0.8.49: marks the ACTIVE sort method/direction — accent label, geometry untouched (a leading glyph would shift the label; colour-only keeps the no-shift contract)
+        // v0.8.163 (§7 item 3, OWNER RULING): "when multiple images are selected, the context menu
+        // should say rate [n], flag [n], reject [n] with bold text". COLOUR-AND-WEIGHT ONLY, like
+        // `checked` above and for the same reason: a weight change moves no geometry (the label is
+        // the h-stretch:1 cell, so a wider glyph run absorbs into the slack, and the 200px budget
+        // in this 224px menu holds "Un-reject 9999" at 700 with room over).
+        in property <bool> bold: false;
+        callback clicked;
+        height: 30px;
+        // v0.8.40 (FIX 1): the wash is the FULL item cell again and the menu BODY's padding drops to 3px
+        // — the user-annotated rule ("3px all sides, not a huge spacing"): glass-edge -> wash = 3px on
+        // every side AND wash -> wash = 3px (the body's 3px item spacing). The v0.8.29 inner 3px-inset
+        // wash stacked on the 6px body padding + the 3px spacing and read as 9px of air everywhere.
+        // v0.8.42 (Item 3): wash radius = Theme.radius-ctrl — ONE LADDER TIER below the menu
+        // glass (Theme.radius), replacing v0.8.40's exact-arithmetic R−3: the user read the
+        // non-ladder value as NOT concentric (rendering near-capsule on the 30px cell). KNOWINGLY
+        // diverges from the strict R−3 pairings — menu items are CONTROL-class rows, so they take
+        // the control radius. (Era note: the values were 13/9 when this was ruled; the L41 even
+        // pass made them 12/8 — the TIER relationship is the rule and survives unchanged.)
+        // USER-FLAGGED: revert to `Theme.radius - 3px` if arithmetic wins the feel test.
+        // Label/glyph/chip layout + the full-cell TouchArea untouched (the v0.8.1 no-shift contract).
+        border-radius: root.edge-to-edge ? 0px : Theme.radius-ctrl;
+        background: (root.enabled && ta.has-hover) ? Theme.hover : transparent;
+        animate background { duration: Theme.anim; easing: ease; }
+        // v0.8.95 (v0.8.94-audit V1/V5/V6): the row's RENDERED enabled state, made observable. A
+        // MenuItem's `enabled` is otherwise only visible as a text colour, which no test can read —
+        // so "this command is greyed on the surface that owns it" was an unpinnable claim, and C21
+        // shipped greying the macOS View row while the in-app row stayed lit. These three lines are
+        // the whole probe (`ElementHandle::find_by_accessible_label(app, <row text>)` +
+        // `accessible_enabled()`), and they are honest a11y for a menu row besides: it IS a button,
+        // its label IS the text, and its enabled state IS `enabled`. NOT a broader a11y pass — the
+        // house has none yet (owner ruling: aesthetics first until an explicit market gate).
+        accessible-role: button;
+        accessible-label: root.text;
+        accessible-enabled: root.enabled;
+        // v0.8.119 (design-sweep O17/O19/O23 + Y41): the same treatment for the SHORTCUT chip, and
+        // for the same reason. Which rows carry a keycap is now conditional — on the menu's target
+        // (a thumb-scoped row must not teach a key that acts on the current shot), on compare (the
+        // Del key is hard-refused there) and, for the Copy trio, on which row the Ctrl+C priority
+        // walk actually performs — and a chip's presence was otherwise only visible as a mounted
+        // child, which no test can read. It is honest a11y besides: a screen reader announcing a
+        // menu row's keyboard shortcut is exactly what accessible-description is for, and rows with
+        // no chip correctly announce nothing.
+        accessible-description: root.shortcut;
+        HorizontalLayout {
+            padding-left: Theme.space-2h + (root.edge-to-edge ? 3px : 0px); padding-right: Theme.space-2h + (root.edge-to-edge ? 3px : 0px); spacing: 8px;
+            // v0.8.1: optional leading glyph (rotate CW / CCW). A false `if` contributes NO child,
+            // so with icon==0 the layout has a single child and its spacing never applies → the
+            // label stays at padding-left 10px, identical to every text-only entry (no shift).
+            if root.icon == 1 : VerticalLayout { alignment: center; RotateGlyph {
+                tint: root.enabled ? Theme.text-dim : Theme.text-mute; width: 14px; height: 14px; } }
+            if root.icon == 2 : VerticalLayout { alignment: center; RotateGlyphCCW {
+                tint: root.enabled ? Theme.text-dim : Theme.text-mute; width: 14px; height: 14px; } }
+            Text {
+                text: root.text; color: root.checked ? Theme.accent : (root.enabled ? Theme.text : Theme.text-mute); font-size: Theme.font-md;
+                font-weight: root.bold ? 700 : 400; // v0.8.163 (§7 item 3): the plural rows only
+                vertical-alignment: center; horizontal-stretch: 1;
+            }
+            // v0.8.28: OPTIONAL trailing shortcut-peek chip. A false `if` contributes NO child (identical to
+            // the leading-icon slot), so items without a shortcut render byte-identically — the h-stretch:1
+            // label fills the row exactly as before. When present the label absorbs the slack and the chip
+            // sits right. text-mute label on a Theme.well keycap + house hairline (a control, not a hole).
+            if root.shortcut != "" : VerticalLayout { alignment: center;
+                // v0.8.44 (G10): the shared Chip primitive, HINT role — byte-identical to the old
+                // hand-rolled pill (18px well + hairline, text-mute font-sm/600, hug+12px).
+                Chip { text: root.shortcut; }
+            }
+        }
+        ta := TouchArea { clicked => { if (root.enabled) { root.clicked(); } } }
+    }
+
+    // ── v0.8.191 (H8, the app-wide hairline sweep). ──────────────────────────────────
+    // The inner rule is the shared `AaHairline`; the 7px OUTER slot is untouched, because four
+    // menu-height rows in the rig are arithmetic on it. This separator is the one plain fill in
+    // the app that offered a genuine SIMULTANEOUS comparison: a context panel is a GlassPanel
+    // layer, so each separator's device row was fixed per menu rather than per open — but the
+    // sep-to-sep offset across a 33px MenuItem is EVEN (46) while the offset across the 32px
+    // rating row or a 32px MenuHeader is ODD (45), so two separators 3–40px apart, both drawn
+    // from this one line of markup, rendered at different weights permanently and in foveal
+    // view. An anti-aliased stroke is the same drawing at every offset.
+    export component MenuSep inherits Rectangle {
+        in property <length> extra-inset: 0px;
+        height: 7px;
+        AaHairline { y: 3px; x: 4px + root.extra-inset; height: 1px; width: parent.width - 8px - 2 * root.extra-inset; tint: Theme.divider; }
+    }
+
+    // ── v0.8.158 (B1a, OWNER RULING Q31): THE MENU'S SUBJECT, AT THE TOP OF THE MENU. ────────────
+    // Both context menus opened on the RATING row — a control — so the one thing the menu never
+    // said was WHICH photograph it was about, on the two surfaces (filmstrip thumb, grid tile)
+    // where the menu's target is deliberately NOT the shot on the stage. This row says it.
+    //
+    // ── v0.8.163 (§7 item 2, OWNER RULING from the v0.8.161 feel test) ───────────────────────────
+    // "the filename header landed in the right PLACE but directly reuses the EXIF panel's large
+    // font — instead use the STANDARD context-menu body text size for consistency, BOLD for
+    // slightly better visibility; and the EXIF panel's filename is CLICKABLE (copies the name) —
+    // the menu header does the same."
+    //
+    // SO THE v0.8.158 RATIONALE BELOW IS SUPERSEDED, and it is worth saying exactly how. It argued
+    // that a header which lights up under the pointer "promises a click it does not have"; the
+    // ruling gives it the click, so the promise is now kept and the hover feedback is the
+    // signifier for it. What survives from that note is the OTHER half — the PLURAL header
+    // ("[n] images") has no single name to copy, so it stays exactly what it was: no TouchArea, no
+    // hover, no accessible role. `clickable` is that split, stated by the call site.
+    //
+    // THE CLICK IS THE EXIF PANEL'S, MIRRORED: the hit area hugs the RENDERED name (never the
+    // whole row — a subject line is not a full-width button), the cursor is `pointer`, the label
+    // turns `Theme.accent` under the pointer, and the handler is the one the panel's own header
+    // calls, which copies and raises the "Filename copied — <name>" transient toast (main.rs
+    // `copy_filename_with_feedback`, shared by both so the two can never drift). THE MENU STAYS
+    // OPEN [VD]: a header utility is not a menu action, and closing the menu the user is still
+    // reading — to copy a name he probably wants to paste somewhere the menu can act on — would
+    // surprise. L39 holds trivially: this arm INVOKES and does nothing else.
+    //
+    // GEOMETRY is the "Rating" label row's, verbatim (32px tall, 10px left / 8px right insets,
+    // Theme.space-1h spacing) — that row is what this one replaces at the top of both menus, so
+    // neither menu's rhythm moves. The TEXT tier is now the MENU BODY's (`Theme.font-md`, the size
+    // every MenuItem label renders at) at weight 700, per the ruling: consistency with the rows
+    // below it, and the bold carries the visibility the 15px title tier used to.
+    //
+    // L5 (widest state): the menus are 224px wide, less 2x3px body padding, less this row's 10+8px
+    // insets = 200px for the name. `overflow: elide` is the app's ONE elision convention for a
+    // filename in a bounded cell (the EXIF panel's `nmtxt`, ComparePinLabel's name, the develop
+    // panel's colour chip all use it) — so a 60-character name shortens instead of widening the
+    // menu, and it is Slint's tail elision, not a middle-out variant this codebase does not have.
+    export component MenuHeader inherits Rectangle {
+        in property <length> extra-inset: 0px;
+        in property <string> text;
+        // v0.8.163 (§7 item 2): the SINGULAR header copies its filename; the plural one has no
+        // single name to copy and stays the inert subject line v0.8.158 shipped. The call site
+        // owns this predicate (it is the same `ctx-plural` the header STRING is composed from,
+        // published by `on_ctx_populate`), so the words and the affordance cannot disagree.
+        in property <bool> clickable: false;
+        callback clicked;
+        height: 32px;
+        // …and it announces what it is, in MenuItem's own grammar (v0.8.95): the ROLE is constant
+        // (Slint requires it — `accessible-role` must be a constant expression, which is exactly
+        // why MenuItem states inertness through `accessible-enabled` rather than through the role)
+        // and the two properties that CAN move carry the split. So a plural header announces as a
+        // disabled, unnamed row — no command claimed — and `find_by_accessible_label` answers for
+        // the singular one only, which is the rig's whole probe.
+        accessible-role: button;
+        accessible-label: root.clickable ? root.text : "";
+        accessible-enabled: root.clickable;
+        HorizontalLayout {
+            padding-left: Theme.space-2h + root.extra-inset; padding-right: 8px + root.extra-inset; spacing: Theme.space-1h;
+            Rectangle {
+                horizontal-stretch: 1;
+                // The EXIF panel's `nmta`, verbatim: declared BEFORE the label so the label paints
+                // over it, and sized to the RENDERED name (capped at the cell) so the hit area is
+                // the words, not the row.
+                hta := TouchArea {
+                    enabled: root.clickable;
+                    x: 0; width: min(htxt.preferred-width, parent.width); height: parent.height;
+                    mouse-cursor: pointer;
+                    clicked => { root.clicked(); }
+                }
+                htxt := Text {
+                    width: 100%; height: 100%;
+                    text: root.text;
+                    color: hta.has-hover ? Theme.accent : Theme.text;
+                    font-size: Theme.font-md; font-weight: 700;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+    }

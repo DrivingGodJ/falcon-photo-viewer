@@ -1,0 +1,260 @@
+// v0.9.5 (ui.rs extraction series): Theme + Tip extracted VERBATIM from the
+// slint! macro in src/ui.rs. The macro imports AND re-exports them, so the generated
+// Rust API (main.rs `app.global::<Theme>()`, the tipgeom rig) is unchanged.
+
+    // ─────────────────────────── design system ───────────────────────────
+    // One edit here restyles every component (radii, colours, hover, timing…).
+    // The flat neutral-gray design (v0.7.0: #171717 base surfaces, #262626 blocks, #0a0a0a wells, no borders, 16px
+    // floating corners — the Figma "experimental" frames, §35 Phase A) IS the design: the original
+    // frosted glass MODE and its A/B toggle were retired in W2/v0.3.57.
+    export global Theme {
+        // PALETTE (v0.4.1 cleanup). Glass mode was retired in W2/v0.3.57; the runtime `opaque` toggle
+        // and every `opaque ? … : …` token ternary are now GONE — each colour is a single flat value.
+        // Same-valued tokens were merged (see the notes). The HOVER-GLASS idle frost on the floating
+        // EXIF/RAW panels is a SEPARATE, live feature (GlassPanel.hover-glass), unrelated to the mode.
+        //
+        // v0.8.48 — COLOUR-MANAGED CHROME: every <color> token below is `in-out` and authored in sRGB
+        // (these initial values ARE the design). At boot (before the window shows) and on every
+        // output-gamut / custom-profile change, Rust re-derives ALL of them through falcon_color's
+        // sRGB→output transform (`apply_theme_transform`, main.rs) — the same path the photos ride —
+        // so the chrome lives in the photos' colour space. On an sRGB output the transform is identity
+        // and these design values render byte-exactly. The four *-flat tokens are opaque flattens
+        // recomputed from TRANSFORMED ingredients at set time (flatten AFTER transform — what FemtoVG's
+        // live compositing of the translucent variants produces).
+        //
+        // ── SURFACES (v0.7.0 contrast pass — the user's consolidated model, PLAN §50.2/§51) ──
+        // ONE consistent layering rule replaces the old #222→#333→#222 zig-zag: surfaces step
+        // LIGHTER (stage < base < block) and every interactive rest-state is a DARK well (#0a0a0a)
+        // that is visible on ANY surface — so the old per-context "visibility deviation" rest-fill
+        // overrides are gone. Actives are accent; hierarchy is direction-consistent everywhere.
+        in-out property <color> stage: #0a0a0a;         // image canvas — NEUTRAL grey (the old #0a0b0d blue cast biased perceived WB)
+        in-out property <color> base: #171717;          // app background / window chrome / title bar / floating panels & popups
+        in-out property <color> block: #262626;         // raised card/track/row ON base (group cards, seg tracks, list rows, toasts)
+        in-out property <color> well: #0a0a0a;          // interactive REST fill (inputs, chips, buttons) — solid; recessed on base AND block
+        // Solid hover LIFTS for solid rest fills (a translucent wash REPLACING a solid fill made the
+        // control vanish, and .brighter() on a near-black well moves nothing — user-caught, v0.7.0).
+        in-out property <color> well-hover: #2e2e2e;    // hovered well — one solid step up (v0.8.11 F1: reverted C1's #242424 back to the brighter #2e2e2e, user pick)
+        in-out property <color> block-hover: #3a3a3a;   // hovered block row/cell — one solid step up
+        in-out property <color> badge-bg: #0a0a0acc;    // dark pill behind over-image badges (neutral ~80% black)
+        in-out property <color> scrim: #0a0a0aaa;        // modal backdrop dim (~67%, neutral family — translucent so the photo stays visible)
+        in-out property <color> scrim-heavy: #0a0a0ac0;  // stage-stale dim (~75%, neutral family — D12)
+        in-out property <color> scrim-light: #0a0a0a66;  // scanning overlay (~40%, neutral family — D12)
+        // v0.8.50 (G2): the edge-hover gradient scrim's two stops (owner design, Figma 253-273:
+        // #0A0A0A@100% at the edge → @0% inward). TOKENS so BOTH stops ride apply_theme_transform
+        // (main.rs) like every other colour — a literal gradient would silently bypass colour
+        // management. Same neutral #0a0a0a family as the scrims above.
+        in-out property <color> scrim-edge: #0a0a0a;      // the opaque edge stop
+        in-out property <color> scrim-edge-clear: #0a0a0a00; // the transparent inner stop (alpha 0 rides the transform like Theme.border)
+        // ── LINES ──
+        in-out property <color> border: transparent;    // flat design has NO button/panel outlines (kept as a no-op so call sites need no churn)
+        in-out property <color> border-strong: #ffffff14; // ~8% hairline EDGE on interactive rests (chips/pills/inputs/rings) — re-lit v0.7.2 (M3) so dark wells read as controls, not holes
+        in-out property <color> border-lift: #ffffff59;  // v0.8.42 (Item 4): ~35% white — the tile HOVER-LIFT frame (FilmThumb/SelTile). border-strong's 8% vanished over bright imagery (user report); sits above hover #ffffff26 in the white-alpha ramp
+        // v0.8.129 (the selection round, spec section 4) -- THE TRANSIENT SELECTION'S OWN RIM + GLOW.
+        // The rim value IS Theme.text (#f7f7f7) by the owner's ruling, minted as its own token so
+        // the selection can diverge from body text later without a sweep. COLOUR-MANAGEMENT RULE
+        // (the trap this file documents at the top): all three are `in-out` COLOURS and are
+        // re-derived in apply_theme_transform (main.rs) like every other colour token -- a literal
+        // at a call site would silently bypass the sRGB->output transform every photo rides.
+        in-out property <color> border-select: #f7f7f7;      // the selected tile's rim
+        in-out property <color> glow-select: #ffffff8c;      // ~55% white -- the REST glow
+        in-out property <color> glow-select-hi: #ffffffd9;   // ~85% white -- the HOVERED (full) glow
+        // (v0.8.133's `glow-star: #ffffff59` is DELETED at v0.8.136 / V3. It was minted on one
+        // measurement -- how far a 55% halo has to fall before it stops washing an UNFILLED star it
+        // is painted directly underneath -- and the owner has retired the shape that measurement
+        // described: no star carries a halo on any surface now. A colour token whose whole comment
+        // reasons about a caster that no longer exists is a false sentence in the palette, so it
+        // goes with it. The plural signal is `StarBulkPill` (widgets.slint) — v0.8.136's underline,
+        // retired in turn at v0.8.137 — which reuses `block` + `glow-select` and mints nothing.
+        // v0.8.138 (X5): the face was `hover-flat` for one release; the owner called it too bright
+        // and it dropped to `block`, the raised-surface grey. Still a reuse, still nothing minted.)
+        // The two rim weights (section 4: 1px at rest, 2px hovered, so selected and hovered-selected
+        // read apart). LENGTHS, so they are exempt from the transform rule above. They are never
+        // ANIMATED: the constant-geometry idiom forbids a border-width fade, and these flip
+        // instantly on the hover edge exactly as the identity colours do.
+        out property <length> border-select-w: 1px;
+        out property <length> border-select-hi-w: 2px;
+        // v0.8.133 (the visual wave, E): the IDENTITY frame weight -- the constant 2px every tile
+        // surface draws its current/compare/reject border at. It was a bare `2px` literal in the
+        // else-arm of three tile borders sitting directly beside `border-select-hi-w: 2px`, and the
+        // same number under two names (one named, one anonymous) reads as an accident: a future
+        // change to the hovered-selection weight looks like it should move all four. It is a LENGTH,
+        // so the colour-management rule above does not apply to it.
+        out property <length> border-identity-w: 2px;
+        // (v0.8.133's `sel-glow-inset: 6px` is DELETED at v0.8.135 / W4. It measured the mat the
+        // inward-cast halo needed; the halo casts outward again and the clearance lives in the
+        // Review grid's own padding and gutters, where it costs the photograph nothing.)
+        out property <length> border-lift-w: 3px;     // v0.8.42 (Item 4): hover-lift frame weight — one step up from the tiles' resting 2px so the frame reads over busy pixels; HOVER ONLY (current/compare/reject frames keep 2px)
+        in-out property <color> divider: #333333;        // separator RULES (menu groups, EXIF grid, Selection safe/destructive split)
+                                                     //   — kept distinct from block so lines can diverge from fills later
+        // ── TEXT (brightest → dimmest — a real 3-step hierarchy restored in v0.4.1/C2) ──
+        in-out property <color> text: #f7f7f7;           // PRIMARY — titles, values, active labels, text-on-accent
+        in-out property <color> text-dim: #cccccc;       // SECONDARY — inactive segment/tab labels, body copy
+        in-out property <color> text-mute: #a3a3a3;      // TERTIARY — descriptions, hints, units, meta (v0.4.1 merged text-faint → text-mute)
+        in-out property <color> text-on-accent: #f7f7f7; // fg on a filled accent / danger surface (= text)
+        in-out property <color> text-on-star: #171717;  // dark fg on a gold star fill (= base — D15)
+        // ── ACCENTS ──
+        in-out property <color> accent: #3f8cff;         // primary interactive (BLUE) — active seg/chip fill, selection, focus, links (v0.8.48: the v0.8.46 hand-dim #5689fc REVERTED to the design value — the runtime output-gamut transform now derives the owner's dimmed hue from it, byte-exactly on his Dell profile)
+        in-out property <color> accent-soft: #3f8cff29;  // ~16% accent — soft active tint / focus ring (v0.8.48: reverted to the design base, alpha byte unchanged)
+        in-out property <color> accent-soft-hover: #3f8cff40; // ~25% accent — hover step for the soft accent rest (D10; v0.8.48: reverted to the design base, alpha byte unchanged)
+        in-out property <color> accent-web: #00d7c8;     // web-export actions (BLUE-GREEN, v0.7.2 P7 — user pick; was purple #823fff; v0.8.48: the v0.8.46 dim #34d4c7 reverted with the accent family) — "goes to ./Web", distinct from blue
+        in-out property <color> accent-web-soft: #00d7c825; // ~16% blue-green (v0.8.48: reverted to the design base, alpha byte unchanged)
+        // ── STATE ──
+        in-out property <color> danger: #e5484d;         // reject / destructive (RED)
+        in-out property <color> danger-soft: #e5484d3d;  // ~24% danger tint (soft destructive wash)
+        in-out property <color> danger-soft-hover: #e5484d5c; // ~36% danger — hover step for the soft danger rest (D10)
+        in-out property <color> star: #ffc24b;           // rating stars (GOLD)
+        in-out property <color> warn: #ffc24b;           // warnings — SAME VALUE as star (v0.7.0 unification) but kept a
+                                                     //   SEPARATE entry so the semantics can diverge again later (user call)
+        in-out property <color> warn-soft: #ffc24b3d;    // ~24% warn tint (soft warning wash) — mirrors danger-soft (v0.8.0 U2)
+        in-out property <color> meter-good: #46b45a;     // cache-meter HEALTHY tier (GREEN — the only green in the palette)
+        // v0.8.196 fix tail (skeptic B, O2 — RULED): the EFFICIENCY LEAF's own green, one step
+        // lighter and cooler than `meter-good`. The leaf sits 4 px from the cache bar; painted in the
+        // bar's own hex it fused with a HEALTHY fill into one continuous green object and separated
+        // again when the cache went amber — so the mode indicator's visual identity was governed by a
+        // variable that has nothing to do with the mode (VISUAL-THINKERS). A distinct token keeps the
+        // badge a constant badge. **Owner veto item.**
+        in-out property <color> leaf: #5fc98d;           // efficiency-mode LEAF badge
+        // ── HOVER WASHES (semi-transparent WHITE, composited over the surface behind) ──
+        // v0.7.0: ONE hover value (~15% — the old seg-hover; the old 8% hover "barely showed") and
+        // ONE rest wash (~8%), so rest → hover is always a visible step.
+        in-out property <color> hover: #ffffff26;        // ~15% — ALL hover washes (buttons, chips, seg cells)
+        in-out property <color> hover-flat: #3a3a3a;    // v0.8.17 (Fix C): OPAQUE flatten of Theme.hover (#ffffff26, ~15% white) over Theme.base #171717 = round(base*(255-a)/255 + white*a/255) per channel = #3a3a3a. Minted in the v0.8.17 lift era; kept after the v0.8.18 revert -- pixel-identical render to the translucent Theme.hover over the solid base, and an opaque body stays artifact-safe if a lift ever returns (see PLAN §62.b).
+        in-out property <color> hover-flat-block: #464646;   // v0.8.48: OPAQUE flatten of Theme.hover over Theme.block #262626 (same v0.8.17 formula -> #464646) — was an inline literal on the events-row hover; a token now so Rust recomputes it from the TRANSFORMED hover/block.
+        in-out property <color> accent-hover-flat: #213451;  // v0.8.48: OPAQUE flatten of accent-soft-hover (#3f8cff40) over Theme.base = round(base + (fg-base)*64/255) -> #213451 — the CullButton Flag hover body (v0.8.17 Fix C), recomputed at token-set time from the TRANSFORMED accent/base so it stays pixel-identical to the translucent composite in ANY output gamut.
+        in-out property <color> danger-hover-flat: #61292a;  // v0.8.48: OPAQUE flatten of danger-soft-hover (#e5484d5c) over Theme.base -> #61292a — the CullButton Reject hover body (v0.8.17 Fix C), same transformed-ingredient recompute as accent-hover-flat.
+        // ── v0.8.138 (X6, owner's FOURTH and final statement of this button) ─────────────────────
+        // "the glow should not make the whole button brighter or darker, simply just add the glow,
+        // and other parts should be the same in terms of hover and styling." That is the complete
+        // model, and it retires three releases of increasingly clever answers: AN ARMED CULL BUTTON
+        // IS STYLED IDENTICALLY TO THE NORMAL ONE IN EVERY STATE. Arming adds exactly two things —
+        // the outer halo, and the counted label. Nothing else may differ.
+        //
+        // Which leaves exactly one problem, and these two tokens are its solution. The armed REST
+        // has to LOOK like the normal rest (the translucent *-soft tint) while being OPAQUE, because
+        // a 55%-white halo renders BEHIND the face: through a translucent face its core shines out
+        // and brightens the button, which is the "brighter or darker" the owner is naming. So these
+        // are the opaque FLATTEN of *-soft over Theme.base — the same v0.8.17 formula, the same
+        // flatten target as the *-hover-flat pair above, so the family stays consistent. The
+        // rendered pixel is identical to the translucent rest on this button's guaranteed-solid
+        // host; only the halo can tell them apart, which is the entire point.
+        //
+        // (v0.8.137's `accent-armed-hover-flat` / `danger-armed-hover-flat` are DELETED with this
+        // ruling. They existed to give the armed state a hover face one step ABOVE the normal one —
+        // exactly the "different in terms of hover" this ruling forbids. The armed hover is now
+        // `*-hover-flat`, the identical token the normal button hovers to.)
+        //
+        // Both are recomputed in apply_theme_transform from the TRANSFORMED accent/danger and base,
+        // like every other flat — never from these hexes, which are only the sRGB reference.
+        in-out property <color> accent-soft-flat: #1d2a3c;  // flatten(base #171717, accent #3f8cff, 0x29) — the opaque twin of accent-soft
+        in-out property <color> danger-soft-flat: #482324;  // flatten(base #171717, danger #e5484d, 0x3d) — the opaque twin of danger-soft
+        in-out property <color> wash-rest: #f7f7f714;    // ~8% — faint idle/rest wash (compare drop-zones)
+        in-out property <color> shadow-control: #0000008c; // THE APP'S HEAVIEST SHADOW BY BLUR/OFFSET (D17, owner 08-14): every panel, popup, menu, modal, toast, pill, stub and floating control casts it at shadow-blur / shadow-dy = 12 / 4 (~55% black); was the slider-handle/floating-control class only. NOT the darkest ALPHA — `shadow-lift` below is (~66%), deliberately: it is a hover-state lift cue on a 9px blur, not a resting elevation, and the D17 ruling exempts the lighter hover/glow classes
+        in-out property <color> shadow-panel: #00000075;   // RETIRED 08-14 (owner ruling D17: the heavy panel shadow is retired app-wide, shadow-control becomes the heaviest) — NO trunk users left; the definition is kept only because the macos-prototype branch may still reference it, so deleting it now could break the Phase-2 merge compile. Delete after that merge. (~46% black; was the floating panel/card/toast/pill class)
+        in-out property <color> shadow-lift: #000000a8;     // tile HOVER lift — the DARKEST alpha in the app (~66% black, vs shadow-control's ~55%) so a picked-up SelTile reads as raised off the grid (E1, v0.8.9); live at 9px blur / 2px down on the filmstrip + review tiles and the grid, which the D17 shadow retirement deliberately left alone (a hover cue, not a resting elevation). Re-anchored 08-15 (W1): it used to be measured against `shadow-panel`, which is now RETIRED and casts nothing.
+        // ── SHADOW GEOMETRY (v0.8.185, W2) ──
+        // The D17 ruling made 12 / 4 the app's ONE resting elevation, and panels.slint's claim that
+        // the panel and modal families "match by construction" was false while it was five
+        // hand-written copies across three files. These are that geometry, once: bound by GlassPanel,
+        // SolidPanel, the toast card, the "Scanning…" pill, the tick-degraded banner and RankRow's
+        // dragged row (whose ternary keeps its 0px rest arm). The lighter classes are NOT bound here —
+        // the 9px hover lifts and the 6px arm glows are their own cues at their own sites, exactly as
+        // the ruling left them. `dy` = the `drop-shadow-offset-y` these pair with; both are EVEN
+        // logical px, so they stay on integer device pixels at the owner's 150% scale (18 / 6) — L41.
+        out property <length> shadow-blur: 12px;
+        out property <length> shadow-dy: 4px;
+        // ── RADII ──
+        // ── v0.8.139 (AA, THE EVEN-RADIUS TRIAL — owner-approved, and a TRIAL) [VD] ────────────
+        // Three of the five radii were ODD (13 / 9 / 7), which at the owner's 150% display scale is
+        // a half device pixel on every corner in the app: 19.5 / 13.5 / 10.5. The corner arc is
+        // curved and therefore antialiased whatever we do, but its two TANGENT points — where the
+        // arc meets the straight top/bottom and left/right edges — are exactly where a half-pixel
+        // radius shows, because the edge either side of them is a crisp axis-aligned line. Rounding
+        // DOWN to the even neighbours maps the whole family to integer device px at 150% (18 / 12 /
+        // 9) and leaves a cleaner geometric scale: 4-6-8-12-16 instead of 4-7-9-13-16, with the
+        // class hierarchy (window > panel > control > small > badge) preserved and every step still
+        // distinct. `radius-xs` (4) and `radius-window` (16) were already even and are UNTOUCHED.
+        //
+        // Everything DERIVED follows automatically and is deliberately not edited: the pill radii
+        // written as `height / 2`, and every child that reads `parent.border-radius`.
+        //
+        // THIS IS A TRIAL. The owner compares the staged v0.8.139 against v0.8.138 and keeps or
+        // reverses it; if the corners read too square the ready counter-proposal is the UP variant
+        // {14, 10, 8}, which is the same parity fix with more curvature rather than less. The G1
+        // circular-corner crease is untouched by either — squircle Paths remain unscoped.
+        out property <length> radius-window: 16px;  // the app window's own corners (H3, v0.7.2)
+        out property <length> radius: 12px;          // floating panels + CARDS + the title-bar hover squares
+        out property <length> radius-ctrl: 8px;      // chips / rows / inputs / action buttons
+        out property <length> radius-sm: 6px;        // small glyph buttons (~28px IconBtn) + PillBtn
+        out property <length> radius-xs: 4px;        // badges / pips
+        // ── ICONS ──
+        out property <length> icon-stroke: 1.4px;    // Path-glyph stroke weight (v0.8.11 F2: reverted 1.6px → 1.4px, user pick; FemtoVG stroke = LOGICAL px, NOT viewbox-scaled — legible for 13-16px glyphs)
+        out property <duration> anim-fast: 100ms;    // handle / thumb slide
+        out property <duration> anim: 120ms;
+        out property <duration> anim-med: 200ms;
+        out property <length> font-xs: 9px;          // over-image badges
+        out property <length> font-sm: 11px;
+        out property <length> font-md: 12px;
+        out property <length> font-body: 13px;       // row / body label (between md and lg)
+        out property <length> font-lg: 14px;
+        out property <length> title-size: 15px;      // panel title (Settings / EXIF / Selection)
+        out property <length> display-md: 20px;       // large display headline (empty-state, confirm count)
+        out property <length> display-xl: 44px;       // giant display letters (compare drop-zones)
+        // spacing scale — the ONLY paddings/gaps the Tier-2 surfaces use (consistency).
+        out property <length> space-1: 4px;          // tight (label + sublabel)
+        out property <length> space-2: 8px;          // intra-group (chips / buttons in a row)
+        out property <length> space-3: 12px;         // section gap (header / list / actions)
+        out property <length> space-4: 16px;         // panel / modal outer padding
+        out property <length> space-5: 20px;
+        out property <length> space-6: 24px;
+        // half-steps (P6, v0.8.7): the 6px / 10px paddings + gaps that recurred as literals — legitimized into the scale (values unchanged)
+        out property <length> space-1h: 6px;         // between space-1 (4) and space-2 (8) — snug intra-group gap
+        out property <length> space-2h: 10px;        // between space-2 (8) and space-3 (12) — cozy row padding
+        // v0.8.33 (M8): immersive reveal corner hot-zones (bottom-left RAW peek, bottom-right cull
+        // chip) — ~160×90 logical px anchored at each corner. Named so the stage hit-math + docs agree.
+        out property <length> reveal-zone-w: 160px;
+        out property <length> reveal-zone-h: 90px;
+        // v0.8.50 (G2): the edge-pill reveal system — ONE depth for both the proximity zone and the
+        // gradient scrim (bottom + left edges; the Figma 253-273 mock reads ~61px at rough scale).
+        out property <length> edge-zone: 60px;
+        // control sizing — heights that were freehand per-component.
+        out property <length> ctrl-h-sm: 28px;       // chips / small controls
+        out property <length> hit-primary: 28px;     // panel-header close/minimise + events-header row (NOT the 44px title bar); == ctrl-h-sm by design
+        out property <length> hit-compact: 24px;     // compact icon buttons
+        // v0.8.81 hotfix (owner ruling): THE section width — the one body/card width a Settings
+        // section renders at (the setflick body: panel 360 − 2×space-5 side padding). Single
+        // source: the Settings GlassPanel DERIVES its 360px from this (section-w + 2×space-5),
+        // and the welcome panel's three columns adopt it verbatim — never a copied 320 literal
+        // anywhere, so the two surfaces can never drift (the hand-mirrored-constants gotcha).
+        out property <length> section-w: 320px;
+    }
+
+    // ── G11 (v0.8.44): shared delayed-tooltip channel. Hover hosts (the five unlabeled title-bar
+    // IconBtns + the HUD chips) WRITE text + their centre-x here from their own TouchArea's
+    // `changed has-hover` (the observer-on-the-owner rule); ONE always-mounted layer at the window
+    // root renders it after a dwell. "" = no tip. cx is in window coordinates — reported via the
+    // host TouchArea's absolute-position (v0.8.45: NEVER the component root's — Slint 1.17.0
+    // double-counts a layout-positioned root's own x; rig-pinned in tipgeom_tests.rs).
+    // The chips NEED the indirection: they live inside hudclip (clip: true), so an in-place tip
+    // below the bar would be clipped — the window-root layer isn't.
+    // v0.8.84 — POSITIONED tips: cy is the pill's window-space TOP edge; 0 is a SENTINEL meaning
+    // "the title-bar tip" (the renderer pins y 47 exactly as before — every pre-v0.8.84 host writes
+    // text/cx only and never touches cy, so their output is unchanged by construction). A host that
+    // DOES write cy (today: the Selection panel's XMP-sync toggle, the sole positioned host) owns
+    // the channel and MUST reset cy to 0 on EVERY leave path — including unconditional reset on
+    // unhover (an A→B move to a sentinel host keeps B's text via the equality guard in either
+    // handler order, and a stale cy would re-anchor B's tip at the dead host's y), click-time
+    // clears, host-unmount edges (panel close, immersive) — see the xmpta wiring + the
+    // changed sel-open / changed immersive observers in main_window.slint.
+    export global Tip {
+        in-out property <string> text: "";
+        in-out property <length> cx: 0px;
+        in-out property <length> cy: 0px;
+    }
+
+    // v0.8.190 — THE v0.8.189 GLYPH-WEIGHT COMPARISON GLOBAL IS RETIRED (name deliberately not
+    // repeated: the identifier greps to zero across the MARKUP and the Rust sources; the only
+    // occurrences left in the tree are the rig's own absence-proof literals). It
+    // carried three DEVELOPER levers for one round; the owner judged them 08-15 and ruled 1px
+    // ANTI-ALIASED for both glyph lines with the frames left at 1px, so the values are fixed in the
+    // markup and the levers, their MainWindow aliases, their three Settings cards and their
+    // settings.json keys are all gone. The mechanism narrative lives at glyphs.slint `AaHairline`.

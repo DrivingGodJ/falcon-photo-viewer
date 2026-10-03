@@ -1,0 +1,9 @@
+///
+/// Original code by libraw and rawspeed, licensed under LGPL-2
+///
+/// Copyright (C) 2016 Alexey Danilchenko
+/// Copyright (C) 2016 Alex Tutubalin
+/// Copyright (C) 2017 Uwe Müssel
+/// Copyright (C) 2017 Roman Lebedev
+/// Copyright (C) 2022 Daniel Vogelbacher
+

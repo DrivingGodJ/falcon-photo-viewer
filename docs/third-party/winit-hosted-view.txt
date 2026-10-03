@@ -1,0 +1,23 @@
+Falcon's Mac app includes a modified copy of winit 0.30.13.
+Upstream: https://github.com/rust-windowing/winit
+Published source revision: e9809ef54b18499bb4f2cac945719ecc2a61061b
+License: Apache License 2.0 (bundled as winit LICENSE.txt).
+
+Why: the Mac app draws its toolbar in a hidden window and moves that drawing
+surface (a macOS view) into the main window's title bar. Unmodified winit expects
+the view to stay in the window that created it.
+
+Falcon modifications, 2026-09-25:
+- An explicit per-window opt-in for a view that is placed in another NSWindow.
+- winit keeps its own reference to that view instead of relying on the hidden
+  window's contentView, which macOS clears when the view moves.
+- Events stay addressed to the hidden window, while size, scale, cursor areas,
+  text-input (IME) positions and Tab-key order come from the window that
+  actually holds the view.
+- Scale and focus are refreshed without moving or resizing the hidden window.
+- After a window-style change, the hidden window does not make the view its
+  first responder (keyboard focus) while another window holds it.
+
+Normal and diagnostic Mac builds share the tested toolbar. Only its hidden
+window opts in. Windows and other non-Mac backend source files are unchanged.
+The full source and the recorded upstream file hashes are in the Falcon repository.

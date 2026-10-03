@@ -1,0 +1,17 @@
+                    // Taken verbatim from FreeType:
+                    //
+                    // "If this flag is set, we have an additional constraint to
+                    // get the blue zone distance: Find a segment of the topmost
+                    // (or bottommost) contour that is longer than a heuristic
+                    // threshold.  This ensures that small bumps in the outline
+                    // are ignored (for example, the `vertical serifs' found in
+                    // many Hebrew glyph designs).
+                    //
+                    // If this segment is long enough, we are done.  Otherwise,
+                    // search the segment next to the extremum that is long
+                    // enough, has the same direction, and a not too large
+                    // vertical distance from the extremum.  Note that the
+                    // algorithm doesn't check whether the found segment is
+                    // actually the one (vertically) nearest to the extremum.""
+                    //
+                    // See <https://gitlab.freedesktop.org/freetype/freetype/-/blob/57617782464411201ce7bbc93b086c1b4d7d84a5/src/autofit/aflatin.c#L641>

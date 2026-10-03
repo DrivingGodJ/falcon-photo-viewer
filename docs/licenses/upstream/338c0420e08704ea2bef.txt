@@ -1,0 +1,5 @@
+/// Bitstream reader with borrowed in-memory buffer.
+///
+/// Implementation is mostly from [jxl-rs].
+///
+/// [jxl-rs]: https://github.com/libjxl/jxl-rs

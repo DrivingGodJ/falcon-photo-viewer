@@ -1,0 +1,1 @@
+// Note: the SVG arc logic is heavily adapted from https://github.com/nical/lyon

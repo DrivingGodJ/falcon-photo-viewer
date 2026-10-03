@@ -1,0 +1,6 @@
+# v1.0.0-rc (BYTES OVER NAMES): these are BYTE-EXACT artefacts. A round whose whole subject is
+# "what do the first bytes of this file say" cannot let git rewrite line endings inside them — and
+# `junk_named_jpg.jpg` (PDF text, no NUL) and the generator would otherwise be auto-detected as
+# text and CRLF-converted on checkout, so the committed fixture and the checked-out one would
+# differ. Same reason as `crates/testdata/.gitattributes`.
+* -text

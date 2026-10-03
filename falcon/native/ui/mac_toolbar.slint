@@ -1,0 +1,67 @@
+import { MainToolbar, ToolbarState } from "toolbar.slint";
+import { Theme, Tip } from "theme.slint";
+export component MacToolbarWindow inherits Window {
+    no-frame: true;
+    // AppKit owns the accessory bounds. An explicit input avoids a circular
+    // preferred-width calculation through the responsive HUD's visibility gates.
+    in property <length> host-width: 1280px;
+    // AppKit also owns the height: the title bar's measured height (38pt in the compact toolbar
+    // style on macOS 15, 26 and 27). Never impose the 44px Windows bar on it — the excess is clipped
+    // above the window edge (full04-3 field report, 2026-09-25).
+    in property <length> host-height: 44px;
+    width: root.host-width; height: root.host-height;
+    default-font-family: "Inter";
+    background: Theme.base;
+    in property <ToolbarState> state;
+    callback action(string, float, float);
+    callback meter-hover(bool, float, float);
+    callback dbg-chips-log(float, float, float, bool, bool, float, int, bool, bool);
+    out property <string> tip-text: Tip.text;
+    out property <length> tip-x: Tip.cx;
+    callback forward-key(KeyEvent, bool);
+    forward-focus: keys;
+    keys := FocusScope {
+        key-pressed(e) => { root.forward-key(e, true); accept }
+        key-released(e) => { root.forward-key(e, false); accept }
+    }
+    MainToolbar {
+        width: parent.width;
+        cache-frac-after: root.state.cache-frac-after;
+        cache-frac-before: root.state.cache-frac-before;
+        cache-len-after: root.state.cache-len-after;
+        cache-len-before: root.state.cache-len-before;
+        cache-meter-hover: root.state.cache-meter-hover;
+        cache-meter-show: root.state.cache-meter-show;
+        chrome-eff: root.state.chrome-eff;
+        compare: root.state.compare;
+        count-all: root.state.count-all;
+        count-picks: root.state.count-picks;
+        count-rejects: root.state.count-rejects;
+        dbg-chrome: root.state.dbg-chrome;
+        efficiency-leaf: root.state.efficiency-leaf;
+        empty-state: root.state.empty-state;
+        film-visible: root.state.film-visible;
+        grid-open: root.state.grid-open;
+        hud-pos: root.state.hud-pos;
+        hud-pos-widest-a: root.state.hud-pos-widest-a;
+        hud-pos-widest-b: root.state.hud-pos-widest-b;
+        immersive: root.state.immersive;
+        loading-open: root.state.loading-open;
+        maximized: root.state.maximized;
+        modal-blocking: root.state.modal-blocking;
+        motion-ui: root.state.motion-ui;
+        native-window-controls: root.state.native-window-controls;
+        notif-open: root.state.notif-open;
+        notif-unread: root.state.notif-unread;
+        path-dir: root.state.path-dir;
+        path-mid: root.state.path-mid;
+        path-text: root.state.path-text;
+        sel-open: root.state.sel-open;
+        settings-open: root.state.settings-open;
+        titlebar-h: root.host-height;
+        titlebar-leading-inset: root.state.titlebar-leading-inset;
+        action(a,x,y) => { root.action(a,x,y); }
+        meter-hover(h,x,y) => { root.meter-hover(h,x,y); }
+        dbg-chips-log(a,b,c,d,e,f,g,h,i) => { root.dbg-chips-log(a,b,c,d,e,f,g,h,i); }
+    }
+}

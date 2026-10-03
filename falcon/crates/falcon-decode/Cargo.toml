@@ -1,0 +1,87 @@
+[package]
+name = "falcon-decode"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Pure-Rust JPEG decode with DCT shrink-on-load (the fast scrub path). Proven in
+# spikes/shrink_bench + real_bench. No cmake/nasm needed.
+jpeg-decoder = "0.3"
+# SIMD downscale (Lanczos). The `image` crate's imageops::resize is ~50x slower
+# on 45 MP and was the cause of multi-second frames — do NOT use it here.
+fast_image_resize = "5"
+# Checked, zero-copy reinterpretation of a `[u16]` sample buffer as bytes (queue item 35): the
+# 16-bit PNG export hands its samples to fast_image_resize, which speaks `&mut [u8]` + `PixelType`,
+# and takes them back for the encoder's big-endian swap. ALREADY in this workspace's lock (1.25.0,
+# via wgpu/Slint), so a direct dep adds nothing to fetch and nothing to build; pure Rust, no cmake,
+# no DLL. The alternative was an `unsafe` pointer cast in a crate whose every other `unsafe` is FFI.
+bytemuck = "1"
+# SIMD baseline JPEG encoder — far faster than image::codecs::jpeg::JpegEncoder.
+jpeg-encoder = "0.6"
+# Pure-Rust PNG decode — the watermark logo for web export AND standalone .png sources (Way A).
+png = "0.17"
+# Pure-Rust TIFF decode for standalone .tif/.tiff sources (Way A, §30.3). No cmake/nasm.
+tiff = "0.9"
+# Pure-Rust WebP decode (lossy VP8 + lossless VP8L; exposes the ICCP colour profile) for standalone
+# .webp sources (§48 #75). Already in the lock via the `image` crate, so no extra fetch. Deterministic
+# on every machine — no OS Store codec needed. Its lossless WebPEncoder (same crate) drives the
+# round-trip unit tests, so no separate dev-dependency is required.
+image-webp = "0.2"
+# Pure-Rust JPEG XL decode for standalone .jxl sources (§ formats batch F1). ALREADY in the lock via
+# rawler (its JXL-compressed-DNG path pulls the full jxl-* stack), so a direct dep adds nothing to the
+# lock — it just pins the same 0.12.x for our own `.jxl` route. Default features (rayon only): the
+# optional `image`/`lcms2`/`moxcms` integrations stay OFF, so the dep surface is pure Rust, no cmake.
+# Orientation lives in the codestream header (applied by jxl-oxide on render) and the embedded ICC
+# feeds the source-gamut path — see decode_jxl_rgb / jxl_color_desc.
+jxl-oxide = "0.12"
+# Pure-Rust animated + static GIF decode for standalone .gif sources (§ formats batch F2). ALREADY in
+# the lock via resvg (Slint's SVG stack), so a direct dep adds nothing to the lock. We composite frames
+# with correct disposal + per-frame delays for real animated playback (see the gif_* fns / GifStream).
+gif = "0.14"
+# Pure-Rust BMP decode for standalone .bmp sources (§ formats batch F3). The `image` crate is ALREADY a
+# transitive dep (via rawler), and the `bmp` feature has NO extra crates — so enabling only that feature
+# (default-features off) adds nothing to the lock, keeps the dep surface pure Rust, and makes BMP
+# UNIVERSAL (works on the macOS port too, unlike a WIC route). See decode_bmp_rgb.
+image = { version = "0.25", default-features = false, features = ["bmp"] }
+# Glyph rasteriser for the TEXT watermark (renders typed text → an RGBA logo that reuses
+# the same stamp path as a PNG logo). Already in the lock via Slint, so no extra fetch.
+ab_glyph = "0.2"
+# True raw develop (decode + demosaic + camera WB + cam->sRGB matrix + gamma).
+# Proven in spikes-raw/raw_develop. On-demand only (~1.2 s/frame), not the hot path.
+# 0.8 supplies the public X-Trans Markesteijn demosaicer used by Falcon's true-RAW paths.
+# Its default developer still selects bilinear for X-Trans, so our dispatch remains explicit.
+rawler = "0.8.0"
+# EXIF from the JPG sibling (TIFF-based). CR3 (ISO-BMFF) falls back to rawler.
+kamadak-exif = "0.5"
+serde = { version = "1", features = ["derive"] }
+anyhow = "1"
+# SDR gamut transforms (matrix + TRC) + the ICC-description → source-gamut mapping.
+falcon-color = { path = "../falcon-color" }
+
+# HEIC/HEIF decode via the OS image codec (Windows WIC), Way C (§30.3). No cmake/nasm/patents in-tree —
+# WIC calls the OS's installed HEVC Image Extension. macOS (CGImageSource) is a future `decode_heic` arm.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Graphics_Imaging",
+    "Win32_System_Com",
+    "Win32_Foundation",
+    # GlobalMemoryStatusEx — the RAM-derived source-pixel cap (max_source_pixels).
+    "Win32_System_SystemInformation",
+] }
+
+# macOS (v0.9.7, Phase 6): total_ram_bytes()'s Mac arm reads `hw.memsize` via `sysctlbyname` — the
+# analogue of GlobalMemoryStatusEx that feeds max_source_pixels (the decompression-bomb cap). Pure
+# system-call binding, no cmake/nasm. Not pulled on Windows/Linux.
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+# probe example reuses rayon to time a parallel thumbnail sweep on the real folder.
+rayon = "1"
+# integration tests re-read decoded JPEG dimensions to assert output sizes.
+jpeg-decoder = "0.3"
+
+[[example]]
+name = "probe"
+path = "examples/probe.rs"

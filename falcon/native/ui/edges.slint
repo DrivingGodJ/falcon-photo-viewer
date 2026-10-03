@@ -1,0 +1,165 @@
+// v0.8.50 (G2, the grid batch): the four edge pills — the owner's Figma components
+// (nodes 247-2 show-filmstrip / 247-27 hide-filmstrip /
+// 247-15 show-grid / 247-43 hide-grid). Pill body per Figma: 84×28 horizontal
+// (bottom edge) / 28×84 vertical (left edge) — v0.8.139 HOTFIX takes each pill's
+// ICON-BEARING axis +2 (86×28 / 30×84) so the glyph's true centre lands on the
+// even device grid; see each mount banner. Fill and border are unchanged:
+// #171717 fill = Theme.base, 1px
+// rgba(255,255,255,0.08) border = Theme.border-strong (byte-equal), radius 9 =
+// Theme.radius-ctrl, icon strokes #a3a3a3 = Theme.text-mute — the Figma pills map
+// 100% onto existing tokens, no new colours.
+// v0.8.54 (owner refinement, his screenshots — supersedes the Figma show-glyphs): the
+// SHOW icons gained an ORIENTATION LINE (the edge the section appears from) and more
+// minimal geometry — see each glyph's note; one icon family with the title-bar
+// SectionChips (hud.slint). The hide chevrons are unchanged.
+//
+// CHEVRONS (owner markup, 2026-07-16): the Figma chevron vectors are RANDOM
+// SKETCHES — only their SIZE is taken from Figma (~18×8.5 rendered). The actual
+// geometry is the EXIF-panel chevron's spec (main_window.slint exbtn1): a
+// 16-viewbox Path polyline spanning x 4..12 with 4-unit depth, Theme.icon-stroke
+// width, fill transparent — drawn in a 36px Path box so the rendered polyline is
+// 18×9 (the Figma size at the EXIF proportions). Tint = Theme.text-mute, matching
+// the pills' own Figma icon stroke AND the font-dropdown chevron precedent.
+//
+// Hover: the IconBtn wash brightness on the pill body (Theme.hover-flat — the
+// opaque flatten over base, pixel-identical to the translucent wash on this solid
+// pill). The pills ACT on click; the reveal choreography (edge proximity, scrim)
+// lives with the overlays in main_window.slint — these are the pure pill bodies.
+
+import { Theme } from "theme.slint";
+import { GridGlyph, FilmFrameBlock, ChevronGlyph } from "glyphs.slint";
+
+    // Bottom-edge pill (86×28, was 84×28 — v0.8.139 hotfix): show/hide FILMSTRIP. strip-visible=true → chevron-down
+    // (hide, node 247-27); false → the four-frames glyph (show, node 247-2).
+    export component EdgePillBottom inherits Rectangle {
+        in property <bool> strip-visible: true;
+        in property <bool> hit: true;
+        callback clicked;
+        out property <bool> hovered: pta.has-hover;
+        // v0.8.139 HOTFIX (owner report): 84 → 86, the twin of the title bar's 32 → 34. The mount
+        // banner below carries the rule; the 28px height is untouched.
+        width: 86px; height: 28px;
+        border-radius: Theme.radius-ctrl;
+        background: pta.has-hover ? Theme.hover-flat : Theme.base;
+        border-width: 1px; border-color: Theme.border-strong;
+        animate background { duration: Theme.anim; easing: ease; }
+        // show — v0.8.54 (owner refinement, his screenshots; supersedes the Figma 247-9 four-frame
+        // sketch): three hollow frames + the horizontal ORIENTATION LINE underneath (the bottom
+        // edge the strip appears from). One icon family with the title-bar SectionChip (icon 1).
+        // v0.8.119 (OWNER REPORT, B1-29 (c)): …which it was in SHAPE and not in SIZE. This drew the
+        // frames at 12px on a 44px row while the title-bar chip drew them at 6px on a 22px row, so
+        // the same control wore a chunky icon at the screen edge and a small one in the bar - the
+        // grid pair's defect, on the other pill ("make it the same size like the title bar icons for
+        // consistency"). It is the SHARED `FilmFrameBlock` now, at the title-bar size, so there is
+        // one filmstrip drawing in the app. (The pill BODY was unchanged at 84x28 by that wave; the
+        // v0.8.139 hotfix below is what moved it, and only on this axis.)
+        // v0.8.138 (X4): re-derived from the block's new 22px width and FLOORED, the same way its
+        // title-bar twin is. This host's own arithmetic:
+        //   x = (84 - 22) / 2 = 31px          <- integer, was (84 - 19) / 2 = 32.5 (half-pixel)
+        //   y = (28 - 6 - 2 - 1.4) / 2 = 9.3  <- floored to 9px
+        // v0.8.139 (AA/H4): …and both of those integers are ODD, which at 150% IS a half device
+        // pixel — device (46.5, 13.5) here against the title-bar chip's (7.5, 12.0). The twins were
+        // still exactly half a device pixel apart vertically, which is the reported symptom. So both
+        // axes went to the even grid, (30, 8), and the rasterisation was fixed.
+        // v0.8.139 HOTFIX (OWNER REPORT): snapped, and off centre — the same defect its title-bar
+        // twin had, for the same reason. AA's banner argued the split "cannot be fixed by resizing
+        // the block", which is true of the BLOCK and was the wrong variable: the owner has now
+        // authorised resizing the HOST ("you can also try slightly changing the width of the button
+        // if it would make it easier to center while maintaining sharpness"), and that dissolves the
+        // trade entirely. THE RULE (derived in hud.slint, one sentence here): the host dimension is
+        // CHOSEN so that true centre lands on the even grid — for a block of width b that means
+        // (h − b) ≡ 0 (mod 4), so with b = 22 this pill goes 84 → 86 and the mount is exact:
+        //   x = round-even((86 − 22) / 2) = round-even(32)  = 32px  <- TRUE CENTRE (was 30, 1px left)
+        //   y = round-even((28 − 6 − 2 − 1.4) / 2) = re(9.3) = 10px <- 0.7px low (the floor's 8 was
+        //                                                              1.3px HIGH — the bigger error,
+        //                                                              and visible next to the chip)
+        // Device at 150%: (48.0, 15.0) — both whole, and the chip's (9.0, 12.0) is whole too, so the
+        // twins still rasterise identically. THE 2px IS REQUIRED, not cosmetic: with the chip's
+        // filmstrip at an even x this pill must be even-phase as well or H4's mirrored-rasterisation
+        // split returns. The height stays 28 — only the axis that carries the block's own width
+        // needs the mod-4 property, and the y is snapped rather than exact by construction (the
+        // block's height carries the 1.4px stroke). The arithmetic is byte-identical to the chip's.
+        // v0.8.188: the height term is the block's OWN declared `block-h` (9px) instead of a
+        // re-spelled `6 + 2 + Theme.icon-stroke` (9.4px) — the twin expression stays byte-identical
+        // to hud.slint's and the OUTPUT here is unchanged: round-even((28 − 9)/2) = 10, exactly what
+        // 9.4 produced. See glyphs.slint for why the block declares a height at all.
+        if !root.strip-visible : FilmFrameBlock {
+            x: Math.round((parent.width - 22px) / 2 / 2px) * 2px;
+            y: Math.round((parent.height - self.block-h) / 2 / 2px) * 2px;
+            tint: Theme.text-mute;
+        }
+        // hide: chevron-DOWN (the strip collapses downward).
+        // v0.8.119 (OWNER REPORT, B1-29 (d)): the stock 14px `ChevronGlyph`. The inline Path this
+        // replaces already had byte-identical coordinates to the glyph's points-down arm - it just
+        // drew them in a 36px box, rendering 18x9 where every other chevron in the app renders
+        // 7x3.5. One drawing (the v0.8.107 doctrine), and the collapse icons now match the show
+        // icons they sit opposite.
+        // v0.8.143 (C3): `points-down` is the same value the old `up` carried here — the property
+        // was renamed to what it draws, not flipped. Correct under the owner's direction rule: the
+        // strip collapses DOWNWARD, so the arrow points down.
+        // ── v0.8.191: THE EVEN-GRID RULE DOES NOT APPLY TO THIS GLYPH, AND APPLYING IT COST.
+        // A mid-round pass even-floored this mount to y = 6 on the reasoning that its SHOW
+        // sibling (`FilmFrameBlock`, above) has snapped since v0.8.139. That was a category
+        // error and it was reverted in the same round. The snap exists for AA-OFF PLAIN FILLS,
+        // whose coverage depends on which sample centres a hard-edged span covers; a chevron is
+        // an anti-aliased Path STROKE on a diagonal and has no such edge. What the floor bought
+        // was error: (28 − 14)/2 = 7 is this pill's true centre, and 6 sits 1 logical = 1.5
+        // DEVICE px above it — and it WIDENED the disagreement with the SHOW glyph beside it
+        // (whose own round-to-even mount lands at 10 against a true 9.5) from 0.5px to 1.5px.
+        // Exact centring is what a soft glyph wants. No claim is made here that the two states
+        // share a grid: they do not, and they do not need to.
+        if root.strip-visible : ChevronGlyph {
+            points-down: true; tint: Theme.text-mute;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+        }
+        pta := TouchArea { enabled: root.hit; clicked => { root.clicked(); } }
+    }
+
+    // Left-edge pill (30×84, was 28×84 — v0.8.139 hotfix): show/hide the folder-grid dock. grid-open=true →
+    // chevron-left (hide, node 247-43); false → the 3×3-dots glyph (show, node 247-15).
+    export component EdgePillLeft inherits Rectangle {
+        in property <bool> grid-open: false;
+        in property <bool> hit: true;
+        callback clicked;
+        out property <bool> hovered: pta.has-hover;
+        // v0.8.139 HOTFIX (owner report): 28 → 30 on the CROSS axis, the twin of the title bar's
+        // 32 → 34. The mount banner below carries the rule; the 84px long axis is untouched.
+        width: 30px; height: 84px;
+        border-radius: Theme.radius-ctrl;
+        background: pta.has-hover ? Theme.hover-flat : Theme.base;
+        border-width: 1px; border-color: Theme.border-strong;
+        animate background { duration: Theme.anim; easing: ease; }
+        // show — v0.8.54 (owner refinement; supersedes the Figma 247-16 stroked pips): the
+        // vertical ORIENTATION RULE on the left (the edge the dock appears from) + 3×3 small
+        // FILLED square dots. One icon family with the title-bar SectionChip (icon 2).
+        // ── v0.8.190: THE SHARED `GridGlyph` — the twin this host kept drifting from. ────────
+        // This pill and hud.slint's SectionChip each spelled the identical dot-origin
+        // arithmetic, rule element and dot-block mount, held in step by comment after two
+        // owner-reported divergences (v0.8.119, v0.8.188). The derivation lives ONCE in
+        // glyphs.slint's `GridGlyph` now, which fills this pill and centres itself from the
+        // 30 × 84 box — (30 − 14)/2 + 4 = 12 exactly on x, even-floor((84 − 10)/2) → 36 on the
+        // long axis (true 37 is an exact tie on the even grid; the 1px is a recorded residue, its
+        // closure wants an 86px long axis and is an owner-line, not a fix to take here).
+        // The rule is the 1px anti-aliased `AaHairline` the owner chose on 08-15, turned a
+        // quarter turn — the SAME walk as the filmstrip underline above; that component's
+        // banner in glyphs.slint carries the whole mechanism and this one does not restate it.
+        // Measured output is byte-identical to the 1px cell the owner judged; the numbers are
+        // pinned in `the_grid_rule_is_the_film_lines_walk_transposed`, not restated here.
+        if !root.grid-open : GridGlyph { tint: Theme.text-mute; }
+        // hide: chevron-LEFT (the dock collapses leftward) — the same EXIF polyline rotated 90°.
+        // v0.8.119 (OWNER REPORT, B1-29 (d)): that rotation is a DIRECTION on the shared
+        // `ChevronGlyph` now, not a fourth inline copy of the polyline; same 14px box as its
+        // sibling above and as the EXIF header's own.
+        // v0.8.191: exact centring — (30 − 14)/2 = 8, (84 − 14)/2 = 35. A mid-round even-floor
+        // to 34 was reverted for the reason written at the bottom pill above: the even-grid rule
+        // is for AA-OFF plain fills, and on an anti-aliased stroke it only moves the ink off
+        // centre. `GridGlyph`'s own long-axis floor is a different case — it carries hard-edged
+        // 2px DOTS, which is exactly what the rule was minted for.
+        if root.grid-open : ChevronGlyph {
+            left: true; tint: Theme.text-mute;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+        }
+        pta := TouchArea { enabled: root.hit; clicked => { root.clicked(); } }
+    }

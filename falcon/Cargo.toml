@@ -1,0 +1,74 @@
+[workspace]
+resolver = "2"
+# The SHIPPING app + its production crates — the workspace is exactly the code that
+# ships, so `cargo check/test/clippy --workspace` are usable as full gates (R5-A
+# archival, PLAN §37). The vestigial members are EXCLUDED in place (not deleted):
+# the bring-up spikes (`spikes-turbo` pulls libjpeg-turbo → needs cmake+nasm, the
+# very C toolchain the production codecs deliberately avoid — see
+# crates/falcon-decode/Cargo.toml "No cmake/nasm"). Because they are excluded
+# rather than moved, their path-deps still resolve — `cd` into one and
+# `cargo build` builds it standalone on demand (own lock + target dir).
+members = [
+    "crates/falcon-decode",
+    "crates/falcon-color",
+    # Direct D3D11VA HEVC tile decode, used by the Windows app.
+    "crates/falcon-hwdec",
+    "crates/falcon-gpu",
+    "crates/falcon-nvjpeg",
+    "native",
+]
+exclude = [
+    "spikes-decode-bench",
+    "spikes",
+    "spikes-gpu",
+    "spikes-raw",
+    "spikes-turbo",
+    "spikes-nvjpeg",
+    "spikes-scrub",
+    "spikes-native",
+    "vendor/winit",
+    "vendor/zune-jpeg",
+]
+
+# Locked 0.30.13 with an opt-in Mac hosted-view extension. All other platform
+# sources match upstream; see docs/platforms/macos/winit-hosting.md.
+[patch.crates-io]
+winit = { path = "vendor/winit" }
+# Independently written AVX2 transpose; see vendor/zune-jpeg/FALCON-CHANGES.md.
+zune-jpeg = { path = "vendor/zune-jpeg" }
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.89"
+license = "Apache-2.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+# v0.8.36: drop the symbol table from the shipped .exe (smaller download). `panic = "unwind"` is
+# LEFT AS THE DEFAULT — the worker-thread `catch_unwind` degradation latches are load-bearing, so
+# `panic = "abort"` must NOT be set here.
+strip = "symbols"
+
+# Optimized deps, debuggable first-party crates. Media codecs (jpeg-decoder,
+# image, rawler, jxl-oxide) are ~20x slower with debug-assertions/overflow-checks
+# on even at opt-level 3, so disable those for deps — this is what makes `tauri
+# dev` (a dev-profile build) perform like the release spikes. Our own crates keep
+# the dev profile's checks.
+[profile.dev.package."*"]
+opt-level = 3
+debug-assertions = false
+overflow-checks = false
+
+# Our own media crates inline heavy generic code from jpeg-decoder /
+# fast_image_resize / jpeg-encoder; that code monomorphizes into the *calling*
+# crate, so at opt-level 0 the SIMD inner loops compile to scalar and a single
+# 45 MP resize takes ~8 s. Optimize the first-party media crates in dev too
+# (the app shell `falcon-app` stays default — it only calls concrete fns).
+[profile.dev.package.falcon-decode]
+opt-level = 3
+[profile.dev.package.falcon-color]
+opt-level = 3
+[profile.dev.package.falcon-gpu]
+opt-level = 3

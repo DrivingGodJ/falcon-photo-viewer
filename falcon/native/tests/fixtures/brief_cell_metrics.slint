@@ -1,0 +1,10 @@
+// Test-only reference: measure a production BriefCell without a separator or GridLayout
+// that could inflate its height. Use the same font family as MainWindow.
+import { BriefCell } from "../../ui/filmstrip.slint";
+
+export component BriefCellMetrics inherits Window {
+    default-font-family: "Inter";
+    in property <string> sample;
+    out property <length> line-height: cell.preferred-height;
+    cell := BriefCell { text: root.sample; }
+}

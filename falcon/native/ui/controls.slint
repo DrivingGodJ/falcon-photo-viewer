@@ -1,0 +1,366 @@
+// v0.9.5 (ui.rs extraction series): the button/input controls (IconBtn, PillBtn,
+// TextField, ActionBtn) extracted VERBATIM from the slint! macro in src/ui.rs.
+// `export` added — they were macro-file-local; importers pull them by name.
+
+import { Theme, Tip } from "theme.slint";
+
+    // v0.8.125 (C2 / design-sweep O3+Y73): THE zoom / focus-check readout, lifted out of the single
+    // view's RAW panel so COMPARE can host the SAME control instead of a compare-only twin (the UI
+    // CONSISTENCY lens: reveal the existing interactive component, never mint a read-only lookalike).
+    // Three inputs decide every state, and they are the three the single view always used: the
+    // honest percentage against SOURCE pixels, whether that percentage describes the shot on screen
+    // (`pct-valid`), and whether the full-res DETAIL frame is what is being shown (`detail-live`).
+    // A tap toggles 1:1 / Fit — which is why this is a control and not a label.
+    //
+    // `compact` is the compare CONTROL-BAR dialect: same words, same colour rule, same click, at
+    // that bar's 20px chip geometry beside its "Center" sibling instead of the panel's 30px block
+    // chip. ONE component, two host dialects (ledger L7) — not two designs.
+    export component FocusBadge inherits Rectangle {
+        in property <int> pct: 100;
+        in property <bool> pct-valid: true;   // G1: false = the % would describe another shot → "—"
+        in property <bool> detail-live: true; // N25: the shown frame IS the full-res detail
+        in property <float> zoom: 1.0;
+        in property <bool> failed: false;     // a LATCHED full-res failure (its retry card is up)
+        // v1.0.0-rc (queue item 30, §1.E — OWNER RULING 2.3c): a sharper frame for what is on
+        // screen is still OWED. The host publishes it from `support::detail_pending`; this
+        // component only reads it, and only at Fit.
+        in property <bool> pending: false;
+        // v0.8.125 (C2): the action cannot run on this shot at all (compare's `native_w == 0` — a
+        // RAW-only shot or an unreadable header). DIMMED but still clickable: the handler's refusal
+        // names WHICH of those two it is, and a greyed-out inert control could say neither (L21).
+        in property <bool> available: true;
+        in property <bool> compact: false;
+        in property <bool> hit: true;         // M6 input gate
+        callback clicked();
+        // The badge is mount-gated in both hosts, and a destroyed TouchArea never fires
+        // `changed has-hover` — so hover is PUSHED to the host, which latches it (the v0.8.98 rule).
+        callback hover-changed(bool);
+        // N25: only claim SHARP 1:1 (solid accent "Focus 1:1") when the full-res detail is actually
+        // shown. At 1:1 over the still-loading proxy → amber "Loading…" (no accent), so a sharpness
+        // judgement is never made on an upscaled proxy.
+        property <bool> sharp: root.pct >= 100 && root.detail-live && root.pct-valid;
+        // `zoom > 1.0` too: the producers fall back to pct=100 when the base width is momentarily 0
+        // (no layout yet), which would blink amber "Loading…" at Fit — nonsensical.
+        property <bool> softzoom: root.pct >= 100 && root.zoom > 1.0 && !root.detail-live && root.pct-valid;
+        // v0.8.96-audit (C3): the THIRD state — a latched failure must not read as a wait, because
+        // the amber "Full-res unavailable — tap to retry" card is on screen in the very same frame.
+        property <bool> stalled: root.softzoom && root.failed;
+        // v1.0.0-rc (queue item 30, §1.E — OWNER RULING 2.3c): THE FOURTH CLAIM, AND THE QUIET ONE.
+        // At Fit the badge read a flat "Fit" over a quarter-scale proxy while the sharp frame was
+        // still being decoded — the app knew and did not say (H1). The owner: *"use the 'Loading'
+        // wording, not 'Preview' — simpler and consistent with the zoomed-in state. Kept quiet
+        // (grey) at Fit; amber stays reserved for zoomed-in."*
+        //
+        // It is built from `pending`, NEVER from `!detail-live`: a playing GIF and an unsupported
+        // placeholder have no detail frame and never will (ledger L15 — a word that never
+        // resolves). And it appears in the WORD ternary only: no colour, background or border
+        // binding reads it, so this state wears the resting grey, and `softzoom` keeps the
+        // `zoom > 1.0` term that is the sole reason amber cannot reach Fit.
+        property <bool> fitloading: root.zoom <= 1.0 && root.pending;
+        height: root.compact ? 20px : 30px;
+        border-radius: root.compact ? Theme.radius-xs : Theme.radius-ctrl;
+        opacity: root.available ? 1.0 : 0.45;
+        // RAISED chip (M3) in the panel — a well vanished on dark photos; in the bar it wears the
+        // bar's own chip material so it sits with its neighbours.
+        background: root.sharp ? Theme.accent
+            : (root.compact ? (zta.has-hover ? Theme.hover : transparent)
+                            : (zta.has-hover ? Theme.block-hover : Theme.block));
+        border-width: root.compact ? 1px : 0px; // flat in the panel: accent TEXT signals 1:1
+        border-color: root.sharp ? Theme.accent
+            : (root.softzoom ? Theme.warn : (root.compact ? Theme.border-strong : Theme.border));
+        animate background { duration: Theme.anim; easing: ease; }
+        HorizontalLayout {
+            padding-left: root.compact ? Theme.space-2 : Theme.space-3;
+            padding-right: root.compact ? Theme.space-2 : Theme.space-3;
+            spacing: Theme.space-1;
+            // `fbtext` is named for the rig: a Text's default accessible-label IS its text, so the
+            // states are readable through the element finder — the only way a test can pin WHICH
+            // claim the badge is making.
+            // v0.8.119 (design-sweep Y69): "Fit" means zoom == 1.0 and nothing else; the band
+            // between Fit and 1:1 reads "Zoomed" (the percentage beside it stays the precise value).
+            fbtext := Text {
+                text: root.sharp ? "Focus 1:1"
+                    : (root.stalled ? "Not sharp"
+                    : (root.softzoom ? "Loading…"
+                    : (root.fitloading ? "Loading…" : (root.zoom > 1.0 ? "Zoomed" : "Fit"))));
+                color: root.sharp ? Theme.text-on-accent : (root.softzoom ? Theme.warn : Theme.text-mute);
+                font-size: root.compact ? Theme.font-sm : Theme.font-md;
+                font-weight: root.compact ? 700 : 600;
+                vertical-alignment: center; horizontal-stretch: 1;
+            }
+            // v0.8.126 (R7): `fbpct` / `fbunit` are named for the rig, like `fbtext` above - the
+            // compact dialect is a FIXED-width chip flanked by two filename labels, so its widest
+            // state has to be measurable rather than estimated. The percentage that feeds it is
+            // clamped producer-side (`tick::ZOOM_PCT_DISPLAY_MAX`); unclamped it is unbounded
+            // below source width and no fixed width could hold it.
+            fbpct := Text {
+                text: root.pct-valid ? root.pct : "—";
+                color: root.sharp ? Theme.text-on-accent : (root.softzoom ? Theme.warn : Theme.text-dim);
+                font-size: root.compact ? Theme.font-sm : Theme.font-md;
+                font-weight: root.compact ? 700 : 600; vertical-alignment: center;
+            }
+            fbunit := Text {
+                text: root.pct-valid ? "%" : "";
+                color: root.sharp ? Theme.text-on-accent : (root.softzoom ? Theme.warn : Theme.text-dim);
+                font-size: root.compact ? Theme.font-sm : Theme.font-md; vertical-alignment: center;
+            }
+        }
+        zta := TouchArea {
+            enabled: root.hit;
+            clicked => { root.clicked(); }
+            changed has-hover => { root.hover-changed(self.has-hover); }
+        }
+    }
+
+    export component IconBtn inherits Rectangle {
+        in property <bool> active: false;
+        in property <bool> danger: false;
+        in property <bool> enabled: true;
+        in property <bool> hit: true;  // M6 (v0.8.19): hit-test gate — false = input passes THROUGH (fading immersive chrome); visuals untouched (unlike `enabled`, the P5 mute, which dims and still swallows)
+        in property <length> radius: Theme.radius-sm;
+        // Glyph buttons draw their hover/active wash as a centred rounded SQUARE (radius-sm) —
+        // the title-bar hover-square language scaled down (v0.7.1; was a circle). The title-bar
+        // buttons use `bar: true` for the larger 13px-radius square; `circle: false` = a plain
+        // full-rect wash (rare).
+        in property <bool> circle: true;
+        // v0.7.0 title-bar wash: a centred rounded-13px SQUARE, side = min(w,h) - 6px (3px in on the
+        // tight axis, matching the floating panels' 3px edge gap). Replaces both the circle wash and
+        // the full-height rectangular wash on every title-bar button.
+        in property <bool> bar: false;
+        // v0.8.17 (Fix C): true = the non-danger hover wash is the OPAQUE Theme.hover-flat (a body pixel-identical to the
+        // translucent wash on solid-BASE hosts: title bar, panel headers, export sheet; kept artifact-safe if a lift ever returns).
+        // false = keep the translucent Theme.hover (hosts over a DIFFERENT solid, e.g. the export preset
+        // rows on Theme.block, where a base-flatten would mis-tint). Danger + active branches are unchanged.
+        in property <bool> visible-flat-hover: true;
+        // G11 (v0.8.44): optional delayed-tooltip label ("" = none). Reported to the shared Tip
+        // channel from ta's `changed has-hover`; the window-root layer renders it after the dwell.
+        in property <string> tip: "";
+        // v0.8.154 (A1, design ruling Q2) — A DYNAMIC TIP MUST RE-PUBLISH ON THE FLIP.
+        // Q2 makes a disabled title-bar button's tip STATE-DERIVED (Compare: "needs 2 photos"),
+        // and `ta`'s hover observer below only ever fires on a hover EDGE. Without this handler a
+        // tip that flips while the pointer rests on the button leaves TWO defects, both already
+        // recorded in this codebase: the reader sees the PREVIOUS state's sentence, and the
+        // unhover branch's ownership guard (`Tip.text == root.tip`) can no longer match, so the
+        // stale string STRANDS until some other Tip host hovers (Tip's layer shows on
+        // `Tip.text != ""` alone). This is the v0.8.53 SectionChip class and the v0.8.118 path-pill
+        // class, third instance — so it takes their fix verbatim: re-publish WHILE WE ARE THE
+        // HOVERED HOST, which refreshes the reader and restores channel ownership in one move.
+        // NEVER an unconditional write (another host may own the channel while this one is merely
+        // mounted), and cx is deliberately NOT re-published: it is a HOVER-EDGE fact, and a change
+        // handler runs before layout has re-solved (the path pill's rule, verbatim).
+        changed tip => {
+            if (ta.has-hover) {
+                if (root.tip != "") { Tip.text = root.tip; }
+                else { Tip.text = ""; }
+            }
+        }
+        callback clicked;
+        out property <bool> hovered: ta.has-hover; // exposed so hover-glass panels can OR child hovers
+        // v0.8.65 (C3/M6): the button's absolute window x, for anchoring a menu under it (the Open…
+        // menu). Read on the x=0 full-size TouchArea, NEVER this positioned root — Slint 1.17.0
+        // double-counts a layout-positioned component root's own x (v0.8.45 rule; rig-pinned).
+        out property <length> ax: ta.absolute-position.x;
+        width: 40px; // v0.7.1: 38 → 40 (slightly larger glyph buttons, user request)
+        property <bool> use-circle: root.circle && !root.bar;
+        // Danger hover: CIRCLE buttons (panel-level destructive glyphs, e.g. the preset bin) get a
+        // soft danger TINT so the danger-stroked glyph stays visible — the old solid Theme.danger
+        // flooded red-on-red and the icon vanished (user report, W3c). The RECTANGULAR danger wash
+        // (circle: false — the Windows-convention title-bar close) keeps the solid red.
+        property <color> wash: !root.enabled ? transparent : (ta.has-hover ? (root.danger ? (root.use-circle ? Theme.danger-soft : Theme.danger) : (root.visible-flat-hover ? Theme.hover-flat : Theme.hover))
+                                            : (root.active ? (Theme.accent-soft) : transparent)); // H4 + P5: disabled shows no wash
+        border-radius: root.radius;
+        opacity: root.enabled ? 1.0 : 0.35; // P5: disabled = muted glyph (colour-agnostic; the child Path owns its colour)
+        background: (root.use-circle || root.bar) ? transparent : root.wash;
+        animate background { duration: Theme.anim; easing: ease; }
+        if root.use-circle : iconwash := Rectangle {
+            // v0.7.1: the glyph wash is a rounded SQUARE at radius-sm (the title-bar square language,
+            // scaled down), slightly larger than the old circle (min-4 vs min-6) — user request.
+            width: min(root.width, root.height) - 4px; height: self.width; border-radius: Theme.radius-sm;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            background: root.wash;
+            animate background { duration: Theme.anim; easing: ease; }
+            // v0.8.14 (Item 3): press-lift on the glyph hover SQUARE (black shadow; every IconBtn consumer -- panel close/minimise + title-bar buttons)
+        }
+        if root.bar : barwash := Rectangle {
+            // EQUAL PERCEIVED spacing on ALL four sides AND a TRUE SQUARE (owner rulings, v0.8.180
+            // — the third visit to this rule): v0.7.2 equalized the CELL insets at 3px, but two
+            // ADJACENT cells put neighbouring washes 6px apart against 3px top/bottom margins — the
+            // between-button gap read double. Uniformity is a property of the GAPS, not the insets:
+            // the horizontal inset must be HALF the vertical one, so every visible gap — bar edge
+            // above, bar edge below, button-to-button, and the window edge (the row's 2px lead-in)
+            // — is the same 4px. The owner then ruled the wash a PERFECT square, which pins the
+            // CELL: in the 44px bar, side = 44−8 = 36, so the cell is 36+4 = 40px wide (width−4 =
+            // height−8 = 36, square by construction — a 44 cell would make it 40×36). Integers
+            // only (the L41 even-grid/AA rule) at both 1× and 1.5× scale.
+            x: 2px; y: 4px;
+            width: parent.width - 4px;
+            height: parent.height - 8px;
+            // The hover-square language (H3: tokenized; 12px since the L41 even-radius pass — the old
+            // "13px" here was that pass's ghost). 2026-09-25 (owner, Mac title-bar toolbar): the radius
+            // keeps the 36px square's proportion when the bar is shorter — 36 → 12 (Windows, unchanged),
+            // 30 → 10 (the Mac's 38 pt title bar) — rounded to an even value (L41).
+            border-radius: Math.round(Theme.radius * (self.height / 36px) / 2px) * 2px;
+            background: root.wash;
+            animate background { duration: Theme.anim; easing: ease; }
+            // v0.8.14 (Item 3): press-lift on the 38px title-bar hover SQUARE (black shadow -- stays black on the danger close button)
+        }
+        ta := TouchArea {
+            enabled: root.hit;
+            // G11 (v0.8.44): tooltip hover report — an observer on the owner element (the changed-x
+            // rule). The unhover branch only clears a tip it still owns: on an A→B hover move the
+            // enter/leave order is not guaranteed, so a late leave must not clobber B's fresh tip.
+            // v0.8.45 (Fix 2): cx reads SELF (this TouchArea, x=0 in root, width 100%) — Slint
+            // 1.17.0's absolute-position on a layout-positioned component root double-counts the
+            // element's own x (cx drifted by exactly the button's x; rig: tipgeom_tests.rs). Every
+            // proven call site (menus/drags) reads it on an x=0 TouchArea — same rule here.
+            changed has-hover => {
+                if (root.tip != "") {
+                    if (self.has-hover) { Tip.text = root.tip; Tip.cx = self.absolute-position.x + root.width / 2; }
+                    else if (Tip.text == root.tip) { Tip.text = ""; }
+                }
+            }
+            clicked => { if (root.enabled) { root.clicked(); } }
+        }
+        @children
+    }
+
+    // Small auto-width pill button (toast + events-row actions, compare 1:1 / Fit). Hover fill +
+    // subtle border; optional danger tint. Absorbs the ~8 hand-rolled inline pills (one look).
+    export component PillBtn inherits Rectangle {
+        in property <string> text;
+        in property <bool> danger: false;
+        in property <bool> enabled: true;
+        // Idle fill: the universal dark well — visible on base AND block, so the old per-context
+        // rest-fill overrides ("well-on-card" vs "on-panel deviation") are gone (v0.7.0 / D4).
+        in property <color> rest-fill: Theme.well;
+        // ── v0.8.186 (U3, OWNER RULING): THE LINKAGE RIM, WITHOUT THE FILL ───────────────────────
+        // "a blue rim around the same undo button in the events panel and the corresponding
+        // notification, indicating it is the same thing/action, … and a similar light gray/white-ish
+        // rim around the redo". The grammar is `ActionBtn.rim`'s — the same opt-in int, the same
+        // "border only, fill untouched", the same L20 discipline of stating it INSIDE the enabled
+        // arm so a greyed pill cannot render a live rim. Every existing call site is byte-identical
+        // at the default 0.
+        //
+        // THE CODES ARE SHARED WITH `ActionBtn` ON PURPOSE, and 2 IS RESERVED (v0.8.186 fix wave,
+        // review finding 3). The first draft called this component's light rim `2` while ActionBtn's
+        // `2` is DANGER RED, under a comment claiming the grammar was carried over "verbatim" — two
+        // sibling controls in one file where the same number means opposite things, which is how a
+        // reader (or a future rim call site) ships a red rim believing it asked for a white one. The
+        // light rim is 3; 2 stays reserved for danger so the two components can be read together.
+        // 0 = the standard hairline / 1 = accent (this is what Ctrl+Z will undo) / 2 = RESERVED:
+        // danger, for grammar parity with `ActionBtn` (no PillBtn call site uses it — the `danger`
+        // BOOL below is this component's own red, and it predates the rim) / 3 = the light neutral
+        // (this is what Ctrl+Y will redo).
+        //
+        // ORDER NOTE (the same finding): the rim arms are tested BEFORE `root.danger` in the
+        // border-colour ternary, so a caller that sets both gets the RIM. That is deliberate — the
+        // linkage cue is the more specific statement — but it means `rim` silently overrides the
+        // danger border, so a future danger pill that also wants a rim must say which it means.
+        in property <int> rim: 0;
+        callback clicked;
+        height: Theme.hit-compact;
+        border-radius: Theme.radius-sm;
+        // opaque: a filled rest chip (the toast "Undo"/"Show" actions were collapsing to bare text
+        // once the outline went transparent — error-recovery affordances must stay visible; audit fix)
+        background: (ta.has-hover && root.enabled) ? (root.danger ? Theme.danger : Theme.well-hover)
+                                 : (root.rest-fill);
+        border-width: 1px;
+        border-color: !root.enabled ? Theme.border
+                    : (root.rim == 1 ? Theme.accent : (root.rim == 3 ? Theme.border-lift // v0.8.186 (U3); 3, not 2 — see the note above
+                    : (root.danger ? Theme.danger : Theme.border-strong))); // v0.8.18: restored the v0.8.10 constant border-strong rim (the v0.8.14 hover-null reverted with the lift family)
+        animate background { duration: Theme.anim; easing: ease; }
+        HorizontalLayout {
+            padding-left: Theme.space-2; padding-right: Theme.space-2;
+            Text {
+                text: root.text; color: root.enabled ? Theme.text : Theme.text-mute; font-size: Theme.font-sm; font-weight: 600;
+                vertical-alignment: center; horizontal-alignment: center;
+            }
+        }
+        ta := TouchArea { clicked => { if (root.enabled) { root.clicked(); } } }
+    }
+
+    // Bordered numeric text field (resolution limits, custom fps, output sizes). ONE height / radius /
+    // fill / focus-ring so every input matches. Caller handles label + suffix in its own row.
+    export component TextField inherits Rectangle {
+        in property <string> value;
+        in property <length> field-width: 80px;
+        in property <length> field-height: 30px;
+        in property <bool> round: false;       // pill shape (radius = height/2) — the Figma speed-popup field
+        in property <brush> field-bg: Theme.well;
+        callback accepted(string);
+        width: root.field-width;
+        height: root.field-height;
+        border-radius: root.round ? root.field-height / 2 : Theme.radius-sm;
+        background: root.field-bg;
+        border-width: 1px;
+        border-color: ti.has-focus ? Theme.accent : Theme.border-strong;
+        ti := TextInput {
+            x: 10px; width: parent.width - 20px; vertical-alignment: center;
+            color: Theme.text; font-size: Theme.font-md;
+            input-type: number; single-line: true;
+            text: root.value;
+            // NOTE: the caller's `accepted` must restore keyboard focus (keys.focus()) — a bare
+            // clear-focus() from this nested component drops focus to nowhere, killing arrow-key nav.
+            accepted => { root.accepted(self.text); }
+        }
+    }
+
+    // Reusable full-width action button (Selection actions, confirm dialog, export sheet footer).
+    // variant: 0 accent / 1 danger / 2 ghost / 3 warn. primary = solid fill at rest. enabled=false → muted + inert.
+    export component ActionBtn inherits Rectangle {
+        in property <string> label;
+        in property <int> variant: 0;
+        in property <bool> primary: false;
+        in property <bool> enabled: true;
+        in property <bool> web: false;       // web-export-related action → the teal web accent
+        // ── v0.8.163 (§7 item 4, OWNER RULING): THE RIM, WITHOUT THE FILL. ───────────────────────
+        // "similar to the export displayed and move rejected buttons, the 2 rotate buttons can have
+        // a colored rim (blue-apply, red-discard, no need for inner fill color just the rim) to
+        // indicate its activeness (still fade like empty->bin if there's nothing to rotate)."
+        //
+        // The rim grammar the ruling points at is THIS component's own: an enabled action states
+        // its colour on the border (`Theme.danger` on Move rejected, `Theme.accent-web` on Export
+        // displayed) and drops to `Theme.border` — which is transparent, i.e. no rim at all — the
+        // moment it is disabled. What those two ALSO do is tint their rest fill (`danger-soft` /
+        // `accent-web-soft`), and the ruling explicitly does not want that here. So the colour is
+        // split off the variant: `rim` overrides the BORDER only, inside the enabled arm, leaving
+        // the variant's fill, hover lift and label exactly as they are.
+        // 0 = the variant's own rim (every existing call site) / 1 = accent (blue) / 2 = danger (red).
+        // v0.8.186 (fix wave, review finding 3): these codes are SHARED with `PillBtn.rim` — same
+        // meanings for 0/1/2, and PillBtn adds 3 (the light neutral linkage rim, which this
+        // component has no use for). Keep them aligned: two sibling controls in one file where the
+        // same number means different things is a rim shipped in the wrong colour.
+        // L20: it is stated INSIDE the enabled arm, so a faded button cannot render a live rim —
+        // the "Empty → Bin" fade stays the one disabled treatment in this row of controls.
+        in property <int> rim: 0;
+        callback clicked;
+        height: 34px;
+        border-radius: Theme.radius-ctrl;
+        property <color> base: root.variant == 1 ? Theme.danger
+                             : (root.variant == 2 ? Theme.well-hover
+                             : (root.variant == 3 ? Theme.warn
+                             : (root.web ? Theme.accent-web : Theme.accent)));
+        // variant 2 (Cancel family): rest = the DARK WELL + hairline (v0.7.2 — the old transparent
+        // rest made every idle Cancel invisible, user-caught), hover = the solid well-hover lift.
+        background: !root.enabled ? Theme.well
+                  : root.primary ? (ta.has-hover ? root.base.darker(0.18) : root.base)
+                  : (ta.has-hover ? root.base
+                  : (root.variant == 1 ? Theme.danger-soft
+                  : (root.variant == 2 ? Theme.well
+                  : (root.variant == 3 ? Theme.warn-soft
+                  : (root.web ? Theme.accent-web-soft : Theme.accent-soft)))));
+        border-width: 1px;
+        border-color: !root.enabled ? Theme.border
+                    : (root.rim == 1 ? Theme.accent : (root.rim == 2 ? Theme.danger // v0.8.163 (§7 item 4): the rim-only override, enabled-arm ONLY
+                    : (root.variant == 1 ? Theme.danger : (root.variant == 2 ? Theme.border-strong : (root.variant == 3 ? Theme.warn : root.base))))); // v0.8.18: restored the v0.8.10 variant-2 constant border-strong (the v0.8.14 hover-null reverted with the lift family)
+        animate background { duration: Theme.anim; easing: ease; }
+        // v0.8.46: the v0.8.38 G5 Enter-target ring (hairline inset marker) was REMOVED here —
+        // owner-revoked ("remove this blue line design"). Enter mappings + the G5 severity ladder stay.
+        Text {
+            text: root.label;
+            color: !root.enabled ? Theme.text-mute : ((root.primary || ta.has-hover) ? (root.variant == 3 ? Theme.text-on-star : Theme.text-on-accent) : Theme.text);
+            font-size: Theme.font-md; font-weight: 600;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        }
+        ta := TouchArea { clicked => { if (root.enabled) { root.clicked(); } } }
+    }

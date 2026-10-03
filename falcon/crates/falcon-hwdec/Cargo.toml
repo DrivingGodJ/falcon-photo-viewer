@@ -1,0 +1,73 @@
+[package]
+name = "falcon-hwdec"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# v0.8.146 (E3 milestone 1) — direct D3D11VA HEVC decode. INERT: nothing that ships depends on this
+# crate (`falcon-native` does not list it), and it is a workspace member only so that
+# `cargo test --workspace` gates it like everything else.
+#
+# NO ffmpeg LINKAGE, deliberately. ffmpeg's `libavcodec/dxva2_hevc.c` is the marshalling READING
+# reference — it settled which order the DXVA quantisation matrices want and how the bitstream
+# buffer is laid out — but not one byte of it is linked, vendored or translated wholesale. The
+# patent shield (plan non-negotiable #3) says consume the OS/driver decoder only, and that is
+# exactly what `ID3D11VideoDevice` is.
+
+# v0.8.152 (ruling 5.1(b), from R3's design-flaw candidate D-2) — THE DELIBERATE-DEFECT LEVERS.
+#
+# `dxva::QmatrixPolicy` and `photo::AssemblyFault` are the house's own falsifier discipline and they
+# are the right call: a falsifier that is a real code path beats a comment claiming a test would have
+# failed. But each names a way to produce a SILENTLY WRONG PHOTO, and until now both were plain `pub`
+# on a `pub` crate with no gate, reachable from `native/src/hwheic.rs` by nothing more than typing
+# their names.
+#
+# This feature is the gate. It is enabled by exactly one thing — the self-referential dev-dependency
+# below — so `cargo test` always compiles the test and example targets WITH the levers (they drive
+# real code, which is the whole point), while the SHIPPING build of the library, the one
+# `falcon-native` links, does not have them at all: a caller there that reaches for a falsifier is a
+# compile error rather than a code review.
+[features]
+falsifiers = []
+
+[dependencies]
+# E1: the container stage. This crate's whole input — per-tile byte ranges and the shared hvcC —
+# comes from `falcon_decode::parse_heif_grid`, so the two stages cannot drift apart.
+falcon-decode = { path = "../falcon-decode" }
+# E2 + E3-M2: the deterministic NV12->RGB kernel and the grid's GPU assembly. The dependency runs
+# THIS WAY ROUND on purpose — falcon-gpu holds the shaders and knows nothing about D3D11VA, so the
+# kernel stays usable by every backend the epic can adopt (and by the Mac trunk, which has none).
+falcon-gpu = { path = "../falcon-gpu" }
+# v0.8.165 (WAVE 1): `PhotoDecoder::decode_managed` names the SOURCE and OUTPUT gamuts in its
+# signature, so the crate needs the type. Promoted from a dev-dependency (where v0.8.148 put it for
+# the CM-chain proof) — falcon-gpu already links it, so the graph gains nothing new.
+falcon-color = { path = "../falcon-color" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    # ID3D11VideoDevice / ID3D11VideoContext / ID3D11VideoDecoder + the decoder buffer types.
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    # DXGI_FORMAT_NV12 and the adapter enumeration used to name the decode device.
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    # GetProcessTimes — the probe's CPU-cost row.
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+# v0.8.152 (5.1(b)): the crate, on itself, with `falsifiers` on. Cargo unifies a dev-dependency's
+# features into the library build whenever a target that needs dev-dependencies is being built, so
+# this one line means `cargo test` / `cargo bench` / `--all-targets` see the levers and a plain
+# `cargo build` (or `cargo check -p falcon-native`) does not. Nothing is linked twice.
+falcon-hwdec = { path = ".", features = ["falsifiers"] }
+
+[[example]]
+name = "hwdec_probe"
+path = "examples/hwdec_probe.rs"
+
+[[example]]
+name = "photo_probe"
+path = "examples/photo_probe.rs"

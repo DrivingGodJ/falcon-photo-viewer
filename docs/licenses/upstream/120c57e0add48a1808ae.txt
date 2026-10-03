@@ -1,0 +1,15 @@
+//! Coercion into `dyn `[`Error`] used in macro expansions.
+//!
+//! # Credits
+//!
+//! The initial idea and implementation was taken from the [`thiserror`] crate and its
+//! [`AsDynError`] trait implementation, and slightly modified for usage in derive [`derive_more`].
+//!
+//! The original code was dual licensed under [Apache License, Version 2.0][APACHE] and [MIT]
+//! licenses.
+//!
+//! [`AsDynError`]: https://github.com/dtolnay/thiserror/blob/2.0.3/src/aserror.rs
+//! [`derive_more`]: crate
+//! [`thiserror`]: https://github.com/dtolnay/thiserror/blob/2.0.3
+//! [APACHE]: https://github.com/dtolnay/thiserror/blob/2.0.3/LICENSE-APACHE
+//! [MIT]: https://github.com/dtolnay/thiserror/blob/2.0.3/LICENSE-MIT

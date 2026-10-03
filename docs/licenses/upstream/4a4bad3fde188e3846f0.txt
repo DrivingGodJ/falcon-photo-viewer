@@ -1,0 +1,2 @@
+        // This function based on code of ImageOps.fit() from Pillow package.
+        // https://github.com/python-pillow/Pillow/blob/master/src/PIL/ImageOps.py

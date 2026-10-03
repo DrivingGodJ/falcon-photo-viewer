@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: LGPL-2.1
+// Copyright 2025 Daniel Vogelbacher <daniel@chaospixel.com>
+//
+// Floating-Point trait was ported from rawspeed:
+// https://github.com/darktable-org/rawspeed/blob/6815b8ca1469234768edc9ddce8b7efb419381bf/src/librawspeed/common/FloatingPoint.h
+// Copyright (C) 2017 Vasily Khoruzhick
+// Copyright (C) 2020 Roman Lebedev
+

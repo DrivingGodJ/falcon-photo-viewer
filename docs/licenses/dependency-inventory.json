@@ -1,0 +1,3491 @@
+{
+  "schema": 1,
+  "tool": "cargo-about 0.9.2",
+  "lock_sha256": "80d1fa421df3120f1d1939faab7d818d662ac3825ee39f0554e65d50d8072272",
+  "text_hash_format": "UTF-8, LF line endings",
+  "project_inputs": {
+    "falcon/Cargo.toml": "49ae4f41ce41bbc22a4516565a6b8145bb0874595e1f7afee94b6206b30e6919",
+    "falcon/about.toml": "496071b678829ffd4237a877a9b2d5fbd789ee138de46b45243ba1a3b67b8a61",
+    "falcon/crates/falcon-color/Cargo.toml": "868e964da2f385bd8144e825cd6a0f0e2453fb85dc57255f8724a26d6d2b918b",
+    "falcon/crates/falcon-decode/Cargo.toml": "20c098c7c185674840c1dd63de9fce3f6208b3a19e795c38b567372052d8dedd",
+    "falcon/crates/falcon-gpu/Cargo.toml": "6a33547cdbde1dc23360f889c8824b4a5e1a91e17a67d78d19a9ca59cefb9c86",
+    "falcon/crates/falcon-hwdec/Cargo.toml": "5518a8095d56abc56a2e2fcff68dbaaf31dbb99c019837a5a4e5a18509e71b3c",
+    "falcon/crates/falcon-nvjpeg/Cargo.toml": "6be1c4244b39794f85ef1a5833fc58b96ab3bb501601ec943308d2768f8b24ef",
+    "falcon/native/Cargo.toml": "22d3f52d41a6f32b5afb9d8019f4e7b9159d47a8538d83fb9c3f89fbbe3b8d76",
+    "falcon/vendor/winit/Cargo.toml": "4c8b88b4a501155443a893ffbda5f5eb23aa03d5a873554a00a23b8f55a91148",
+    "falcon/vendor/zune-jpeg/Cargo.toml": "cc3be1dd6f068b881ddc5445e7ca521920430311c9a134d1dd6b35c8e72d8ff1"
+  },
+  "notice_source_inputs": {
+    "docs/licenses/notice-sources.json": "e4884e102fd822687b2af3cf4d3b29fd68a8e9ebb58049a7dec7f7ea9d755d1a",
+    "docs/licenses/upstream/a6cba85bc92e0cff7a45.txt": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+    "docs/licenses/upstream/fff7d277429072bbdce4.txt": "fff7d277429072bbdce4dce4a580a3580e42a871dcb887afebbcbc7d8680cde7",
+    "docs/licenses/upstream/f5af8beef8f5f88f1b78.txt": "f5af8beef8f5f88f1b78494703bbfa019c4f3630ac111344390d6f9975ab22ed",
+    "docs/licenses/upstream/c0c56f26d9c051cac4d2.txt": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae",
+    "docs/licenses/upstream/7fe5314b810fcfed0918.txt": "7fe5314b810fcfed0918ce649a5ccf59d25536a8b1cf65f94e8be96daf499461",
+    "docs/licenses/upstream/946c9835d8034d24404f.txt": "946c9835d8034d24404f8cfec5f4654cee5dad17e944afc3d06d742cf2882831",
+    "docs/licenses/upstream/118929e2af641db591b3.txt": "118929e2af641db591b373fe6a3c607fedca84f7f877f81e68743cfaf69f1cfd",
+    "docs/licenses/upstream/f3e4452a50490fd9b5f1.txt": "f3e4452a50490fd9b5f1c5fea4cd3ed45a7ada46f81ddf2dd66bfab28a742b51",
+    "docs/licenses/upstream/5ce28e787b4252739a72.txt": "5ce28e787b4252739a720bcdca99f795123c4ff0d471cc4c4a969ad253adbafe",
+    "docs/licenses/upstream/6dc0e068dcf3a5bc8e05.txt": "6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a",
+    "docs/licenses/upstream/9eff396a99bafd208e71.txt": "9eff396a99bafd208e7126602420d6864f6066c08b84485a5b032320a9c01997",
+    "docs/licenses/upstream/dcc82da0a685086cb075.txt": "dcc82da0a685086cb0754c3f45211aa993732a9e3c158d3147973bc57aa2e45e",
+    "docs/licenses/upstream/ae6ea15a65b0a1f50e42.txt": "ae6ea15a65b0a1f50e42881be36c75b05f0fabecd120a74107ddad72748f2bce",
+    "docs/licenses/upstream/cfc7749b96f63bd31c3c.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "docs/licenses/upstream/8a7572d955f871de8638.txt": "8a7572d955f871de863843c527759ce04c883cadd88c250989859e50ace5eb01",
+    "docs/licenses/upstream/a91ea54e0959640cac75.txt": "a91ea54e0959640cac759d9900b45027d9d15697689fa529c94549b0c549850f",
+    "docs/licenses/upstream/3823dda7cf046602f4b4.txt": "3823dda7cf046602f4b4e77ec8e227863dc4736037cc85bb33d9f19febe16bb7",
+    "docs/licenses/upstream/16cd38a2d4dd0bf4b8a5.txt": "16cd38a2d4dd0bf4b8a51ab4bd8779856a38d7ac96d4f8a3b092d8c707b0a021",
+    "docs/licenses/upstream/565eff8b979411888b4f.txt": "565eff8b979411888b4fc163ba49daf7ad9beba47ee485942f032edcefd17948",
+    "docs/licenses/upstream/e1be4a329850c826811b.txt": "e1be4a329850c826811b4faff3476ed2755911b67a74ef3157fdb89c0b6efd91",
+    "docs/licenses/upstream/b7cd2c72320a62dc4080.txt": "b7cd2c72320a62dc4080895af92772e2ed1b83513fdd7fbfcac7d63d536f72cd",
+    "docs/licenses/upstream/baa7e430ba6fb973c100.txt": "baa7e430ba6fb973c100eef93c8c539cf62ba033746c6bf418bb8b51a8930267",
+    "docs/licenses/upstream/8553c5aa4bf0eb5a8d46.txt": "8553c5aa4bf0eb5a8d46085a28271a84572b739f003383c2ee9967f122208b47",
+    "docs/licenses/upstream/d9f4ab9d6379a978daaf.txt": "d9f4ab9d6379a978daaf6507f1a6b77abb9b8178af56f761a93ba460392f7844",
+    "docs/licenses/upstream/3636b6533bb78c6976b4.txt": "3636b6533bb78c6976b4d112f9805311e445547676a4daa161c9a7b7a93e086c",
+    "docs/licenses/upstream/ca254aa33491b3ee9a0a.txt": "ca254aa33491b3ee9a0a365629c5a0abda4aa71df314f122155335e394cb1173",
+    "docs/licenses/upstream/e2c5e3a74a29f6c88233.txt": "e2c5e3a74a29f6c88233646995cfe44b14516067992b9670439ffa0a595e56a5",
+    "docs/licenses/upstream/5c6f62056611d3f02565.txt": "5c6f62056611d3f0256525565d02e2cfb48385b26812fb4d606fc7d13de1a0d3",
+    "docs/licenses/upstream/295652e546289d034aff.txt": "295652e546289d034affd02f181bac977ae12d9d511ed109ee9272c3aa1dc148",
+    "docs/licenses/upstream/0b440c42f760e089d0bc.txt": "0b440c42f760e089d0bc76710790c2e0b7efa4314212bf30ae6a3adf704b6ce0",
+    "docs/licenses/upstream/f859426403dc7a2995e5.txt": "f859426403dc7a2995e52bc16daf8ea5d5bc97107e57e15f0fddd0aa903a9fca",
+    "docs/licenses/upstream/4607899cec7ea61b3337.txt": "4607899cec7ea61b3337abbae6c2a63a00711fd2246d6414e2856b9ce9328c8b",
+    "docs/licenses/upstream/a73d54cb35f7f5da2a67.txt": "a73d54cb35f7f5da2a672552c76104143de8afd2c0b1a7977893fd22540f1663",
+    "docs/licenses/upstream/77ed8e6418a5dc262e9b.txt": "77ed8e6418a5dc262e9bd63ccebce7e9aaf6881cbe682d00d7db425024192efd",
+    "docs/licenses/upstream/eed3ddbe9a813731dbc4.txt": "eed3ddbe9a813731dbc46d1c7de836086f31ce6022a4f76ea032bc311f8342fb",
+    "docs/licenses/upstream/f117f16ae37d151238cf.txt": "f117f16ae37d151238cfc1a3030f060b06f9045ed0298cbdddbdf1ae0b8c0487",
+    "docs/licenses/upstream/3b54a8cada3c6f3fb882.txt": "3b54a8cada3c6f3fb8821e40a1c935199466bee0c8fce6981b872edcbc206f6f",
+    "docs/licenses/upstream/4bb33cc4cd956b56b779.txt": "4bb33cc4cd956b56b779b501f18cae46a9e26f8c8500cca86ed758b8bc5e1788",
+    "docs/licenses/upstream/9d3f31bd07caf5bd9bee.txt": "9d3f31bd07caf5bd9beed69b05788a5f4be2377558a0746ed2eca86f6fbc4543",
+    "docs/licenses/upstream/dff4433fd850d3c25b23.txt": "dff4433fd850d3c25b232e8e2059777a1efdfbf13b89639ac7f285b61ee13506",
+    "docs/licenses/upstream/e62b2f512a94ec183e96.txt": "e62b2f512a94ec183e96aab70af079e00fb0acc02ed49103b6b073a18b662c32",
+    "docs/licenses/upstream/dd8e2adbdff76ebef124.txt": "dd8e2adbdff76ebef124790c5969ef51d3b70eccf9098b01fe6f158d8f345e80",
+    "docs/licenses/upstream/900a350b27797ec9c091.txt": "900a350b27797ec9c0914edb41e7b1d078b3672e44e11f035ac80cf567a067ee",
+    "docs/licenses/upstream/aeead01fd87ff58acfab.txt": "aeead01fd87ff58acfabb82b4de740a2e47f8e4214d9fedfc15b08838c8a6f41",
+    "docs/licenses/upstream/1ff6f7085d796c24e00f.txt": "1ff6f7085d796c24e00fc803c4ee55020514c7c8bf7f7f1f3380aee49faaf0b5",
+    "docs/licenses/upstream/3a292d99f9eb2189e6a2.txt": "3a292d99f9eb2189e6a2b8caf35de8e04b20f74ea805c90b9958f7165f61e153",
+    "docs/licenses/upstream/b357f76ad8c48307c144.txt": "b357f76ad8c48307c1448fd5d4b760bbb64e6f2a0ebc5af08c0eec17a33de765",
+    "docs/licenses/upstream/192ba839c22997b9cddf.txt": "192ba839c22997b9cddf01b305912d5c1391d658e1a718b3d0b40c6d3ec09e9d",
+    "docs/licenses/upstream/d9942e76d0c2b527faa0.txt": "d9942e76d0c2b527faa0ad54be7b3933d1e5cc01abda8d8d7cf3222848f78557",
+    "docs/licenses/upstream/e2fe1b70d772c027bd6e.txt": "e2fe1b70d772c027bd6ef153ddec063ada6d2e45370ae024542475ea8415849a",
+    "docs/licenses/upstream/03ed699c66f5a41eb1f4.txt": "03ed699c66f5a41eb1f4fe572396d55107220cd17758bdc1e227da8c5786d584",
+    "docs/licenses/upstream/cae0182fe7eaf4c33613.txt": "cae0182fe7eaf4c33613f9f213a6b87ce1bcb88c629fd03fcecbb5b2951a1841",
+    "docs/licenses/upstream/54a3ced604ab57255719.txt": "54a3ced604ab572557191858d5a1b85fcad3158d7fe9ed263ef893728892ed9a",
+    "docs/licenses/upstream/c962ee4d1d05ddc138b2.txt": "c962ee4d1d05ddc138b202b2540219ebc57893fcf97b364852094a9a94ce1365",
+    "docs/licenses/upstream/4caf6a76db5636b5e6e6.txt": "4caf6a76db5636b5e6e6c166440d3ffad45840d4feb1192bdc2fbb9d2e63d58f",
+    "docs/licenses/upstream/04e6410a91c2673c285d.txt": "04e6410a91c2673c285da4aa79c33e44893c6158138338a59f5badc7f5cbcf4c",
+    "docs/licenses/upstream/c2cfccb812fe482101a8.txt": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+    "docs/licenses/upstream/e353f37b12aefbb9f9b2.txt": "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5",
+    "docs/licenses/upstream/7f976f7e9cb2d87df723.txt": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+    "docs/licenses/upstream/f72143f7e9d9fb8bd336.txt": "f72143f7e9d9fb8bd336b139fa22f825a299591c29f2f7338c5566347b137613",
+    "docs/licenses/upstream/5226e27d5fbc683db56c.txt": "5226e27d5fbc683db56c52853cdb9d15b69abadb525a60f95c862c2dbd77cdc8",
+    "docs/licenses/upstream/80f275e90d799911ed38.txt": "80f275e90d799911ed3830a7f242a2ef5a4ade2092fe0aa07bfb2d2cf2f2b95e",
+    "docs/licenses/upstream/4feb2fc93d22a09c5abb.txt": "4feb2fc93d22a09c5abbc75673df3b45cea3a8c08bde0b5ea061363129a7c07d",
+    "docs/licenses/upstream/7a4af3392db8241f161d.txt": "7a4af3392db8241f161d0f5856107b853d5776d9a1160a5795dbb1327264e806",
+    "docs/licenses/upstream/1fef8871be7977748c6c.txt": "1fef8871be7977748c6ca97b4217d057bc66844f57098c1d6f1d2def572d2244",
+    "docs/licenses/upstream/c8167fdeeed46d3f244d.txt": "c8167fdeeed46d3f244d3f85c5bf998ce889343691c32be2c61a8bc4b5c08333",
+    "docs/licenses/upstream/a7083ef3dd41a65eeb21.txt": "a7083ef3dd41a65eeb2162c2c091b0082e2724fb4c6ed029b363c7840d244ecd",
+    "docs/licenses/upstream/c9bff75738922193e67f.txt": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+    "docs/licenses/upstream/b66746c33fab85fdd93e.txt": "b66746c33fab85fdd93e6f8fecd676c9a1dd919dbdbad67062afb06642bbc275",
+    "docs/licenses/upstream/af831a1272448fc6009b.txt": "af831a1272448fc6009b8575897b9ab687af0f03af7a050078626e5592e7cd23",
+    "docs/licenses/upstream/c47b94ade8e06f1621e2.txt": "c47b94ade8e06f1621e205315f5c09da3d72ececff5c69a2503e1b885523998c",
+    "docs/licenses/upstream/1ed17a09d2f8ecb84f62.txt": "1ed17a09d2f8ecb84f62e25e985db02fd428ab766f7182daafbb0b8c9881c295",
+    "docs/licenses/upstream/1f534f158fa6257f6943.txt": "1f534f158fa6257f6943fd94552b6a57df134e53f05e3b1cf64c81a4d255e16e",
+    "docs/licenses/upstream/4b88f68c805a1bb0883f.txt": "4b88f68c805a1bb0883f4c202c95083cf9bfc8122a9c57e16a0786bfe4a3b2e0",
+    "docs/licenses/upstream/4f9213fe3fa39ca35563.txt": "4f9213fe3fa39ca3556324c4155aea96a50cca3216b6e3bb0ed9fc6f5858d147",
+    "docs/licenses/upstream/6d41e05f1d54fe726997.txt": "6d41e05f1d54fe726997cb0334ec539f1dff50600b1d5d90462ec2b392770ced",
+    "docs/licenses/upstream/628b0d7bf1343dc330eb.txt": "628b0d7bf1343dc330eb4fad7ac3850affe8c8991afb0111bfd15544bb8c0d49",
+    "docs/licenses/upstream/be994952d3686b864e3a.txt": "be994952d3686b864e3ab391d61a2e2b2c72c5a010261e4619320d46b5207045",
+    "docs/licenses/upstream/6894a8575bf77fb1dc6e.txt": "6894a8575bf77fb1dc6e83dc60f11479d88e4c898331311c97cc62077355bd66",
+    "docs/licenses/upstream/c77f8c2c0d0e89cb7324.txt": "c77f8c2c0d0e89cb7324b407aaf0759a28dc8b24a9d79fe4b7e5e151df668661",
+    "docs/licenses/upstream/0ca021b92904ea70386e.txt": "0ca021b92904ea70386e6c5be5c820e5437cdae5e7a858e6ca79202fbbae02ce",
+    "docs/licenses/upstream/1e2b7ade3fb228130408.txt": "1e2b7ade3fb228130408b9990cae6a7618eb314c75aa0b164bfe485d9d9756ee",
+    "docs/licenses/upstream/31b94860253d8ec7b452.txt": "31b94860253d8ec7b4529f51901044d3b459d6292d996504a36b1bae3a36a812",
+    "docs/licenses/upstream/7576269ea71f767b9929.txt": "7576269ea71f767b99297934c0b2367532690f8c4badc695edf8e04ab6a1e545",
+    "docs/licenses/upstream/a60eea817514531668d7.txt": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+    "docs/licenses/upstream/ecc269ef87fd38a1d98e.txt": "ecc269ef87fd38a1d98e30bfac9ba964a9dbd9315c3770fed98d4d7cb5882055",
+    "docs/licenses/upstream/7365cc8878a1d7ce155a.txt": "7365cc8878a1d7ce155a58c4ca09c3d7a6be413efa5334a80ea842912b669349",
+    "docs/licenses/upstream/c77a4cf9da729987d0fe.txt": "c77a4cf9da729987d0fe7ccd811e3bd27393914ddf3d23467c18cc22954513b3",
+    "docs/licenses/upstream/0d542e0c8804e39aa7f3.txt": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+    "docs/licenses/upstream/5aec868f669e384a2237.txt": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+    "docs/licenses/upstream/124d3d3444cd660a5e0f.txt": "124d3d3444cd660a5e0f126db544476cc511df9d16027cdb48b15bfadbc37778",
+    "docs/licenses/upstream/8084c648d72edeee2ddc.txt": "8084c648d72edeee2ddc05a48d5b3b1667e6d2458af62fff03b4133df289248b",
+    "docs/licenses/upstream/ec4d81573ba98a77a3e8.txt": "ec4d81573ba98a77a3e81ed0c01914cfca3ceb4029f49e716b27e4d6ef5c0cdf",
+    "docs/licenses/upstream/28c2dc052fa772f91778.txt": "28c2dc052fa772f9177804293b4dcffc531c08807b1257238784a9211aa49df0",
+    "docs/licenses/upstream/f46b49322089f9682001.txt": "f46b49322089f968200164367740252ef1a124973e8e07f6c24acb95f1d7f357",
+    "docs/licenses/upstream/e3cf273663003ea51123.txt": "e3cf273663003ea511235a778afa9ba29f3063ce654a608ce112e9d3846e4be1",
+    "docs/licenses/upstream/cc3273e0694ea5896145.txt": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+    "docs/licenses/upstream/508a77d2e7b51d98adee.txt": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1",
+    "docs/licenses/upstream/7aa615df0376504c0dfa.txt": "7aa615df0376504c0dfa905f81759d00e64155345640a802db721b72ad4ec19e",
+    "docs/licenses/upstream/b71bd43a069ca0641a9e.txt": "b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1",
+    "docs/licenses/upstream/7bac7f9bfffcce3bbf8b.txt": "7bac7f9bfffcce3bbf8b1cfc49b4fbf1181de7fa5e109d9a9a4659aa3e2e3b1d",
+    "docs/licenses/upstream/b03f8ac48483de652991.txt": "b03f8ac48483de6529918cfd19dff473334750a3896f92ce89755e7d6690d762",
+    "docs/licenses/upstream/23f18e03dc49df91622f.txt": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+    "docs/licenses/upstream/861399f8c21c042b1105.txt": "861399f8c21c042b110517e76dc6b63a2b334276c8cf17412fc3c8908ca8dc17",
+    "docs/licenses/upstream/8ada45cd9f843acf64e4.txt": "8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb",
+    "docs/licenses/upstream/62c7a1e35f56406896d7.txt": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+    "docs/licenses/upstream/8405932022a556380c2d.txt": "8405932022a556380c2d8c272eff154a923feb197233f348ce5f7334fb0a5ede",
+    "docs/licenses/upstream/28c4ac3f331af27053e5.txt": "28c4ac3f331af27053e50c77c3d0f6a4b002e6204880d5b16d3a440096095a21",
+    "docs/licenses/upstream/338c0420e08704ea2bef.txt": "338c0420e08704ea2bef380045d20276c511ce28428a1925dc23d20ac0da65e8",
+    "docs/licenses/upstream/905b322e46377ead9af9.txt": "905b322e46377ead9af981dc46b5408993fcb8e71433d9c967beac1ec17f7b82",
+    "docs/licenses/upstream/99b78551906f79452818.txt": "99b78551906f79452818af445ffd6e2bfe468265a0b58f6b861783985dd190d5",
+    "docs/licenses/upstream/f8bfe0ce3c98c52f742a.txt": "f8bfe0ce3c98c52f742aeb5e87881226f0465e3c3f9216c4140a9220af4fa48e",
+    "docs/licenses/upstream/6dfbba31f2fb81bbfa81.txt": "6dfbba31f2fb81bbfa81737409dd14bcd192cf427fbd7a461445b881a4693aa0",
+    "docs/licenses/upstream/413d3dcd8049f1147175.txt": "413d3dcd8049f114717599a31275ba8e215182ca6cc2333d4027534ec69a08b7",
+    "docs/licenses/upstream/8671478ef86692fe4e7c.txt": "8671478ef86692fe4e7c8fdf3a0dcd9b98f023c4bea39f0fdcca5709c857ad48",
+    "docs/licenses/upstream/abbc096ba1d63e54c37a.txt": "abbc096ba1d63e54c37a5c187c68343824258fdb7edf76f870ded9cc482b1b1c",
+    "docs/licenses/upstream/0be96d891d00e0ae0df7.txt": "0be96d891d00e0ae0df75d7f3289b12871c000a1f5ac744f3b570768d4bb277c",
+    "docs/licenses/upstream/0f96a83840e146e43c0e.txt": "0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f",
+    "docs/licenses/upstream/5a04af80a19bcfe545b4.txt": "5a04af80a19bcfe545b48901c48fbad7bacfc52d6d7f5221c7bbc4e270456529",
+    "docs/licenses/upstream/f9adea5bb6a3bb565b3a.txt": "f9adea5bb6a3bb565b3a865d8680e03305a0f56deb1a43c150df6b9176fd7bfb",
+    "docs/licenses/upstream/f7db81051789b729fea5.txt": "f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1",
+    "docs/licenses/upstream/a69b36adb8d116376bcd.txt": "a69b36adb8d116376bcd580772fa45f08fffecc17833cb9822532f4e4f5ec372",
+    "docs/licenses/upstream/30fefc3a7d6a00415418.txt": "30fefc3a7d6a0041541858293bcbea2dde4caa4c0a5802f996a7f7e8c0085652",
+    "docs/licenses/upstream/769f80b5bcb42ed0af4e.txt": "769f80b5bcb42ed0af4e4d2fd74e1ac9bf843cb80c5a29219d1ef3544428a6bb",
+    "docs/licenses/upstream/b3ec01ad0869c5c50937.txt": "b3ec01ad0869c5c50937bc68780cd0bb44e235ad858dfa54a7a381dced9b115a",
+    "docs/licenses/upstream/cb5aedb296c5246d1f22.txt": "cb5aedb296c5246d1f22e9099f925a65146f9f0d6b4eebba97fd27a6cdbbab2d",
+    "docs/licenses/upstream/f9c4c77baa3828004ee5.txt": "f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d",
+    "docs/licenses/upstream/fd80a26fbb3f644af1fa.txt": "fd80a26fbb3f644af1fa994134446702932968519797227e07a1368dea80f0bc",
+    "docs/licenses/upstream/84b34dd7608f7fb9b17b.txt": "84b34dd7608f7fb9b17bd588a6bf392bf7de504e2716f024a77d89f1b145a151",
+    "docs/licenses/upstream/206edd588d7e0dc30a12.txt": "206edd588d7e0dc30a1236892d4ccc9a4d9d5c43b5f8b5c83ae9855ee0e19475",
+    "docs/licenses/upstream/7c69e6afc1bd1d6ac701.txt": "7c69e6afc1bd1d6ac701c0a93690f5926a2c9a5aa69101cd22c4b358c27f4f70",
+    "docs/licenses/upstream/124c1d4fd047508d87f6.txt": "124c1d4fd047508d87f66641c378c48b15c27cbbe6598f406ef6fdf795c4e095",
+    "docs/licenses/upstream/d7a897946c233c44d9a9.txt": "d7a897946c233c44d9a976aa030d02eeff05b86df54157d9f5d478ef0cc214e7",
+    "docs/licenses/upstream/7dedeb59e2a6b10de97d.txt": "7dedeb59e2a6b10de97d188169b3331e98036023f531346f626b07734b6fcec1",
+    "docs/licenses/upstream/4d6a2286423001206928.txt": "4d6a22864230012069284ffc528e169aa077cb0a96dbac8d144ce42df8261c15",
+    "docs/licenses/upstream/163fbee5116a2725fdba.txt": "163fbee5116a2725fdba8faa47a9fbf8006e0a7cbdb14ae5ecf62c8f9ccc00af",
+    "docs/licenses/upstream/b5ab341b9e89c5af5d79.txt": "b5ab341b9e89c5af5d791ff5cba8fea30170989918c2dd7e81504d73eb05dd8b",
+    "docs/licenses/upstream/6e8caa37a314b0de048b.txt": "6e8caa37a314b0de048b44931ebb516de29afbd439ca10b1a12492db855fe315",
+    "docs/licenses/upstream/f5e7195f466771aec6ca.txt": "f5e7195f466771aec6ca3ec5f9bd84521f5ef7a3fe9b03b7e6a2dc53f9360eaa",
+    "docs/licenses/upstream/08df0baad1ed9da66170.txt": "08df0baad1ed9da6617048e8704236860ae2adbae007208bfc5e746fafb480cc",
+    "docs/licenses/upstream/12366357685a3f503a6f.txt": "12366357685a3f503a6f796f4f97f19ec0c1b91f3aa9d31af3fc15925737aafb",
+    "docs/licenses/upstream/23c23145f6eac25c28cd.txt": "23c23145f6eac25c28cdcc03d38506a5712a9a8cffb5bd5301457f6173ea696e",
+    "docs/licenses/upstream/8ee8a83ce28aa6e595c0.txt": "8ee8a83ce28aa6e595c00af9fac8e23403648e95b8bbb652a27d7342af1018dd",
+    "docs/licenses/upstream/6787208f83f659ccbc22.txt": "6787208f83f659ccbc2223b2fde952ffa6f7e8aca62f1a8a2bf5bc51bb1b2383",
+    "docs/licenses/upstream/05f5185ee577daa8ddd9.txt": "05f5185ee577daa8ddd9957efe469afc0e01f932ddcbefc8a8b0414df7c6464c",
+    "docs/licenses/upstream/750dc1b658a160daf327.txt": "750dc1b658a160daf327d14379dc223ec8cc49213d195f2929bad72fa31cfffd",
+    "docs/licenses/upstream/1dfeac2b788d56ff9f9e.txt": "1dfeac2b788d56ff9f9e053197e95aeea3a66bbceefed4cced444623c2c1cdd9",
+    "docs/licenses/upstream/f6224315921e334403c1.txt": "f6224315921e334403c1d87a2b1227a215f68c0aae35c1b0e61c859c3e2b17d3",
+    "docs/licenses/upstream/3576ba357ddd66a683ed.txt": "3576ba357ddd66a683ed17362bffa5418b7e5d60dc677958dcc16ae12e9f8aaa",
+    "docs/licenses/upstream/0fd32268d2caf7271950.txt": "0fd32268d2caf7271950ee68f717860b71ea6b12c235c48a8ba00f8f10806884",
+    "docs/licenses/upstream/ec69a93290dc42c3f177.txt": "ec69a93290dc42c3f177906f27e8665533c60ebb1cae9260316776d09934dd67",
+    "docs/licenses/upstream/da20112a3c19ec5106b2.txt": "da20112a3c19ec5106b2cb2cdbbb6f5d29422a4d6d6950bf9de7ddd1b4ecb167",
+    "docs/licenses/upstream/a783837ee67b9380395d.txt": "a783837ee67b9380395dde3615127cb8eba714f1fc5e88974c9ea83201973225",
+    "docs/licenses/upstream/d929e0be94b1f678f280.txt": "d929e0be94b1f678f280e580b0c9abad1725c002cc9d7f991bafe64b5d80980f",
+    "docs/licenses/upstream/0fd7f74bf54b7574afb7.txt": "0fd7f74bf54b7574afb7babd4554726272cf06244ae88cf30de6ee758138f920",
+    "docs/licenses/upstream/e45f889d8710189ebc83.txt": "e45f889d8710189ebc836f8b1e5ef91cafb9ae4fcb1f434f2217dfbd7182f990",
+    "docs/licenses/upstream/4a0ed41c30aa02256d6d.txt": "4a0ed41c30aa02256d6d2183189d440427cfcf2095d98227b479966fed238625",
+    "docs/licenses/upstream/0f68576945d712ad02b1.txt": "0f68576945d712ad02b13c27376560906420f890e1044994b31bf10c0618d147",
+    "docs/licenses/upstream/08691c5050a296741982.txt": "08691c5050a296741982ae3066a2579827873bf39aba35267b7a08c6d5481763",
+    "docs/licenses/upstream/efee43f6e8c22989ca5e.txt": "efee43f6e8c22989ca5ed25b14a6b5d4f4ba57431b5e4b56500a5c9746af389e",
+    "docs/licenses/upstream/23b3aaa9d55564e719d9.txt": "23b3aaa9d55564e719d93855d363f232fa4b98bb48945be6f33818abd85584dd",
+    "docs/licenses/upstream/529c20af860d2d16a73c.txt": "529c20af860d2d16a73c43ae087c759bc863770a4791f391d8bd3263908bf8e0",
+    "docs/licenses/upstream/7e5726c24b8f2afa178a.txt": "7e5726c24b8f2afa178af9655d9504cf0d6c6fc6ed1c5057ec36b2dc67137c1e",
+    "docs/licenses/upstream/43b3814758bc7cd40ade.txt": "43b3814758bc7cd40adebea80e81728c33d486ba15be6b9c430382f2612c9265",
+    "docs/licenses/upstream/aaa3a8349d68e54a0343.txt": "aaa3a8349d68e54a0343d1f9e63891cee2896d9be2d0c7b2268feca34202f3da",
+    "docs/licenses/upstream/2368364a0446e0574c12.txt": "2368364a0446e0574c1254a07b6ba90743d92d9fb2bc71797d47c9fd0afc0cf0",
+    "docs/licenses/upstream/479a29987e73b1ca24ec.txt": "479a29987e73b1ca24ec3ec7044431f00f6d237f88eab43926a332403968d338",
+    "docs/licenses/upstream/bd0f1d1f6519d5058ec2.txt": "bd0f1d1f6519d5058ec2b98c55ec9ed05cec2b467db7e8ea58e7f4d9bdbbbb76",
+    "docs/licenses/upstream/2aa92cada6431e75615e.txt": "2aa92cada6431e75615e3fe6cb1a9082c98f777d48ae1c087c0da0e37f7b8bff",
+    "docs/licenses/upstream/4d87ff498cfb6659cd17.txt": "4d87ff498cfb6659cd1792867238d3e5bc786f88f97a49eeb8289bd74f713cac",
+    "docs/licenses/upstream/5a21ffc77d892e36df51.txt": "5a21ffc77d892e36df510e76d1b9cb538389c17e182ccd5c0f3fbcb04babb05c",
+    "docs/licenses/upstream/67a11298e1e09dfbabc7.txt": "67a11298e1e09dfbabc701236f64a050ba73d7a7b76a69d3c0485757b223e53c",
+    "docs/licenses/upstream/edbdc15099a7fb506047.txt": "edbdc15099a7fb506047adc0d28f4c6058018c630cc2da862608ba3020eea47a",
+    "docs/licenses/upstream/5e4aaeff33ea2ea362bc.txt": "5e4aaeff33ea2ea362bcb6c14202545fab4cf6ab77cae45edb5e5be9b38f9308",
+    "docs/licenses/upstream/3e0f275dce7132c8235a.txt": "3e0f275dce7132c8235aa90959336b9663141793c7893f2dc284859b91440cf0",
+    "docs/licenses/upstream/3a3754c1b5f9667e2714.txt": "3a3754c1b5f9667e27148acbf7a60112c74d14754aab02f6242038eb8ab83501",
+    "docs/licenses/upstream/9b43b7619db4689b223e.txt": "9b43b7619db4689b223ecd931b4f15189b6b021ed02b490421a56b5d8a6aa9e2",
+    "docs/licenses/upstream/b2380b6bc091ff5b913d.txt": "b2380b6bc091ff5b913df4131f9817ed97c9187b18d2b373be9ccf9497505c59",
+    "docs/licenses/upstream/471d99532690dc8f90ca.txt": "471d99532690dc8f90ca7a144adbe8d72267a74622b92401d1571afffd08bb24",
+    "docs/licenses/upstream/f686a15f8ed89fb2027f.txt": "f686a15f8ed89fb2027f20238214c81b4c7c9b31a4212605de6d9ef61a6f2984",
+    "docs/licenses/upstream/120c57e0add48a1808ae.txt": "120c57e0add48a1808ae07248bbeca7432cd8dcfbf146dc9d50b3df3b8b1e932",
+    "docs/licenses/upstream/543a2ea78f61e53c0d0a.txt": "543a2ea78f61e53c0d0a81003ac334a7333b2a61df391f162562b87b79826ec0",
+    "docs/licenses/upstream/08c135755dd589039470.txt": "08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1",
+    "docs/licenses/upstream/ff65c1261169323df839.txt": "ff65c1261169323df839fcf50947f202d99a27f10c241497cecb8d498e45e738",
+    "docs/licenses/upstream/19403e405501c5d6e7ef.txt": "19403e405501c5d6e7ef2f19b7c89447550c40010c53b0bad93a7d2a17e5bb30",
+    "docs/licenses/upstream/e2c35c98dc5af86890b9.txt": "e2c35c98dc5af86890b92d025343a05f00cc5a08d746665c92d13803691e94ee",
+    "docs/licenses/upstream/7ee1b20518e1f3486472.txt": "7ee1b20518e1f348647216237fb49a4512bf080f186842c36716c330785a6a56",
+    "docs/licenses/upstream/1a09b726d81944ab387f.txt": "1a09b726d81944ab387ffb0ed47e73ca265f4fd9c327ab031dfa952cbdd615e2",
+    "docs/licenses/upstream/449bcb7f0c6984eea000.txt": "449bcb7f0c6984eea00036c06816f498a08f17ca044f15a5bcab7685647e2258",
+    "docs/licenses/upstream/bb04506f485643dae914.txt": "bb04506f485643dae9140bee4d79a586b5394868d7565f655f1742fd0b3c32fe",
+    "docs/licenses/upstream/bb1d21f57b7d7eea9259.txt": "bb1d21f57b7d7eea9259d0f460f5156d3c2d66c67a00081724a3d1694ce0931c",
+    "docs/licenses/upstream/bb1939c7229b8dfdfc41.txt": "bb1939c7229b8dfdfc41be402df107d83569a3890654b77a18f23e8791d5382f",
+    "docs/licenses/upstream/5e72bddb6efbac440198.txt": "5e72bddb6efbac440198ac3046188d11f9de0642ac21cfae13463b4940d7d067",
+    "docs/licenses/upstream/6fe03ae1be876df60c0a.txt": "6fe03ae1be876df60c0aa873662d2b4c6d0570e66f09f64bb2c1beec34bbccb3",
+    "docs/licenses/upstream/8b801fd7baad8d868f0c.txt": "8b801fd7baad8d868f0cb3341d6dcb24c7c735bcd82d0ed3f3143c48d932f174",
+    "docs/licenses/upstream/cdb6b2a4e60de61211f8.txt": "cdb6b2a4e60de61211f8759676ea2251ed3a42d0d3d7b4e83eaccf4af1c15472",
+    "docs/licenses/upstream/f3c9fe731c701ed77fd5.txt": "f3c9fe731c701ed77fd5fbaac573872af04dc5869385eb9bd5e3c73c42713814",
+    "docs/licenses/upstream/813cf9b53947ad8e3c66.txt": "813cf9b53947ad8e3c66b463bc9f5ae8e82d676602ba1bb798034a45844b3f7e",
+    "docs/licenses/upstream/c6a4ae2a0565d17ac7fc.txt": "c6a4ae2a0565d17ac7fccae808275596fc5959ffdf507107d001bc4669189e45",
+    "docs/licenses/upstream/ecaf022f0acacc705c12.txt": "ecaf022f0acacc705c12e27c20b03a53e7009dedc1bd66195b087ddaea776cbb",
+    "docs/licenses/upstream/5bb11d96b393a698df70.txt": "5bb11d96b393a698df70018069a986248021f286344c437a13f299c3daf1dfd4",
+    "docs/licenses/upstream/9c6b2257f2cc310f1ef9.txt": "9c6b2257f2cc310f1ef919f70cbefb715fce9961b0232421e1c6223ce3c62a2f",
+    "docs/licenses/upstream/aa66bf6df888e95fe0b1.txt": "aa66bf6df888e95fe0b1f922506e18a5a358b8edc6b54589e923290f8df99be6",
+    "docs/licenses/upstream/4a4bad3fde188e3846f0.txt": "4a4bad3fde188e3846f0aa0ccce323b1e300d8f97c158d2d690b526132e37285",
+    "docs/licenses/upstream/930a605a8a7d9c29e1db.txt": "930a605a8a7d9c29e1db1360449a3dc2fafcf94bf6241c01649cb4f52d54bddb",
+    "docs/licenses/upstream/3ade9ed42f63f75e386b.txt": "3ade9ed42f63f75e386bef5716b484ee096b26d66f0da170df2da54ba51dd726",
+    "docs/licenses/upstream/e7c7dec4f30e7c6b2093.txt": "e7c7dec4f30e7c6b2093faf66e8ac74dc4194e65af48dee84461aebdeea60348",
+    "docs/licenses/upstream/b9981623711f17a4d09b.txt": "b9981623711f17a4d09b73002167393424e52f0566581901db41a39f30b3df06",
+    "docs/licenses/upstream/ed516e32e5cce4be9f8b.txt": "ed516e32e5cce4be9f8b8df2a8cd1c25cd860e39675016d358bb611c66673bd3",
+    "docs/licenses/upstream/eec50dfebb8bd0e5e870.txt": "eec50dfebb8bd0e5e8709509d59bc491580d523b032a4ed80bebfbb7232c35d5",
+    "docs/licenses/upstream/ac7d6ff302813114d7c7.txt": "ac7d6ff302813114d7c783dd0161c190e5759fdc5e0bdecd03920737a72f2218",
+    "docs/licenses/upstream/a26a5af19dfee904aba6.txt": "a26a5af19dfee904aba6b8d6d34896f17b9e735c0cd4c48a2ac460a497e18fdc",
+    "docs/licenses/upstream/f4a85f8677ca4e41b185.txt": "f4a85f8677ca4e41b185c0a9f7c31a30ddb9ce43c561483ee92ef12db37c2a10",
+    "docs/licenses/upstream/d93070ea91432eb79371.txt": "d93070ea91432eb79371f4d54e42e606cc8ef11e5e46bb8ccfe95bda75f4b153",
+    "docs/licenses/upstream/0621878e61f0d0fda054.txt": "0621878e61f0d0fda054bcbe02df75192c28bde1ecc8289cbd86aeba2dd72720",
+    "docs/licenses/upstream/3b7df402160fc95c1ec4.txt": "3b7df402160fc95c1ec4d256f720da6b75b1c5c69ad6826acfa5f096e349a42c",
+    "docs/licenses/upstream/02f7ba45f2117e1386f3.txt": "02f7ba45f2117e1386f3a422780b18ee90bbbdc5db4ad854cd94c48437c84c26",
+    "docs/licenses/upstream/3a7c3f0b887abb7c638f.txt": "3a7c3f0b887abb7c638faf022d29257418458614c6724b120ceeffb279f9c7d2",
+    "docs/licenses/upstream/ada2ee52b8bd02ea0a5b.txt": "ada2ee52b8bd02ea0a5b30f754cc6a8fa3999f3c2ae605ffce51d51bfc2d7b40",
+    "docs/licenses/upstream/28116bddf903ca25565a.txt": "28116bddf903ca25565a7a0938a77e79e0f0a35784bc0f45676dd4493812398e",
+    "docs/licenses/upstream/ac1fba5ce573a84bffa0.txt": "ac1fba5ce573a84bffa0e6e114d03b68e46fa05a0132c7f96b5ca178eaea0af7",
+    "docs/licenses/upstream/5091b9ccc0739775800f.txt": "5091b9ccc0739775800f5121e2b13e4dc4d5bc8cae5369f02686c3c9f629d580",
+    "docs/licenses/upstream/2a0003b9cb67e65af2ed.txt": "2a0003b9cb67e65af2ede49200eb66cb3c9e1a5c3d4baff954d8e500cf58336d",
+    "docs/licenses/upstream/c4304c40043b16a1aa4b.txt": "c4304c40043b16a1aa4b15c12dba7741d166f0ea9c9616a2c786a49518312469",
+    "docs/licenses/upstream/c71d239df91726fc519c.txt": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "docs/licenses/upstream/d30047bca3b516639339.txt": "d30047bca3b516639339a3c279bb84c3483124fb5a9dafe3c75056a85090e745",
+    "docs/licenses/upstream/d201d14804d3bcd3b944.txt": "d201d14804d3bcd3b944147173175e4abfbd838b7c8069b6bd3452496bf13e6c",
+    "docs/licenses/upstream/adbeebebf11206920171.txt": "adbeebebf1120692017116e9c60b65670cfbbc2181a2e07425e4bb482d0129cb",
+    "docs/licenses/upstream/368cca1106be99d39ecd.txt": "368cca1106be99d39ecd32a38d8305585d802a475effb66380b91ffc9bcf709b",
+    "docs/licenses/upstream/08a959077fe4d731c957.txt": "08a959077fe4d731c9571891fe49d3f6adc2b3581ead46a2f5752520bd97d645"
+  },
+  "supplementary_inputs": {
+    "falcon/native/assets/fonts/Inter-OFL.txt": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a",
+    "falcon/vendor/winit/LICENSE": "6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a",
+    "docs/third-party/winit-hosted-view.txt": "c4466bb5def4d2368f361793c33520a20714b5a00828c9fa1ec7da3832c6dd17",
+    "docs/third-party/chromium-chrome02.txt": "9c7ada3e360a89b692d4e9c790082f3e638b33df4890675e6ba716789ff91a54",
+    "falcon/vendor/zune-jpeg/FALCON-CHANGES.md": "7a1ed06ff622d5c2ad46f45a03dd37f7faebeab3b82a5dfab9664523fe23d033"
+  },
+  "font_inputs": {
+    "falcon/native/assets/fonts/Inter-Bold.ttf": "288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+    "falcon/native/assets/fonts/Inter-Medium.ttf": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+    "falcon/native/assets/fonts/Inter-Regular.ttf": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+    "falcon/native/assets/fonts/Inter-SemiBold.ttf": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3"
+  },
+  "runtime_notice_sha256": "78c163fcec50e64bfd85fedb850c273595602fafa2b41f30f75d4e410b80ee83",
+  "targets": [
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin"
+  ],
+  "packages": [
+    {
+      "name": "ab_glyph",
+      "version": "0.2.32",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "ab_glyph_rasterizer",
+      "version": "0.1.10",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "addr2line",
+      "version": "0.25.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "adler2",
+      "version": "2.0.1",
+      "declared": "0BSD OR MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "adler32",
+      "version": "1.2.0",
+      "declared": "Zlib",
+      "selected": [
+        "Zlib"
+      ]
+    },
+    {
+      "name": "alloc-no-stdlib",
+      "version": "2.0.4",
+      "declared": "BSD-3-Clause",
+      "selected": [
+        "BSD-3-Clause"
+      ]
+    },
+    {
+      "name": "alloc-stdlib",
+      "version": "0.2.4",
+      "declared": "BSD-3-Clause",
+      "selected": [
+        "BSD-3-Clause"
+      ]
+    },
+    {
+      "name": "allocator-api2",
+      "version": "0.2.21",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "annotate-snippets",
+      "version": "0.12.16",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "anstyle",
+      "version": "1.0.14",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "anyhow",
+      "version": "1.0.103",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "arrayref",
+      "version": "0.3.9",
+      "declared": "BSD-2-Clause",
+      "selected": [
+        "BSD-2-Clause"
+      ]
+    },
+    {
+      "name": "arrayvec",
+      "version": "0.7.7",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "ash",
+      "version": "0.38.0+1.3.281",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "auto_enums",
+      "version": "0.8.9",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "autocfg",
+      "version": "1.5.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "backtrace",
+      "version": "0.3.76",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "base64",
+      "version": "0.22.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "bit-set",
+      "version": "0.9.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "bit-vec",
+      "version": "0.9.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "bitflags",
+      "version": "1.3.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "bitflags",
+      "version": "2.13.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "bitstream-io",
+      "version": "4.10.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "block2",
+      "version": "0.5.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "block2",
+      "version": "0.6.2",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "brotli-decompressor",
+      "version": "5.0.3",
+      "declared": "BSD-3-Clause OR MIT",
+      "selected": [
+        "BSD-3-Clause"
+      ]
+    },
+    {
+      "name": "by_address",
+      "version": "1.2.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "bytemuck",
+      "version": "1.25.0",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "bytemuck_derive",
+      "version": "1.10.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "byteorder",
+      "version": "1.5.0",
+      "declared": "Unlicense OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "byteorder-lite",
+      "version": "0.1.0",
+      "declared": "Unlicense OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "cc",
+      "version": "1.2.65",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "cfg-if",
+      "version": "1.0.4",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "cfg_aliases",
+      "version": "0.2.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "chrono",
+      "version": "0.4.45",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "clipboard-win",
+      "version": "5.4.1",
+      "declared": "BSL-1.0",
+      "selected": [
+        "BSL-1.0"
+      ]
+    },
+    {
+      "name": "clru",
+      "version": "0.6.3",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "codespan-reporting",
+      "version": "0.13.1",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "color_quant",
+      "version": "1.1.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "const-field-offset",
+      "version": "0.2.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "const-field-offset-macro",
+      "version": "0.2.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "convert_case",
+      "version": "0.10.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "copypasta",
+      "version": "0.10.2",
+      "declared": "MIT  OR  Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "core-foundation",
+      "version": "0.9.4",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "core-foundation-sys",
+      "version": "0.8.7",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "core-graphics",
+      "version": "0.23.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "core-graphics-types",
+      "version": "0.1.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "core_maths",
+      "version": "0.1.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "countme",
+      "version": "3.0.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "crc32fast",
+      "version": "1.5.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "critical-section",
+      "version": "1.2.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "crossbeam-channel",
+      "version": "0.5.15",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "crossbeam-deque",
+      "version": "0.8.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "crossbeam-epoch",
+      "version": "0.9.20",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "crossbeam-utils",
+      "version": "0.8.21",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "cursor-icon",
+      "version": "1.2.0",
+      "declared": "MIT OR Apache-2.0 OR Zlib",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "dary_heap",
+      "version": "0.3.9",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "data-url",
+      "version": "0.3.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "derive_more",
+      "version": "2.1.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "derive_more-impl",
+      "version": "2.1.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "derive_utils",
+      "version": "0.15.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "dispatch",
+      "version": "0.2.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "dispatch2",
+      "version": "0.3.1",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "displaydoc",
+      "version": "0.2.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "dlib",
+      "version": "0.5.3",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "document-features",
+      "version": "0.2.12",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "dpi",
+      "version": "0.1.2",
+      "declared": "Apache-2.0 AND MIT",
+      "selected": [
+        "Apache-2.0",
+        "MIT"
+      ]
+    },
+    {
+      "name": "either",
+      "version": "1.16.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "enumn",
+      "version": "0.1.14",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "equivalent",
+      "version": "1.0.2",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "error-code",
+      "version": "3.3.2",
+      "declared": "BSL-1.0",
+      "selected": [
+        "BSL-1.0"
+      ]
+    },
+    {
+      "name": "euclid",
+      "version": "0.22.14",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "falcon-color",
+      "version": "0.0.0",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "falcon-decode",
+      "version": "0.0.0",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "falcon-gpu",
+      "version": "0.0.0",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "falcon-hwdec",
+      "version": "0.0.0",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "falcon-native",
+      "version": "1.0.11",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "falcon-nvjpeg",
+      "version": "0.1.0",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "fast_image_resize",
+      "version": "5.5.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "fdeflate",
+      "version": "0.3.7",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "femtovg",
+      "version": "0.25.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "field-offset",
+      "version": "0.3.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "find-msvc-tools",
+      "version": "0.1.9",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "fixed_decimal",
+      "version": "0.7.2",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "flate2",
+      "version": "1.1.9",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "float-cmp",
+      "version": "0.9.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "fnv",
+      "version": "1.0.7",
+      "declared": "Apache-2.0  OR  MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "foldhash",
+      "version": "0.1.5",
+      "declared": "Zlib",
+      "selected": [
+        "Zlib"
+      ]
+    },
+    {
+      "name": "foldhash",
+      "version": "0.2.0",
+      "declared": "Zlib",
+      "selected": [
+        "Zlib"
+      ]
+    },
+    {
+      "name": "font-types",
+      "version": "0.11.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "fontdb",
+      "version": "0.23.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "fontique",
+      "version": "0.10.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "foreign-types",
+      "version": "0.5.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "foreign-types-macros",
+      "version": "0.2.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "foreign-types-shared",
+      "version": "0.3.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "form_urlencoded",
+      "version": "1.2.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "getopts",
+      "version": "0.2.24",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "getrandom",
+      "version": "0.4.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "gif",
+      "version": "0.14.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "gimli",
+      "version": "0.32.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "gl_generator",
+      "version": "0.14.0",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "glob",
+      "version": "0.3.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "glow",
+      "version": "0.17.0",
+      "declared": "MIT OR Apache-2.0 OR Zlib",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "glutin_wgl_sys",
+      "version": "0.6.1",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "gpu-allocator",
+      "version": "0.28.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "gpu-descriptor",
+      "version": "0.3.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "gpu-descriptor-types",
+      "version": "0.2.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "half",
+      "version": "2.7.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "harfrust",
+      "version": "0.8.4",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "hashbrown",
+      "version": "0.14.5",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "hashbrown",
+      "version": "0.15.5",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "hashbrown",
+      "version": "0.16.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "hashbrown",
+      "version": "0.17.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "heck",
+      "version": "0.5.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "hex",
+      "version": "0.4.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "hexf-parse",
+      "version": "0.2.1",
+      "declared": "CC0-1.0",
+      "selected": [
+        "CC0-1.0"
+      ]
+    },
+    {
+      "name": "htmlparser",
+      "version": "0.2.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "i-slint-backend-selector",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "i-slint-backend-winit",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "i-slint-common",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "i-slint-compiler",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "i-slint-core",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "i-slint-core-macros",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "i-slint-renderer-femtovg",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "iana-time-zone",
+      "version": "0.1.65",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "icu_collections",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_decimal",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_decimal_data",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_locale",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_locale_core",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_locale_data",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_normalizer",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_normalizer_data",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_properties",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_properties_data",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_provider",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_segmenter",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "icu_segmenter_data",
+      "version": "2.2.0",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "idna",
+      "version": "1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "idna_adapter",
+      "version": "1.2.2",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "image",
+      "version": "0.25.10",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "image-webp",
+      "version": "0.2.4",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "imagesize",
+      "version": "0.14.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "imgref",
+      "version": "1.12.2",
+      "declared": "CC0-1.0 OR Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "indexmap",
+      "version": "2.14.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "itertools",
+      "version": "0.14.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "itoa",
+      "version": "1.0.18",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jpeg-decoder",
+      "version": "0.3.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jpeg-encoder",
+      "version": "0.6.1",
+      "declared": "(MIT OR Apache-2.0) AND IJG",
+      "selected": [
+        "IJG",
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-bitstream",
+      "version": "1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-coding",
+      "version": "1.0.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-color",
+      "version": "0.11.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-frame",
+      "version": "0.13.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-grid",
+      "version": "0.6.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-image",
+      "version": "0.13.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-jbr",
+      "version": "0.2.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-modular",
+      "version": "0.11.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-oxide",
+      "version": "0.12.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-oxide-common",
+      "version": "1.0.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-render",
+      "version": "0.12.4",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-threadpool",
+      "version": "1.0.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "jxl-vardct",
+      "version": "0.11.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "kamadak-exif",
+      "version": "0.5.5",
+      "declared": "BSD-2-Clause",
+      "selected": [
+        "BSD-2-Clause"
+      ]
+    },
+    {
+      "name": "keyboard-types",
+      "version": "0.7.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "khronos-egl",
+      "version": "6.0.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "khronos_api",
+      "version": "3.1.0",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "kurbo",
+      "version": "0.13.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "lazy_static",
+      "version": "1.5.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "libc",
+      "version": "0.2.186",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "libflate",
+      "version": "2.3.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "libflate_lz77",
+      "version": "2.3.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "libloading",
+      "version": "0.8.9",
+      "declared": "ISC",
+      "selected": [
+        "ISC"
+      ]
+    },
+    {
+      "name": "libm",
+      "version": "0.2.16",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "linebender_resource_handle",
+      "version": "0.1.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "linked-hash-map",
+      "version": "0.5.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "linked_hash_set",
+      "version": "0.1.6",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "litemap",
+      "version": "0.8.2",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "litrs",
+      "version": "1.0.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "lock_api",
+      "version": "0.4.14",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "log",
+      "version": "0.4.33",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "lyon_algorithms",
+      "version": "1.0.20",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "lyon_extra",
+      "version": "1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "lyon_geom",
+      "version": "1.0.19",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "lyon_path",
+      "version": "1.0.19",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "md5",
+      "version": "0.8.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "memchr",
+      "version": "2.8.2",
+      "declared": "Unlicense OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "memmap2",
+      "version": "0.9.11",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "memoffset",
+      "version": "0.9.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "miniz_oxide",
+      "version": "0.8.9",
+      "declared": "MIT OR Zlib OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "moxcms",
+      "version": "0.8.1",
+      "declared": "BSD-3-Clause OR Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "muda",
+      "version": "0.19.3",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "multiversion",
+      "version": "0.8.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "multiversion-macros",
+      "version": "0.8.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "mutate_once",
+      "version": "0.1.2",
+      "declared": "BSD-2-Clause",
+      "selected": [
+        "BSD-2-Clause"
+      ]
+    },
+    {
+      "name": "naga",
+      "version": "29.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "no_std_io2",
+      "version": "0.9.4",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num",
+      "version": "0.4.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num-bigint",
+      "version": "0.4.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num-complex",
+      "version": "0.4.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num-integer",
+      "version": "0.1.46",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num-iter",
+      "version": "0.1.45",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num-rational",
+      "version": "0.4.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num-traits",
+      "version": "0.2.19",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num_enum",
+      "version": "0.7.6",
+      "declared": "BSD-3-Clause OR MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "num_enum_derive",
+      "version": "0.7.6",
+      "declared": "BSD-3-Clause OR MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc-sys",
+      "version": "0.3.5",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2",
+      "version": "0.5.2",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2",
+      "version": "0.6.4",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-app-kit",
+      "version": "0.2.2",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-app-kit",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-cloud-kit",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-core-data",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-core-foundation",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-core-graphics",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-core-image",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-core-text",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-core-video",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-encode",
+      "version": "4.1.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-foundation",
+      "version": "0.2.2",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-foundation",
+      "version": "0.3.2",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-metal",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "objc2-quartz-core",
+      "version": "0.3.2",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "object",
+      "version": "0.37.3",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "once_cell",
+      "version": "1.21.4",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "ordered-float",
+      "version": "5.3.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "owned_ttf_parser",
+      "version": "0.25.1",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "parking_lot",
+      "version": "0.12.5",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "parking_lot_core",
+      "version": "0.9.12",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "parlance",
+      "version": "0.1.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "parley",
+      "version": "0.10.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "parley_data",
+      "version": "0.10.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "percent-encoding",
+      "version": "2.3.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pico-args",
+      "version": "0.5.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pin-project",
+      "version": "1.1.13",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pin-project-internal",
+      "version": "1.1.13",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pin-project-lite",
+      "version": "0.2.17",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pin-utils",
+      "version": "0.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pin-weak",
+      "version": "1.1.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pkg-config",
+      "version": "0.3.33",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "png",
+      "version": "0.17.16",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "png",
+      "version": "0.18.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pollster",
+      "version": "0.4.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "polycool",
+      "version": "0.4.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "portable-atomic",
+      "version": "1.13.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "potential_utf",
+      "version": "0.1.5",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "presser",
+      "version": "0.3.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "proc-macro-crate",
+      "version": "3.5.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "proc-macro2",
+      "version": "1.0.106",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "profiling",
+      "version": "1.0.18",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pulldown-cmark",
+      "version": "0.13.4",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pulldown-cmark-escape",
+      "version": "0.11.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "pxfm",
+      "version": "0.1.29",
+      "declared": "BSD-3-Clause OR Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "quick-error",
+      "version": "2.0.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "quote",
+      "version": "1.0.46",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "range-alloc",
+      "version": "0.1.5",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "raw-window-handle",
+      "version": "0.6.2",
+      "declared": "MIT OR Apache-2.0 OR Zlib",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "raw-window-metal",
+      "version": "1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rawler",
+      "version": "0.8.0",
+      "declared": "LGPL-2.1",
+      "selected": [
+        "LGPL-2.1"
+      ]
+    },
+    {
+      "name": "rayon",
+      "version": "1.12.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rayon-core",
+      "version": "1.13.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "read-fonts",
+      "version": "0.39.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "renderdoc-sys",
+      "version": "1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "resvg",
+      "version": "0.47.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rfd",
+      "version": "0.15.4",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rgb",
+      "version": "0.8.53",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rle-decode-fast",
+      "version": "1.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rowan",
+      "version": "0.16.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "roxmltree",
+      "version": "0.21.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rustc-demangle",
+      "version": "0.1.27",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rustc-hash",
+      "version": "1.1.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rustc_version",
+      "version": "0.4.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rustversion",
+      "version": "1.0.22",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "rustybuzz",
+      "version": "0.20.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "scoped-tls-hkt",
+      "version": "0.1.5",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "scopeguard",
+      "version": "1.2.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "semver",
+      "version": "1.0.28",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "serde",
+      "version": "1.0.228",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "serde_core",
+      "version": "1.0.228",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "serde_derive",
+      "version": "1.0.228",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0.150",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "serde_spanned",
+      "version": "0.6.9",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "serde_spanned",
+      "version": "1.1.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "shlex",
+      "version": "2.0.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "simd-adler32",
+      "version": "0.3.9",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "simplecss",
+      "version": "0.2.2",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "siphasher",
+      "version": "1.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "skrifa",
+      "version": "0.42.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "slab",
+      "version": "0.4.12",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "slint",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "slint-macros",
+      "version": "1.17.0",
+      "declared": "GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0",
+      "selected": [
+        "LicenseRef-Slint-Royalty-free-2.0"
+      ]
+    },
+    {
+      "name": "slotmap",
+      "version": "1.1.1",
+      "declared": "Zlib",
+      "selected": [
+        "Zlib"
+      ]
+    },
+    {
+      "name": "smallvec",
+      "version": "1.15.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "smol_str",
+      "version": "0.2.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "smol_str",
+      "version": "0.3.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "spin_on",
+      "version": "0.1.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "spirv",
+      "version": "0.4.0+sdk-1.4.341.0",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "stable_deref_trait",
+      "version": "1.2.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "static_assertions",
+      "version": "1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "strict-num",
+      "version": "0.1.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "strum",
+      "version": "0.28.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "strum_macros",
+      "version": "0.28.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "svgtypes",
+      "version": "0.16.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "swash",
+      "version": "0.2.9",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "syn",
+      "version": "2.0.118",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "synstructure",
+      "version": "0.13.2",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "sys-locale",
+      "version": "0.3.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "taffy",
+      "version": "0.10.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "target-features",
+      "version": "0.1.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "text-size",
+      "version": "1.1.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "thiserror",
+      "version": "2.0.18",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "thiserror-impl",
+      "version": "2.0.18",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "tiff",
+      "version": "0.9.1",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "tiny-skia",
+      "version": "0.12.0",
+      "declared": "BSD-3-Clause",
+      "selected": [
+        "BSD-3-Clause"
+      ]
+    },
+    {
+      "name": "tiny-skia-path",
+      "version": "0.12.0",
+      "declared": "BSD-3-Clause",
+      "selected": [
+        "BSD-3-Clause"
+      ]
+    },
+    {
+      "name": "tinystr",
+      "version": "0.8.3",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "tinyvec",
+      "version": "1.11.0",
+      "declared": "Zlib OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "tinyvec_macros",
+      "version": "0.1.1",
+      "declared": "MIT OR Apache-2.0 OR Zlib",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "toml",
+      "version": "0.8.23",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "toml",
+      "version": "1.1.2+spec-1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "toml_datetime",
+      "version": "0.6.11",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "toml_datetime",
+      "version": "1.1.1+spec-1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "toml_edit",
+      "version": "0.22.27",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "toml_edit",
+      "version": "0.25.12+spec-1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "toml_parser",
+      "version": "1.1.2+spec-1.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "toml_write",
+      "version": "0.1.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "tracing",
+      "version": "0.1.44",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "tracing-core",
+      "version": "0.1.36",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "trash",
+      "version": "5.2.6",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "ttf-parser",
+      "version": "0.25.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "typed-index-collections",
+      "version": "3.5.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicase",
+      "version": "2.9.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-bidi",
+      "version": "0.3.18",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-bidi-mirroring",
+      "version": "0.4.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-ccc",
+      "version": "0.4.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-ident",
+      "version": "1.0.24",
+      "declared": "(MIT OR Apache-2.0) AND Unicode-3.0",
+      "selected": [
+        "MIT",
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "unicode-linebreak",
+      "version": "0.1.5",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "unicode-properties",
+      "version": "0.1.4",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-script",
+      "version": "0.5.8",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-segmentation",
+      "version": "1.13.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-vo",
+      "version": "0.1.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-width",
+      "version": "0.2.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "unicode-xid",
+      "version": "0.2.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "url",
+      "version": "2.5.8",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "usvg",
+      "version": "0.47.0",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "utf8_iter",
+      "version": "1.0.4",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "uuid",
+      "version": "1.23.4",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "version_check",
+      "version": "0.9.5",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "vtable",
+      "version": "0.4.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "vtable-macro",
+      "version": "0.4.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "wayland-sys",
+      "version": "0.31.11",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "webbrowser",
+      "version": "1.2.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "weezl",
+      "version": "0.1.12",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "wgpu",
+      "version": "29.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "wgpu-core",
+      "version": "29.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "wgpu-core-deps-apple",
+      "version": "29.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "wgpu-core-deps-windows-linux-android",
+      "version": "29.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "wgpu-hal",
+      "version": "29.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "wgpu-naga-bridge",
+      "version": "29.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "wgpu-types",
+      "version": "29.0.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows",
+      "version": "0.56.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows",
+      "version": "0.62.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-collections",
+      "version": "0.3.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-core",
+      "version": "0.56.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-core",
+      "version": "0.62.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-future",
+      "version": "0.3.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-implement",
+      "version": "0.56.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-implement",
+      "version": "0.60.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-interface",
+      "version": "0.56.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-interface",
+      "version": "0.59.3",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-link",
+      "version": "0.2.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-numerics",
+      "version": "0.3.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-result",
+      "version": "0.1.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-result",
+      "version": "0.4.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-strings",
+      "version": "0.5.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.52.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.59.0",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.61.2",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-targets",
+      "version": "0.52.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows-threading",
+      "version": "0.2.1",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "windows_x86_64_msvc",
+      "version": "0.52.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "winit",
+      "version": "0.30.13",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    },
+    {
+      "name": "winnow",
+      "version": "0.7.15",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "winnow",
+      "version": "1.0.3",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "winreg",
+      "version": "0.55.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "winresource",
+      "version": "0.1.31",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "writeable",
+      "version": "0.6.3",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "xml-rs",
+      "version": "0.8.28",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "xmlwriter",
+      "version": "0.1.0",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "yazi",
+      "version": "0.2.1",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "yoke",
+      "version": "0.8.3",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "yoke-derive",
+      "version": "0.8.2",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "zeno",
+      "version": "0.3.3",
+      "declared": "Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "zerocopy",
+      "version": "0.8.52",
+      "declared": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "zerocopy-derive",
+      "version": "0.8.52",
+      "declared": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "zerofrom",
+      "version": "0.1.8",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "zerofrom-derive",
+      "version": "0.1.7",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "zerotrie",
+      "version": "0.2.4",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "zerovec",
+      "version": "0.11.6",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "zerovec-derive",
+      "version": "0.11.3",
+      "declared": "Unicode-3.0",
+      "selected": [
+        "Unicode-3.0"
+      ]
+    },
+    {
+      "name": "zmij",
+      "version": "1.0.21",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "zune-core",
+      "version": "0.5.1",
+      "declared": "MIT OR Apache-2.0 OR Zlib",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "zune-jpeg",
+      "version": "0.5.15",
+      "declared": "Apache-2.0",
+      "selected": [
+        "Apache-2.0"
+      ]
+    }
+  ],
+  "notices_sha256": "662cc9e8c02ddc3ec2babc16884843eacd410b0e7bf9a6139f7403ca9bac5f99"
+}

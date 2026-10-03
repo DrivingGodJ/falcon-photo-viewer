@@ -1,0 +1,550 @@
+// v0.9.5 (ui.rs extraction series): the filmstrip / selection-grid pieces (CullBadge,
+// TileBadge, FilmThumb, BriefCell, BriefSep, SelTile) extracted VERBATIM from the
+// slint! macro in src/ui.rs. `export` added — they were macro-file-local.
+
+import { Theme } from "theme.slint";
+import { Star, Chip, ChipRole } from "widgets.slint";
+import { AaHairline, FlagGlyph, ArchiveGlyph, RotateGlyph, UnsupportedGlyph } from "glyphs.slint";
+import { FilmItem } from "structs.slint";
+
+    // Shared flag/reject corner badge — a rounded square with the FLAG (pick) or FILE-ARCHIVE (reject)
+    // glyph, mutually exclusive. ONE grammar across the filmstrip + Selection tiles so the core cull
+    // control reads identically everywhere (Step 5b). Hidden when neither is set.
+    // ── v0.8.139 (AA/M8): THE GLYPH IS THE BOX MINUS 4, NOT TWO THIRDS OF IT. ──────────────────
+    // `box * 2 / 3` gave a 12px glyph in the 18px badge, which centres to (18 - 12)/2 = 3 — ODD, so
+    // device 4.5 — while the Selection tile's badge pair (22px badge, 14px glyph) centres to 4 and
+    // renders clean. The two tile families that sit closest together in the Review panel drew the
+    // same flag/reject pair at two different parities. `box - 4px` mounts at exactly 2 for ANY even
+    // box, so the parity is now a property of the component rather than a coincidence of one call
+    // site's numbers — and it retires the ratio's other trap, which the audit named: `box * 2 / 3`
+    // yields a FRACTIONAL glyph size for any box that is not a multiple of 3.
+    // THE PRICE, STATED: the glyph grows 12px -> 14px inside the unchanged 18px badge (padding 3 ->
+    // 2 per side), which is also what makes it match the Selection tile's 14px glyph exactly.
+    export component CullBadge inherits Rectangle {
+        in property <bool> flag;
+        in property <bool> reject;
+        in property <length> box: 18px;
+        width: root.box; height: root.box; border-radius: Theme.radius-xs;
+        visible: root.flag || root.reject;
+        background: root.reject ? Theme.danger : Theme.accent;
+        if root.reject : ArchiveGlyph { tint: Theme.text; width: root.box - 4px; height: root.box - 4px;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+        if !root.reject : FlagGlyph { tint: Theme.text; width: root.box - 4px; height: root.box - 4px;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+    }
+
+    // Corner text badge (frame number / R+J format / name) on filmstrip + Selection tiles. Caller sets
+    // the corner via x/y; width hugs the text (+10px). Same grammar the three inline copies used.
+    export component TileBadge inherits Rectangle {
+        in property <string> text;
+        height: 16px;
+        width: t.preferred-width + 10px;
+        border-radius: Theme.radius-xs;
+        background: Theme.badge-bg;
+        t := Text { text: root.text; x: 5px; color: Theme.text; font-size: Theme.font-xs;
+                    font-weight: 700; vertical-alignment: center; }
+    }
+
+    export component FilmThumb inherits Rectangle {
+        in property <image> thumb;
+        in property <string> number;
+        in property <string> badge;            // filetype label (JPG / PNG / TIFF / RAW / R+J / HEIC …)
+        in property <bool> is-current: false;
+        in property <bool> valid: false;
+        in property <bool> loading: false;
+        in property <bool> unsupported: false; // recognised-but-undecodable source → broken-image glyph
+        // v0.8.120 (design-sweep Y48): a RUNTIME thumbnail-decode failure (FilmItem.failed). Flat
+        // in-property like its siblings — this component takes the model row's fields one by one,
+        // not the row itself.
+        in property <bool> failed: false;
+        in property <int> rating: 0;     // 0..5 — drawn as a proportional gold bar
+        in property <bool> flag: false;  // pick (blue corner dot)
+        in property <bool> reject: false; // reject (red corner dot)
+        in property <bool> hit: true; // M6 (v0.8.19): input gate — its internal ta is normally OCCLUDED by the strip-wide area, but would be EXPOSED the moment that area disables (pass-through class); both gate on the same bool
+        // v0.8.129 (W1-3): this thumb is SELECTED (or is the current photo previewing the range
+        // origin while Shift is held). Computed by the HOST from FilmItem.selected + the shared
+        // sel-preview mirror, so the preview rule lives in one place for all three surfaces.
+        in property <bool> selected: false;
+        // v0.8.133 (the visual wave, D): Ctrl is physically held and the selection affordance is
+        // live. The GHOST — what a click would do — is that ANDed with this thumb being the one
+        // under the pointer, which on the strip is `lift` (the strip-wide TouchArea drives it), plus
+        // the VOID-slot exclusion: the edge slots before the first and after the last shot are
+        // FilmItem::default() with no badge, and a click there selects nothing, so they must never
+        // promise one. THE REST-VISUAL RULE: a ghost is hovered by definition, so it takes the
+        // 1px / 55% rest visual and never the hovered escalation (see the border below).
+        in property <bool> ctrl-preview: false;
+        property <bool> sel-ghost: root.ctrl-preview && root.lift && root.badge != "";
+        property <bool> sel-vis: root.selected || root.sel-ghost;
+        in property <bool> lift: false; // v0.8.27: hover lift, DRIVEN BY THE STRIP (fsinner.hover-k) — the strip-wide
+                                        // TouchArea occludes this component's own ta, so has-hover here never fired in
+                                        // the strip (the old -2px y-translate hover it drove was dead in practice).
+        callback clicked;
+        // v0.8.27: hover LIFTS the thumb — the SelTile drag-affordance grammar (E1 shadow elevation +
+        // hover border-strengthen; v0.8.17 constant-geometry idiom: geometry never moves, only colours
+        // fade). Blur/offset are REDUCED from SelTile's 20/6: fsinner clips at the 102px strip (femtovg
+        // clips shadows at ancestor clips) and the thumb band leaves 11px above/below — 9/2 is the
+        // largest lift that fits with ZERO visible cut (top reach 7px, bottom reach 11px exactly).
+        content := Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: Theme.radius-sm;
+            // v0.8.45 (Fix 1, supersedes the v0.8.42/44 border-morph): this border carries ONLY the
+            // identity frames (current accent / reject danger) at a CONSTANT 2px — the hover-lift
+            // frame moved to the liftframe overlay at the end of this box (opacity fade = the
+            // title-bar wash grammar; see its note). Width never animates: the v0.8.17
+            // constant-geometry idiom, now strictly true. The duration ternary stays so an identity
+            // flip UNDER the pointer (click-to-jump) snaps as in v0.8.44, while unhovered identity
+            // changes keep their 120ms fade.
+            // v0.8.129 (W1-3, spec section 4): while SELECTED the white rim WINS over every other
+            // claimant -- current accent AND reject danger (architect ruling, same rationale as the
+            // owner's accent ruling: selection is the rarest, most deliberate state, and reject
+            // stays legible through its corner badge). 1px at rest, 2px hovered. The width flips
+            // instantly and is never animated (the v0.8.45 constant-geometry idiom is about
+            // ANIMATING width; a hover-edge step is the same class as the identity colour flip).
+            // v0.8.133 (D): the escalation arm reads `selected`, not `sel-vis` — a Ctrl ghost stays
+            // at the rest weight. The else-arm's anonymous 2px is `border-identity-w` now (E).
+            border-width: root.sel-vis ? ((root.selected && root.lift) ? Theme.border-select-hi-w : Theme.border-select-w) : Theme.border-identity-w;
+            border-color: root.sel-vis ? Theme.border-select
+                        : (root.is-current ? Theme.accent : (root.reject ? Theme.danger-soft : transparent));
+            animate border-color { duration: root.lift ? 0ms : Theme.anim; easing: ease; }
+            // ...and the white GLOW REPLACES the hover-lift's dark shadow while selected (one shadow
+            // per tile at a time, section 4). 9px/2px is the strip's measured maximum: femtovg clips
+            // shadows at ancestor bounds and fsinner clips at the 102px strip (see the note above).
+            drop-shadow-color: root.sel-vis ? ((root.selected && root.lift) ? Theme.glow-select-hi : Theme.glow-select)
+                             : (root.lift ? Theme.shadow-lift : transparent);
+            drop-shadow-blur: 9px;
+            drop-shadow-offset-y: 2px;
+            animate drop-shadow-color { duration: root.lift ? 0ms : Theme.anim; easing: ease; }
+            background: Theme.block;
+            clip: true;
+            if root.valid : Image {
+                source: root.thumb;
+                image-fit: contain; // show the image at its native aspect (no crop)
+                width: 100%;
+                height: 100%;
+            }
+            // v0.8.120 (design-sweep Y48): + `failed`, the runtime decode-failure latch — see grid.slint.
+            if (root.unsupported || root.failed) && !root.valid : UnsupportedGlyph {
+                width: 22px; height: 22px;
+                x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            }
+            // G6: a cell with no thumbnail yet reads as LOADING (quiet dots), not broken/black.
+            // badge != "" excludes the strip's VOID edge slots (FilmItem::default() before the
+            // first / after the last shot) — those must stay blank, not "forever loading".
+            if !root.valid && !root.unsupported && !root.failed && root.badge != "" : Text {
+                text: "···"; color: Theme.text-mute; font-size: Theme.font-md; font-weight: 700;
+                x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            }
+            if root.loading : Text {
+                text: "Loading…"; color: Theme.text-mute; font-size: Theme.font-sm;
+                horizontal-alignment: center; vertical-alignment: center;
+                width: 100%; height: 100%;
+            }
+            if root.badge != "" : TileBadge { x: 4px; y: 4px; text: root.badge; }
+            // flag / reject corner badge (mutually exclusive), top-right — shared CullBadge grammar
+            CullBadge {
+                x: parent.width - self.width - 4px; y: 4px;
+                flag: root.flag; reject: root.reject;
+            }
+            TileBadge {
+                x: parent.width - self.width - 4px; y: parent.height - self.height - 4px;
+                text: root.number;
+            }
+            // rating badge — a gold NUMBER, sitting LEFT of the cull badge (they coexist; the
+            // Figma experimental dual-badge rule, Phase D). Replaces the old bottom gold bar.
+            // v0.8.44 (G10): now the shared Chip primitive, BADGE role (18×18 badge-bg + star digit).
+            if root.rating > 0 : Chip {
+                role: ChipRole.badge;
+                text: root.rating;
+                // top-right corner (where cull lives) when unmarked; shift left by the cull badge only if flagged/rejected
+                x: (root.flag || root.reject) ? parent.width - self.width - 4px - 18px - 4px : parent.width - self.width - 4px; y: 4px;
+            }
+            // v0.8.45 (Fix 1): the hover-lift FRAME — its own overlay fading by OPACITY, the
+            // title-bar wash grammar (instant engage / Theme.anim ease release — the exact IconBtn
+            // spec). v0.8.44 faded border-color toward `transparent` (#00000000, transparent BLACK):
+            // the 35%-white frame darkened toward grey as it faded (muddy, perceptually dead early)
+            // while border-width animated 3px→2px under it (a geometry pop at the tail) — so a fast
+            // sweep's staggered per-thumb releases collapsed into "all gone at once" (user feel-test,
+            // v0.8.44). An opacity fade keeps the frame WHITE all the way down and moves no geometry,
+            // so each thumb's trail stays legible from the moment the pointer left it and a sweep
+            // reads as a graded tail. SelTile carries the twin overlay.
+            Rectangle {
+                width: 100%; height: 100%;
+                border-radius: Theme.radius-sm;
+                border-width: Theme.border-lift-w;
+                border-color: Theme.border-lift;
+                opacity: (root.lift && !root.is-current && !root.reject && !root.sel-vis) ? 1.0 : 0.0; // v0.8.129: the selection rim owns the look while selected (v0.8.133: the ghost too)
+                animate opacity { duration: root.lift ? 0ms : Theme.anim; easing: ease; }
+            }
+        }
+        ta := TouchArea { enabled: root.hit; clicked => { root.clicked(); } }
+    }
+
+    // Folded-EXIF grid helpers: a value cell (elides if too long) + a thin column rule.
+    export component BriefCell inherits Text {
+        color: Theme.text-dim;
+        font-size: Theme.font-md; // match the expanded-view rows so wide cells don't clip
+        vertical-alignment: center;
+        overflow: elide;
+        horizontal-stretch: 1;
+    }
+
+    // ── v0.8.191 (H9, the app-wide hairline sweep): the folded-EXIF grid's column rules. ─────
+    // Seven mounts inside the info panel's GridLayout, all vertical, all previously AA-off plain
+    // fills on a panel-local x. A vertical `AaHairline` is the horizontal one rotated a quarter
+    // turn (a 1px-WIDE bordered rect would hit the renderer's `min(bw, width/2)` clamp and draw
+    // its OUTLINE instead — the same bytes, a different drawing; see glyphs.slint).
+    // NO EXPLICIT HEIGHT, DELIBERATELY: the GridLayout row sizes the slot, and the rotated child
+    // reads `parent.height` for its own length. The child is absolutely positioned inside the
+    // slot and contributes nothing to layout info, so the row's measurement is unchanged —
+    // measured, not assumed (v0.8.191 §C2).
+    export component BriefSep inherits AaHairline {
+        width: 1px;
+        horizontal-stretch: 0;
+        vertical: true;
+        tint: Theme.divider;
+    }
+
+    // Selection-panel TILE: cover image (3:2) with R+J marker, jump-on-click, and flag/reject
+    // toggle buttons over it; the rating sits directly UNDER the image as inline stars.
+    // PHOTO-FIRST (v0.8.9): the thumbnail ALWAYS renders at original colour - no hover-darken,
+    // no reject-wash. Hover LIFTS the tile (drop-shadow elevation, like a card you can pick up +
+    // drag to A/B compare); reject reads as a red INNER GLOW around the frame. The controls stay
+    // full-opacity + tappable so un-rejecting (the panel's whole job) never looks disabled.
+    export component SelTile inherits Rectangle {
+        in property <FilmItem> item;
+        in property <bool> edits-enabled: true;
+        pure function edit-tint(c: color) -> color { return root.edits-enabled ? c : c.with-alpha(0.35); }
+        in property <int> cur-idx;      // the current shot index — reactive highlight (no model rebuild)
+        in property <bool> cmp-a: false; // this tile is currently compare half A
+        in property <bool> cmp-b: false; // this tile is currently compare half B
+        // v0.8.129 (W1-3): Shift is physically held, so the CURRENT tile previews the range origin
+        // in the REST selection visual. Pushed from the host (root.sel-preview) rather than read
+        // here, so compare/immersive dormancy is decided in ONE place.
+        in property <bool> preview: false;
+        // v0.8.135 (W6, OWNER VETO): there is no `bulk` property here any more. v0.8.130 gave the
+        // tile's stars AND its two corner badges the bulk glow and the bulk dispatch; v0.8.133 took
+        // it off the stars (five 36px halos at an 18px pitch merged into the container box the
+        // grammar forbids); the owner's second feel-test took it off the badges too. A tile shows
+        // ONE photograph, so every control drawn on it edits that photograph — full stop. The
+        // plural flag/reject surfaces are the EXIF cull row and the two context menus, each of which
+        // glows white AND carries a counted, directed label ("Unflag 12"); a 22px corner square over
+        // a thumbnail can carry neither, so it never spoke for twelve photographs legibly.
+        // v0.8.133 (the visual wave, D): Ctrl is physically held and the selection affordance is live
+        // (the host decides that once, in `sel-ctrl-preview`). ANDed with this tile's own hover it is
+        // the GHOST of the selection visual — what a click would do, shown where the pointer is.
+        // THE REST-VISUAL RULE: a ghost is hovered by definition, so it must never take the hovered
+        // escalation (2px / 85%); it renders the 1px / 55% rest visual and nothing else, or "what a
+        // click would do" would be a lie about which of the two visuals it would produce.
+        in property <bool> ctrl-preview: false;
+        // v0.8.129 (W1-2): a clean left click, WITH its modifiers -- the host classifies it through
+        // MainWindow.sel-gesture-kind and routes to either a selection gesture or the jump this
+        // callback used to perform unconditionally. (ctrl, shift).
+        callback clicked-with(bool, bool);
+        callback rate(int);
+        callback toggle-flag;
+        callback toggle-reject;
+        callback ctx(length, length);   // right-click → open the send-to-A/B menu at (window x, y)
+        callback drag-start;
+        callback drag-move(length, length); // cursor in WINDOW coords (absolute-position + mouse)
+        callback drag-end;
+        property <bool> is-current: root.item.idx == root.cur-idx;
+        // v0.8.133 (D): the selection visual splits in two. `sel-real` is a tile that IS in the set
+        // (or the Shift range origin) — it owns the hover ESCALATION. `sel-vis` adds the Ctrl ghost,
+        // which owns the rest visual only. Every consumer that asks "is the selection chrome on"
+        // reads sel-vis; the single consumer that asks "may this escalate" reads sel-real.
+        property <bool> sel-real: root.item.selected || (root.preview && root.is-current);
+        property <bool> sel-ghost: root.ctrl-preview && jta.has-hover;
+        property <bool> sel-vis: root.sel-real || root.sel-ghost;
+        property <bool> sel-hot: jta.has-hover && root.sel-real;
+        // ── v1.0.0-rc (queue item 31, §3.A): EVERY POINTER SURFACE THE TILE OWNS, as one OR. ───
+        // The picture, the two corner badges and the five caption stars — EIGHT surfaces, and the
+        // word is exact. The 4 px gap under the picture and the frame-number `Text` left of the
+        // star cluster are NOT surfaces (together 9.15 % of the tile by area, measured on the
+        // shipped tiles 09-07 by skeptic B), so resting the pointer on THOSE lets the card go after
+        // the 120 ms linger and coming back costs a fresh rest. That is the behaviour as built and
+        // it is on sheet 3.1j for the owner, with "the whole tile" offered as the alternative. This
+        // header used to say "THE WHOLE TILE'S HOVER", which is the one thing it is not [B Y9].
+        // Slint hover is EXCLUSIVE: the pointer crossing a corner badge or one of the five caption
+        // stars drops `jta.has-hover`, so a hover-preview term spelled `jta.has-hover` would blink
+        // the card off inside the very tile it is previewing. `GridThumb` already carries this
+        // spelling for its own lift (`grid.slint:52`, three surfaces); this is that spelling
+        // extended by the five stars, which `Star` exposes as `hov` for exactly this purpose.
+        //
+        // EVERY EXISTING `jta.has-hover` READER IS LEFT AS IS — the lift frame, the shadow, the
+        // border, the Ctrl ghost and `sel-hot`. This round changes no shipped hover FEEL; `hot` is
+        // a new property with one new consumer.
+        property <bool> hot: jta.has-hover || fbta.has-hover || rbta.has-hover
+                          || st1.hov || st2.hov || st3.hov || st4.hov || st5.hov;
+        // The tile's own vertical centre in WINDOW space, read off the TouchArea and never off the
+        // component root: Slint 1.17.0 materialises a layout-positioned ROOT's `absolute-position`
+        // as `ItemAbsolutePosition(elem) + elem.x` while the runtime walk already includes `elem.x`,
+        // so the root double-counts (`theme.slint`'s own warning, rig-proven v0.8.45). `jta` fills
+        // `imgbox` at x = 0, so it is the safe reader — and it is the PICTURE's centre, which is
+        // what the card should be level with.
+        property <length> hover-cy: jta.absolute-position.y + jta.height / 2;
+        // (idx, hot, centre-y, pressed). The host keeps ONE hovered index; `pressed` is what makes a
+        // press distinguishable from a leave, which the Rust step's suppression arm needs — a press
+        // must hide the card AND keep it hidden until the pointer moves to another tile, while an
+        // ordinary leave only starts the 120 ms linger. DEVIATION from the spec's 3-argument
+        // callback, recorded in the round record's §C.
+        callback hover-changed(int, bool, length, bool);
+        changed hot => { root.hover-changed(root.item.idx, root.hot, root.hover-cy, false); }
+        // The LIVE rim weight, named once because two things now derive from it: the border itself
+        // and the reject bands' inset (v0.8.133, A-F4 — see their note).
+        property <length> rim-w: root.sel-vis ? (root.sel-hot ? Theme.border-select-hi-w : Theme.border-select-w) : Theme.border-identity-w;
+        VerticalLayout {
+            spacing: Theme.space-1;
+            imgbox := Rectangle {
+                height: self.width * 2 / 3; // 3:2 contact-sheet tile
+                border-radius: Theme.radius-ctrl;
+                // v0.8.45 (Fix 1, supersedes the v0.8.42/44 border-morph): CONSTANT-width identity/
+                // rest border only (reject danger / current+compare accent / plain hairline) — the
+                // hover-lift frame moved to the liftframe overlay at the end of this box (opacity
+                // fade = the title-bar wash grammar): the white frame now fades OVER the constant
+                // hairline instead of morphing INTO it, and width never animates. The duration
+                // ternary keeps identity flips under the pointer instant, as in v0.8.44.
+                // v0.8.129 (W1-3, spec section 4): the selection rim wins over reject AND over the
+                // current/compare accent -- see FilmThumb's note for the ruling. 1px rest / 2px hover.
+                border-width: root.rim-w;
+                border-color: root.sel-vis ? Theme.border-select
+                            : (root.item.reject ? Theme.danger
+                            : ((root.is-current || root.cmp-a || root.cmp-b) ? Theme.accent
+                            : Theme.border));
+                animate border-color { duration: jta.has-hover ? 0ms : Theme.anim; easing: ease; }
+                background: Theme.block;
+                // E1 LIFT: hover raises the tile off the grid via a drop-shadow elevation (rest = flat,
+                // no shadow -> hover = deep soft shadow). Slint 1.17 has no render-transform/scale for a
+                // layout child (a width/height bump would reflow the grid), so the "pick-up" affordance
+                // is pure elevation + the existing hover border-strengthen - NO change to photo pixels.
+                // v0.8.135 (W4, ruled): ONE shadow, cast OUTWARD, in the filmstrip's exact grammar —
+                // blur 9 / offset-y 2, glow-select at rest and glow-select-hi hovered while the
+                // selection chrome is on, the dark lift otherwise. `FilmThumb` and `GridThumb` have
+                // rendered precisely this for four versions; the Review tile is the third surface,
+                // not a fourth idiom. Blur and offset are shared by both states because a Slint
+                // element has ONE shadow: 9/2 is what the grid's new 9/9/7/11 padding and 18px gaps
+                // were measured against, so the halo is uncut on all four flanks of every tile and
+                // two selected neighbours cannot touch. The 20/6 the dark lift used to carry went
+                // with the 20px halo it was sized beside.
+                drop-shadow-color: root.sel-vis ? (root.sel-hot ? Theme.glow-select-hi : Theme.glow-select)
+                                 : (jta.has-hover ? Theme.shadow-lift : transparent);
+                drop-shadow-blur: 9px;
+                drop-shadow-offset-y: 2px;
+                animate drop-shadow-color { duration: jta.has-hover ? 0ms : Theme.anim; easing: ease; } // v0.8.44 (Item 7): instant engage, 120ms release
+                clip: true;
+                // v0.8.135 (W4) — THE MAT IS GONE, AND THE HALO IS OUTSIDE AGAIN.
+                // v0.8.133 solved "the glow is half missing" by turning it inward: an OPAQUE caster
+                // (`photobox`) inset 6px inside this clipping cell, with the photograph inside IT,
+                // so the spread landed in a 6px ring and `imgbox`'s clip cut the rest. It worked and
+                // it cost what its own note said it would — the photograph rendered 6px smaller on
+                // every side, permanently, which the owner's second feel-test read as a mat around
+                // every tile and rejected. The halo goes back OUTWARD (see the shadow above) and the
+                // GRID pays for it in padding and gutters instead of the picture paying for it in
+                // pixels. Net: the visible photograph is 212px wide either way — `photobox` was
+                // 224 − 12, the tile is 212 now — so nothing about the picture changed size; only
+                // where the clearance is taken from did.
+                if root.item.valid : Image {
+                    // PHOTO-FIRST: no hover-darken, no reject-dim - the thumbnail is always its
+                    // true colour. Hover reads via the tile LIFT (shadow); reject via the inner glow.
+                    source: root.item.thumb; image-fit: cover; width: 100%; height: 100%;
+                }
+                // v0.8.120 (design-sweep Y48): + `failed` — the third of the three surfaces (this
+                // one, the grid dock, the filmstrip) that rendered a permanently-failed thumbnail as
+                // "still loading". See grid.slint.
+                if (root.item.unsupported || root.item.failed) && !root.item.valid : UnsupportedGlyph {
+                    width: 30px; height: 30px;
+                    x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+                }
+                // G6: not-yet-decoded tile reads as LOADING (quiet dots), not broken/black.
+                // badge != "" excludes a default-item HALF-ROW slot (odd tile count) — stays blank.
+                if !root.item.valid && !root.item.unsupported && !root.item.failed && root.item.badge != "" : Text {
+                    text: "···"; color: Theme.text-mute; font-size: Theme.font-lg; font-weight: 700;
+                    x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+                }
+                // E2 REJECT GLOW: the photo stays at ORIGINAL colour (no wash/dim). Rejected reads as
+                // a red haze vignetting INWARD from the frame - Slint has no box-shadow-inset, so it's
+                // two concentric translucent-red bands that hug the rounded frame, even on all four
+                // edges, fading toward the centre. The existing 2px solid danger
+                // border (imgbox) sits at the very edge + the reject badge (below) complete the state.
+                // v0.8.191 (H16, BANNER ONLY): the words "radius-following" stood here and are not
+                // what the renderer draws. A bordered rect is STROKED, and femtovg's stroke radius
+                // sits in the MIDDLE of the border, so i-slint-renderer-femtovg's
+                // `draw_border_rectangle` first raises the fill radius to at least bw/2 + 1 device
+                // px and then walks the stroke at `fill_radius − bw/2` — which is therefore never
+                // less than ONE device px, and never the frame's own radius on a wide band. At the
+                // owner's 150% the 11px band strokes at about (radius-ctrl − rim) × 1.5 − 8.25 ≈ 2
+                // device px of corner where the frame has ≈10, so its corners read essentially
+                // square; the 5px band keeps about 7. The EDGES — which is what the eye reads on a
+                // vignette — hug exactly as described, and nobody has reported the corners.
+                // Recorded and corrected in words; no geometry moved.
+                // v0.8.133 (A-F4, BUG) — THE BANDS SIT INSIDE THE IDENTITY RIM NOW. These were
+                // 100%x100% children painted AFTER imgbox's own border, and Slint draws a border
+                // INSIDE the element's bounds — so the 5px 24%-red band landed directly ON TOP of the
+                // 1-2px white selection rim and composited it to #f3cdce. The v0.8.129 ruling that
+                // "while SELECTED the white rim WINS over every other claimant, reject included" was
+                // therefore true in the source and false on the screen: a selected+rejected tile wore
+                // a pink rim. Inset by the LIVE rim weight (`rim-w`, which is the same expression the
+                // border uses), the bands start where the rim ends and the ruling holds literally.
+                // v0.8.133 (A-F5): ...and while the selection chrome is on, they are muted to about
+                // half — 13% -> 6.5% and 24% -> 12%. Two red bands under a white halo was the single
+                // hottest composite in the panel, and reject still reads: its own corner badge is
+                // untouched, and the badge is what the E2 note always named as the state's carrier.
+                if root.item.reject : rejband := Rectangle {
+                    x: root.rim-w; y: root.rim-w;
+                    width: parent.width - 2 * root.rim-w; height: parent.height - 2 * root.rim-w;
+                    Rectangle { width: 100%; height: 100%; border-radius: max(0px, Theme.radius-ctrl - root.rim-w);
+                                border-width: 11px; border-color: root.sel-vis ? Theme.danger.with-alpha(0.065) : Theme.danger.with-alpha(0.13); } // ~13% danger - widest/faintest (under); v0.8.48: derived from the token (0.13*255 -> the same 0x21 alpha byte) so the band follows the colour-managed danger — it sits concentric with the danger-soft band below
+                    Rectangle { width: 100%; height: 100%; border-radius: max(0px, Theme.radius-ctrl - root.rim-w);
+                                border-width: 5px; border-color: root.sel-vis ? Theme.danger.with-alpha(0.12) : Theme.danger-soft; } // ~24% danger - inner/stronger (over)
+                }
+                // jump / right-click menu / drag-to-compare. Declared FIRST so the corner toggles
+                // (declared after) win clicks where they overlap. Right-click opens the send-to-A/B
+                // menu; a left press + drag past a threshold starts a drag to the centred A/B zones;
+                // a clean left click jumps. Coords are converted to WINDOW space via absolute-position.
+                jta := TouchArea {
+                    property <bool> dragged;
+                    pointer-event(e) => {
+                        // v1.0.0-rc (queue item 31, §3.A.2): A PRESS IS A COMMITMENT — a drag to
+                        // A|B, a right-click menu, or a click into the photograph — so the hover
+                        // card gets out of the way, and stays out of the way until the pointer
+                        // moves to another tile. Pushed from BOTH down arms rather than from
+                        // `changed pressed`, because the right button never sets `pressed`.
+                        // `changed hot` does not fire here (the pointer has not moved), which is
+                        // precisely what makes the suppression last: the host's index is cleared
+                        // and nothing on this tile can set it again until the pointer leaves.
+                        //
+                        // THE RIGHT BUTTON DOES NOT RECOVER THAT WAY, MEASURED [09-07, skeptic A
+                        // Y8]: after a RIGHT press+release the rig sees the tile's `Exit` withheld,
+                        // so `hot` stays latched true, `changed hot` can never fire again, and NO
+                        // tile re-arms the index until the next mouse PRESS — not the pressed tile
+                        // and not another one. The cause is Slint's own input routing after a right
+                        // press+release (`TouchArea::input_event_filter_before_children` sets
+                        // `has_hover` true for every event that reaches it and false only on
+                        // `Exit`), not this round's code, and the stuck state is PRE-EXISTING for
+                        // every other consumer of `jta.has-hover` — the lift, the shadow, the
+                        // border and `sel-hot` inherit it and always have. What is new is a
+                        // consumer that clears its own index on the press, which turns a benign
+                        // stuck hover into a feature that does nothing. In the app the right-click
+                        // also opens the tile's context menu, and dismissing that menu is itself a
+                        // press, which by the same measurement unsticks it — so the real
+                        // consequence is bounded between "invisible" and "no preview until the next
+                        // click". NOT fixed here on a hypothesis: the investigation is queued
+                        // (QUEUE §2, 09-07) and sheet 3.1j asks the owner to try it.
+                        if (e.kind == PointerEventKind.down) {
+                            root.hover-changed(root.item.idx, false, root.hover-cy, true);
+                        }
+                        if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) {
+                            root.ctx(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+                        }
+                        if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                            self.dragged = false;
+                        }
+                        if (e.kind == PointerEventKind.up && e.button == PointerEventButton.left) {
+                            if (self.dragged) { root.drag-end(); self.dragged = false; }
+                            // v0.8.129 (W1-2): the modifiers ride out with the click; the HOST decides
+                            // whether this is a selection gesture or the jump it has always been.
+                            else { root.clicked-with(e.modifiers.control, e.modifiers.shift); }
+                        }
+                    }
+                    moved => {
+                        if (self.pressed) {
+                            if (!self.dragged && (abs(self.mouse-x - self.pressed-x) > 6px || abs(self.mouse-y - self.pressed-y) > 6px)) {
+                                self.dragged = true;
+                                root.drag-start();
+                            }
+                            if (self.dragged) {
+                                root.drag-move(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+                            }
+                        }
+                    }
+                }
+                // v0.8.139 (AA/M6): 4px, not 5px. The same `TileBadge` is mounted at a literal 4px
+                // inset on the filmstrip thumb (:127) and on the folder-grid tile (grid.slint), and
+                // at 5px here — odd, so this copy alone began at device 7.5 and its rim and its four
+                // rounded corners were a half-pixel smear while its twins a few hundred pixels away
+                // in the same Review panel were clean. One inset, the even one.
+                if root.item.badge != "" : TileBadge { x: 4px; y: 4px; text: root.item.badge; }
+                // flag + reject toggle badges (top-right): rounded squares w/ vector glyphs —
+                // accent/danger when active, subtle otherwise
+                HorizontalLayout {
+                    width: 48px; x: parent.width - 48px - 4px; y: 4px; spacing: Theme.space-1;
+                    Rectangle {
+                        width: 22px; height: 22px; border-radius: Theme.radius-sm;
+                        background: root.edit-tint(root.item.flag ? Theme.accent : Theme.badge-bg);
+                        border-width: 1px; border-color: root.edit-tint(root.item.flag ? Theme.accent : Theme.border-strong);
+                        FlagGlyph { tint: root.edit-tint(root.item.flag ? Theme.text : Theme.text-mute); width: 14px; height: 14px;
+                                    x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                        fbta := TouchArea { clicked => { if (root.edits-enabled) { root.toggle-flag(); } } } // v0.8.135 (W6): named for the rig row that pins it single-photo
+                    }
+                    Rectangle {
+                        width: 22px; height: 22px; border-radius: Theme.radius-sm;
+                        background: root.edit-tint(root.item.reject ? Theme.danger : Theme.badge-bg);
+                        border-width: 1px; border-color: root.edit-tint(root.item.reject ? Theme.danger : Theme.border-strong);
+                        ArchiveGlyph { tint: root.edit-tint(root.item.reject ? Theme.text : Theme.text-mute); width: 14px; height: 14px;
+                                       x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                        rbta := TouchArea { clicked => { if (root.edits-enabled) { root.toggle-reject(); } } } // v0.8.135 (W6): the flag badge's twin
+                    }
+                }
+                // compare-slot badge (bottom-left): shows which half this tile occupies (A / B)
+                if root.cmp-a || root.cmp-b : Rectangle {
+                    x: 4px; y: parent.height - self.height - 4px;
+                    width: 20px; height: 20px; border-radius: Theme.radius-xs;
+                    background: Theme.accent;
+                    Text { text: root.cmp-a ? "A" : "B"; color: Theme.text; font-size: Theme.font-sm; font-weight: 700;
+                           x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                }
+                // v0.8.0: manual-rotation badge (bottom-right corner) — shown only when this shot has a delta.
+                if root.item.rot > 0 : Rectangle {
+                    x: parent.width - self.width - 4px; y: parent.height - self.height - 4px;
+                    width: 20px; height: 20px; border-radius: Theme.radius-xs;
+                    background: Theme.badge-bg;
+                    border-width: 1px; border-color: Theme.border-strong;
+                    RotateGlyph { tint: Theme.text-dim; width: 13px; height: 13px;
+                                  x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                }
+                // v0.8.45 (Fix 1): the hover-lift FRAME overlay — FilmThumb's twin (see its note):
+                // an opacity fade of a constant white frame replaces the v0.8.44 border-morph.
+                Rectangle {
+                    width: 100%; height: 100%;
+                    border-radius: Theme.radius-ctrl;
+                    border-width: Theme.border-lift-w;
+                    border-color: Theme.border-lift;
+                    opacity: (jta.has-hover && !root.sel-vis && !root.item.reject && !(root.is-current || root.cmp-a || root.cmp-b)) ? 1.0 : 0.0; // v0.8.129: the selection rim owns the look while selected
+                    animate opacity { duration: jta.has-hover ? 0ms : Theme.anim; easing: ease; }
+                }
+            }
+            // caption: frame number (left) + inline editable 5-star rating (right, UNDER the image)
+            HorizontalLayout {
+                spacing: Theme.space-1; height: 20px;
+                Text { text: root.item.number; color: Theme.text-dim; font-size: Theme.font-sm;
+                       vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                HorizontalLayout {
+                    // v0.8.131 (F-P6): the star emits the RAW index it stands for. It used to
+                    // send `rating == N ? 0 : N`, i.e. THIS tile's toggle direction — which the
+                    // host then forwarded to a bulk rating of the whole selection, so ★3 on a tile
+                    // already rated 3 asked to CLEAR twelve photographs while the same click on its
+                    // neighbour asked to RATE them. One tile's state cannot decide a group's
+                    // direction; the receiver arm re-applies the single-photo toggle.
+                    // v0.8.133 (A-F6, OWNER RULING — the tile stars are single-photo, forever).
+                    // v0.8.130 gave these five stars the bulk glow AND the bulk dispatch. At box 18
+                    // with spacing 0 the pitch is 18px and the old halo's extent was 36px, so each
+                    // star's halo covered both its neighbours and the five merged into one ~90px
+                    // slab sitting on the tile's own downward-biased glow — the "container box around
+                    // the row" the grammar forbids, plus a rating gesture on a contact-sheet tile
+                    // that silently meant twelve photographs. Both are gone: no glow here, and the
+                    // receiver arm in main_window.slint rates THIS photograph. The bulk star row now
+                    // lives only where it is unmistakable — the EXIF panel's action row and the two
+                    // context menus, each with a counted, directed label beside it. `Star.glow`
+                    // itself stays in widgets.slint: those three surfaces are its consumers.
+                    spacing: 0;
+                    // v1.0.0-rc (queue item 31): NAMED, so the tile's `hot` OR can read each
+                    // star's own `hov`. Nothing else about them moves.
+                    st1 := Star { enabled: root.edits-enabled; box: 18px; index: 1; rating: root.item.rating; clicked => { root.rate(1); } }
+                    st2 := Star { enabled: root.edits-enabled; box: 18px; index: 2; rating: root.item.rating; clicked => { root.rate(2); } }
+                    st3 := Star { enabled: root.edits-enabled; box: 18px; index: 3; rating: root.item.rating; clicked => { root.rate(3); } }
+                    st4 := Star { enabled: root.edits-enabled; box: 18px; index: 4; rating: root.item.rating; clicked => { root.rate(4); } }
+                    st5 := Star { enabled: root.edits-enabled; box: 18px; index: 5; rating: root.item.rating; clicked => { root.rate(5); } }
+                }
+            }
+        }
+    }

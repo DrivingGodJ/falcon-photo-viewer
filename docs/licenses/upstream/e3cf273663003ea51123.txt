@@ -1,0 +1,4 @@
+/// This function has been rewritten to encourage auto-vectorization.
+///
+/// Based on [src/dsp/yuv.h](https://github.com/webmproject/libwebp/blob/8534f53960befac04c9631e6e50d21dcb42dfeaf/src/dsp/yuv.h#L79)
+/// from the libwebp source.

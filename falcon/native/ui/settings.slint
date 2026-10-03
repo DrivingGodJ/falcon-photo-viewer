@@ -1,0 +1,428 @@
+// v0.9.5 (ui.rs extraction series): the Settings-panel row widgets (ToggleRow,
+// OptionChip, RankRow, CopyRankList) extracted VERBATIM from the slint! macro in
+// src/ui.rs. `export` added — they were macro-file-local.
+
+// No `Tip` import: nothing in this file is a tooltip host (v0.8.106 — see OptionChip's note).
+import { Theme } from "theme.slint";
+import { FlagGlyph, ArchiveGlyph, RotateGlyph, CloseGlyph } from "glyphs.slint";
+import { CopyPrefRow } from "structs.slint";
+
+    // v0.8.75 (owner redesign): the toggle PILL (track+knob) extracted VERBATIM from ToggleRow so
+    // the Selection panel's compact "XMP sync" control renders the IDENTICAL visual — one component,
+    // both call sites. Fixed literals on purpose (46×26 r13 track, 20px knob, 3px inset): every
+    // caller gets the same pill, so the Settings rows are pixel-identical to the pre-extraction
+    // render. `hovered` is the caller's TouchArea hover (the pill itself is inert — the caller owns
+    // the click surface, exactly as ToggleRow's row-level TouchArea always did).
+    export component ToggleTrack inherits Rectangle {
+        in property <bool> on: false;
+        in property <bool> hovered: false;
+        width: 46px; height: 26px; border-radius: 13px;
+        // the off-pill is the standard dark well — visible on the block row
+        background: root.on ? Theme.accent : (Theme.well);
+        border-width: 1px;
+        border-color: root.on ? Theme.accent : (root.hovered ? Theme.border-strong : Theme.border);
+        animate background, border-color { duration: Theme.anim; easing: ease; }
+        Rectangle {
+            width: 20px; height: 20px; border-radius: 10px; background: #f7f7f7; // pure-white toggle knob — kept literal (max contrast on BOTH the accent-on and well-off pill; decoupled from Theme.text on purpose)
+            y: (parent.height - self.height) / 2;
+            x: root.on ? parent.width - self.width - 3px : 3px;
+            animate x { duration: Theme.anim; easing: ease; }
+        }
+    }
+
+    export component ToggleRow inherits Rectangle {
+        in property <string> label;
+        in property <bool> on: false;
+        in property <bool> enabled: true;
+        // queue 34 (§1.B): a COLOUR-ONLY semantic on the label, and the ONE thing the export
+        // sheet's hand-built copies carried that this component did not. The include-rejects
+        // question is warning-yellow on both surfaces that ask it (v0.8.132 OQ1: "one question,
+        // asked identically on both surfaces") because it reports a state the user did not ask
+        // for; every other call site leaves the default and renders byte-identically.
+        // GEOMETRY IS UNTOUCHED, which is the whole distinction from the v0.8.79 `pad-h` ruling:
+        // that property let an instance re-derive the row's SHARED GEOMETRY, and the retirement
+        // was about geometry. A semantic colour on a label is the `MenuItem.checked` / `.bold`
+        // precedent — colour and weight move nothing.
+        in property <brush> label-color: Theme.text;
+        // H1 (v0.7.2); mixed grammar legalized v0.8.6 (B2): the default is TRANSPARENT (flat-on-base).
+        // The `block` fill IS the "card" grammar and is used INTENTIONALLY two ways — both correct:
+        //   • a LONE standalone toggle sets `bg: Theme.block` so it reads as its own one-row card; and
+        //   • RELATED toggles are wrapped in a SettingsGroup (which carries the `block` card fill) and
+        //     each inner row stays transparent (the default), so the whole group reads as ONE card.
+        // Rule: groups for related rows, standalone cards for lone toggles — the mix is by design.
+        in property <brush> bg: transparent;
+        in property <length> bw: 0px;
+        // v0.8.79: the v0.8.77 `pad-h` property is RETIRED — it existed solely so the welcome
+        // panel's compact instance could zero the side padding, and that variant is gone (owner
+        // ruling: shared controls render identically everywhere; the welcome row now hosts the
+        // stock component flush to its card, SettingsGroup-style). Fixed 12px again on purpose:
+        // no instance can re-derive the row's shared geometry. The 3px-inset hover rect below
+        // is THE shared spec.
+        callback toggled;
+        height: 44px;
+        background: root.bg;
+        border-radius: Theme.radius-ctrl;
+        border-width: root.bw;
+        border-color: Theme.border;
+        // H5 (v0.7.2): rest→hover feedback — a 15% wash over whatever the row shows (toggles were
+        // the ONE control family with zero hover response).
+        Rectangle {
+            // concentric: row card radius-ctrl 9 − 3px inset; 3px matches the title-bar hover-inset grammar
+            x: 3px; y: 3px; width: parent.width - 6px; height: parent.height - 6px;
+            border-radius: 6px;
+            background: (ta.has-hover && root.enabled) ? Theme.hover : transparent;
+            animate background { duration: Theme.anim; easing: ease; }
+        }
+        HorizontalLayout {
+            padding-left: 12px; padding-right: 12px;
+            Text {
+                text: root.label;
+                color: root.enabled ? root.label-color : Theme.text-mute;
+                vertical-alignment: center; horizontal-stretch: 1;
+                font-size: Theme.font-body;
+                font-weight: 500; // v0.8.80 (3B, owner ruling): Medium — one toggle-label weight app-wide (Settings groups, standalone toggles, welcome wheel row). Size unchanged.
+            }
+            VerticalLayout {
+                alignment: center;
+                // v0.8.75: the pill is the shared ToggleTrack now (extracted verbatim above) —
+                // same bindings (`on`, row-TouchArea hover), pixel-identical render.
+                ToggleTrack { on: root.on; hovered: ta.has-hover; }
+            }
+        }
+        ta := TouchArea { clicked => { if (root.enabled) { root.toggled(); } } }
+    }
+
+    // THE one "pick one of N" chip — soft-accent + outline when active. Absorbs Chip / SelChip / OptChip:
+    // `count` ≥ 0 shows a trailing count (Selection filters); `enabled` mutes it; `stretch` fills its row
+    // (filter / option bars) or hugs its content (Settings chips). One height / radius / active grammar.
+    export component OptionChip inherits Rectangle {
+        in property <string> label;
+        in property <int> count: -1;         // < 0 = no count
+        in property <bool> active;
+        in property <bool> enabled: true;
+        // v0.8.104 (Round-A, owner ruling): the DISABLED LOOK without the disabled BEHAVIOUR. A
+        // Custom chip whose remembered profile is missing/unloadable must be distinguishable from a
+        // never-configured one — today both render as an ordinary rest chip, so a failed profile is
+        // invisible at the control itself. But the chip is still the recovery: clicking it opens the
+        // Load-profile picker directly (the shortcut the owner chose), so `enabled: false` — which
+        // gates the TouchArea — would take the fix away with the affordance. `dimmed` drives only the
+        // visual treatment; the click is untouched.
+        in property <bool> dimmed: false;
+        in property <bool> stretch: true;    // false → hug content (Settings chips)
+        in property <int> icon: 0;           // 0 none / 1 FlagGlyph (pick) / 2 ArchiveGlyph (reject) / 3 RotateGlyph (rotated) — vector, before the label
+        // v0.8.106 (Round-A final check): OptionChip is deliberately NOT a Tip host. The v0.8.105
+        // (W12) attempt added the IconBtn observer here and shipped two bugs at once: IconBtn is a
+        // title-bar control whose tip needs no `Tip.cy` (the layer defaults to y=47), so a chip
+        // buried in a Settings/card body rendered its tip pinned to the TITLE BAR, unattached; and
+        // the leave-clear was gated on the chip's own `tip` string, which every call site bound to a
+        // LIVE expression — a successful install (or an unmount) under the pointer flipped it to ""
+        // and stranded the parked tip forever. A body-level Tip host needs cy plumbing plus an
+        // unmount edge per host, which no chip owns. The house precedent for explaining a body
+        // control is the card's INLINE CAPTION — both Custom cards' mount-gated failure-warning rows
+        // already name the recovery in place ("Or load it again below." / "Or run Auto-detect again
+        // above." in Settings, "Or use Auto-detect above." on the welcome card) — and the dimmed
+        // chip keeps its hover step below as the affordance cue.
+        callback clicked;
+        height: Theme.ctrl-h-sm;
+        min-width: 50px;
+        horizontal-stretch: root.stretch ? 1 : 0;
+        border-radius: Theme.radius-ctrl;
+        // Rest fill: the universal dark well (v0.7.0 / D4) — recessed and visible on base AND block,
+        // so the old per-context overrides (the "approved visibility deviation") are gone.
+        in property <color> rest-fill: Theme.well;
+        // Figma: ACTIVE = SOLID accent + light text, NO outline (the accent-border + soft-tint
+        // combo read as an "outlined button" — the misread the user's screenshots flagged).
+        // v0.8.105 (W12): the dimmed chip KEEPS its hover step. The dimmed test used to precede the
+        // hover test, so `Theme.well-hover` was unreachable while dimmed — and since OptionChip has
+        // no tooltip and sets no mouse-cursor, a chip that renders exactly like the disabled
+        // treatment gave a sighted user zero evidence that clicking it does anything, while it
+        // silently opened a system file dialog. That is the ruling's own "visual treatment only, the
+        // click is untouched" broken on the affordance side, and it costs the recovery shortcut the
+        // ruling exists to preserve. Order now: disabled (no hover — genuinely inert) → active-and-
+        // not-dimmed (a dimmed chip must not read as the selected one) → hover → rest.
+        background: !root.enabled ? root.rest-fill
+                  : (root.active && !root.dimmed) ? (Theme.accent)
+                  : ta.has-hover ? (Theme.well-hover)
+                  : root.rest-fill;
+        border-width: 1px; // M3 (v0.7.2): the hairline edge — a dark well reads as a control, not a hole
+        border-color: (root.active && root.enabled && !root.dimmed) ? Theme.accent : Theme.border-strong; // v0.8.18: restored the v0.8.10 constant border-strong (the v0.8.14 hover-null reverted with the lift family)
+        animate background { duration: Theme.anim; easing: ease; }
+        HorizontalLayout {
+            padding-left: Theme.space-3; padding-right: Theme.space-3; spacing: Theme.space-1;
+            alignment: center;
+            // optional leading cull glyph (Picks = flag, Rejects = archive) — same vectors as the EXIF/tile
+            // cull buttons; replaces the old ✓/✕ text (the ✕ glyph is a tofu box in Inter).
+            if root.icon == 1 : VerticalLayout { alignment: center; FlagGlyph {
+                tint: !root.enabled ? Theme.text-mute : root.active ? Theme.text : (Theme.text-dim);
+                width: 13px; height: 13px; } }
+            if root.icon == 2 : VerticalLayout { alignment: center; ArchiveGlyph {
+                tint: !root.enabled ? Theme.text-mute : root.active ? Theme.text : (Theme.text-dim);
+                width: 13px; height: 13px; } }
+            // v0.8.1: rotate glyph (the "Rotated" filter chip) — reuses the SelTile badge Path.
+            if root.icon == 3 : VerticalLayout { alignment: center; RotateGlyph {
+                tint: !root.enabled ? Theme.text-mute : root.active ? Theme.text : (Theme.text-dim);
+                width: 13px; height: 13px; } }
+            Text { text: root.label;
+                   color: (!root.enabled || root.dimmed) ? Theme.text-mute
+                        : root.active ? Theme.text
+                        : (Theme.text-dim);
+                   // SemiBold when active (opaque active = solid accent fill → user rule: text on blue/purple = 600)
+                   font-size: Theme.font-md; font-weight: (root.active ? 600 : 500);
+                   vertical-alignment: center; }
+            // count on a SOLID accent chip needs light text (accent-on-accent is unreadable)
+            if root.count >= 0 : Text { text: root.count;
+                   color: root.active ? (Theme.text) : Theme.text-dim;
+                   font-size: Theme.font-sm; font-weight: 700; vertical-alignment: center; }
+        }
+        // No Tip observer here by design — see the `tip`-removal note above the callback.
+        ta := TouchArea {
+            clicked => { if (root.enabled) { root.clicked(); } }
+        }
+    }
+
+    // v0.8.129 (W1-4, owner ruling Q5 + the section-4 visual grammar) -- THE HIDDEN "Selected"
+    // CATEGORY BUTTON. An OptionChip SIBLING (same 28px height, same radius-ctrl, same hairline
+    // geometry, same font weights) wearing the SELECTION's chrome instead of the accent one: the
+    // white rim + glow that every selected tile wears, its live count already composed into the
+    // label Rust-side ("Selected · 12" -- Slint has no int+string concat), and the CLEAR (×)
+    // NESTED INSIDE it, which is the ★ Rated nested-pill precedent (the 0-5 digits nested inside the
+    // Rated pill, v0.3.20) the owner named as the reference.
+    //
+    // DECLARATION ORDER MATTERS: the chip-wide TouchArea is declared FIRST so the nested × (declared
+    // after, inside the layout) wins the hits where they overlap -- the same rule the grid tiles'
+    // corner toggles rely on. OptionChip can put its own `ta` last only because it has no
+    // interactive children.
+    //
+    // stretch-0 by design: it hugs its content and lives on its own row above the four category
+    // chips. See the L5 width arithmetic at the call site (main_window.slint) -- the four chips'
+    // content minimums already fill the 460px panel body, and a Slint layout never shrinks a child
+    // below its content minimum, so a fifth chip in that row would push itself off the panel.
+    export component SelectedChip inherits Rectangle {
+        in property <string> label: "";   // the WHOLE label, Rust-composed (support::selected_chip_label)
+        in property <bool> active: false; // the Selected category is the live filter mode
+        callback clicked;
+        callback cleared;
+        // v0.8.131 (J4 / F3 L-8): ONE hover state for the whole chip. The nested x sits INSIDE the
+        // chip's own TouchArea, and Slint hands the pointer to the innermost area — so moving onto
+        // the x dropped `chipta.has-hover` and the chip visibly un-lit (background, border weight
+        // AND glow) at the exact moment the user was reaching for its control. The grid.slint `hot`
+        // idiom: the two areas are ORed, so the chip stays lit for as long as the pointer is
+        // anywhere on it, while each area keeps its own click.
+        property <bool> hot: chipta.has-hover || xta.has-hover;
+        height: Theme.ctrl-h-sm;
+        horizontal-stretch: 0;
+        border-radius: Theme.radius-ctrl;
+        background: root.active ? Theme.accent : (root.hot ? Theme.well-hover : Theme.well);
+        border-width: root.hot ? Theme.border-select-hi-w : Theme.border-select-w;
+        border-color: Theme.border-select;
+        drop-shadow-color: root.hot ? Theme.glow-select-hi : Theme.glow-select;
+        drop-shadow-blur: 9px;
+        drop-shadow-offset-y: 0px;
+        animate background { duration: Theme.anim; easing: ease; }
+        // v0.8.133 (the visual wave, B): `mouse-cursor: pointer` — the whole file had none, while
+        // every sibling chip family in the app sets it (HudChip, SectionChip, ComparePinLabel). The
+        // cursor is the one affordance signal that survives a chip whose hover wash is already lit.
+        chipta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+        HorizontalLayout {
+            padding-left: Theme.space-3; padding-right: Theme.space-1h; spacing: Theme.space-1h;
+            alignment: center;
+            // `selchiplbl` is named for the rig: a Text's default accessible-label IS its text, so
+            // the live count is readable through the element finder (the fbtext precedent).
+            selchiplbl := Text {
+                text: root.label;
+                color: Theme.text;
+                font-size: Theme.font-md; font-weight: 600;
+                vertical-alignment: center;
+            }
+            VerticalLayout {
+                alignment: center;
+                // ── v0.8.133 (the visual wave, B) — THE NESTED x JOINS THE HOUSE IDIOM ──────────
+                // The owner reported the x as hard to see and hard to aim at. It was not occluded
+                // (this area is declared last and wins its hits) and it did have a wash — the
+                // failure was purely perceptual, and it had three causes, all fixed here.
+                // (1) SIZE: 18px against the three precedents' 22-28px (PanelHeader dismiss 28,
+                //     the toast x 26, the *Rated digit chips 22). 22px + radius-sm puts it on the
+                //     smallest of them, which is the right neighbour for a chip-nested control.
+                // (2) THE WASH WAS SUB-THRESHOLD IN BOTH STATES, for two different reasons. On the
+                //     INACTIVE chip, J4's hot-OR has already lifted the whole chip to well-hover
+                //     (#2e2e2e) before the pointer arrives, so a 15% white wash over THAT reads as
+                //     #4d4d4d — a step the eye cannot find. The opaque `hover-flat` is the
+                //     IconBtn.visible-flat-hover split, and it is the answer to exactly this
+                //     question there too. On the ACTIVE chip the body is saturated accent and never
+                //     changes on hover, and theme.slint already records that a white wash over a
+                //     saturated fill barely moves (#3f8cff -> #5c9dff) — so the active arm keeps the
+                //     translucent `hover`, which over accent is the visible one of the two.
+                // (3) A HAIRLINE ON HOVER, the *Rated digit chip's own signature: an edge appearing
+                //     where there was none is a shape change, and shape survives where value does not.
+                // J4's hot-OR is deliberately KEPT — this is a legibility fix for the x, not a
+                // reversal of the ruling that the chip stays lit while the pointer is anywhere on it.
+                selchipx := Rectangle {
+                    width: 22px; height: 22px; border-radius: Theme.radius-sm;
+                    background: xta.has-hover ? (root.active ? Theme.hover : Theme.hover-flat) : transparent;
+                    border-width: xta.has-hover ? 1px : 0px;
+                    border-color: Theme.border-strong;
+                    animate background { duration: Theme.anim; easing: ease; }
+                    CloseGlyph {
+                        tint: xta.has-hover ? Theme.text : Theme.text-dim;
+                        width: 9px; height: 9px;
+                        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+                    }
+                    xta := TouchArea { mouse-cursor: pointer; clicked => { root.cleared(); } }
+                }
+            }
+        }
+    }
+
+    // One draggable priority row (§33 copy-shortcut list): rounded-square tick + label + hamburger
+    // grip. `active` (the row being dragged) gets the accent highlight + lift from the screenshot.
+    export component RankRow inherits Rectangle {
+        in property <string> label;
+        in property <bool> on;
+        in property <bool> active: false;
+        callback toggled;
+        border-radius: Theme.radius-ctrl;
+        background: root.active ? Theme.accent-soft : Theme.block;
+        // flat design: no outline on the lifted (dragged) row either — the shadow is the lift cue
+        border-width: 0px;
+        border-color: root.active ? Theme.accent : Theme.border;
+        // v0.8.185 (W2): the dragged row's lift IS the app's resting-elevation class (it always was
+        // — D17 named it as the precedent), so its two live values come off the shared tokens; the
+        // ternary shape and the 0px rest arm are unchanged.
+        drop-shadow-blur: root.active ? Theme.shadow-blur : 0px;
+        drop-shadow-color: Theme.shadow-control;
+        drop-shadow-offset-y: root.active ? Theme.shadow-dy : 0px;
+        animate background, border-color { duration: Theme.anim; easing: ease; }
+        HorizontalLayout {
+            padding-left: Theme.space-2h; padding-right: Theme.space-2h; spacing: Theme.space-2h;
+            // rounded-square checkbox — tick = included in the Ctrl+C fallback walk
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 22px; height: 22px; border-radius: Theme.radius-sm;
+                    // dark well so the unticked box stays visible on the block row (audit fix)
+                    background: root.on ? Theme.accent : (Theme.well);
+                    border-width: 1px;
+                    border-color: root.on ? Theme.accent : (cbta.has-hover ? Theme.border-strong : Theme.border);
+                    animate background, border-color { duration: Theme.anim; easing: ease; }
+                    if root.on : Path {
+                        width: 14px; height: 14px;
+                        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+                        viewbox-width: 16; viewbox-height: 16;
+                        stroke: Theme.text-on-accent; stroke-width: 2px; fill: transparent;
+                        MoveTo { x: 3.5; y: 8.5; } LineTo { x: 6.8; y: 12; } LineTo { x: 12.5; y: 4.5; }
+                    }
+                    cbta := TouchArea { clicked => { root.toggled(); } }
+                }
+            }
+            Text {
+                text: root.label; color: Theme.text; font-size: Theme.font-body;
+                vertical-alignment: center; horizontal-stretch: 1;
+            }
+            // hamburger grip — a visual affordance; the list's drag surface does the actual dragging
+            //
+            // ── v0.8.139 (AA/H1): THREE BARS, ONE RASTERISATION. ───────────────────────────────
+            // The grip shipped at y = 2 / 6.25 / 10.5 — a pitch of 4.25, fractional rather than
+            // merely odd — with each bar a 1.5px filled Rectangle. At the owner's 150% scale that
+            // put the three bars at device y 3.000 / 9.375 / 15.750, i.e. at three DIFFERENT
+            // subpixel phases (.0 / .375 / .75), and each bar 2.25 device px tall. Bar 1 got a hard
+            // top edge and faded downward, bar 3 was its mirror, and BAR 2 HAD NO HARD EDGE AT ALL:
+            // it spread 2.25 px of ink across three device rows with no fully-covered boundary, so
+            // it read as a lighter, blurrier line between two darker ones. This is FilmFrameBlock's
+            // middle-square symptom (v0.8.138 X4) on a different control, and it is INVARIANT — the
+            // three phases are fixed relative to each other wherever the row lands on screen.
+            //
+            // Re-pitched to the all-even geometry its sibling glyphs use: bars at y 2 / 6 / 10,
+            // PITCH 4, height 2px. At 150% that is device y 3 / 9 / 15, each bar exactly 3 device
+            // rows, every boundary whole — the three bars now rasterise as triplets. The envelope
+            // is unchanged (2px of clearance above the first bar and below the last, inside the
+            // same 14px box); the price is +0.5px of weight per bar, which is what buying a hard
+            // edge on a sub-pixel bar costs.
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 20px; height: 14px;
+                    Rectangle { y: 2px;  x: 2px; width: parent.width - 4px; height: 2px; background: Theme.text-mute; }
+                    Rectangle { y: 6px;  x: 2px; width: parent.width - 4px; height: 2px; background: Theme.text-mute; }
+                    Rectangle { y: 10px; x: 2px; width: parent.width - 4px; height: 2px; background: Theme.text-mute; }
+                }
+            }
+        }
+    }
+
+    // Drag-to-reorder priority list (§33). Rows animate to make room as you drag; crossing half a row
+    // (swap-bias) pushes the neighbour. One stationary drag surface UNDER the rows handles the gesture;
+    // each row's checkbox TouchArea sits on top so ticking still works. The Rust `moved`/`toggled`
+    // callbacks mutate the backing VecModel (the source of truth persisted by build_settings).
+    export component CopyRankList inherits Rectangle {
+        in property <[CopyPrefRow]> model;
+        callback toggled(int);     // toggle enabled for the pref with this mode
+        callback moved(int, int);  // reorder: from index → to index
+        property <length> rowh: 44px;    // slot height (row + gap)
+        property <length> rowgap: Theme.space-1h;
+        property <int> drag-idx: -1;     // model index grabbed (-1 = idle)
+        property <int> di: Math.max(0, Math.min(root.model.length - 1, root.drag-idx)); // safe overlay index
+        property <length> drag-dy: 0px;  // pointer delta from the grab point
+        property <float> swap-bias: 0.5; // fraction of a row you must cross to push a neighbour (tunable)
+        // where the dragged row would land right now
+        property <int> drag-to: Math.max(0, Math.min(root.model.length - 1,
+            Math.floor((root.drag-idx * root.rowh + root.drag-dy) / root.rowh + (1.0 - root.swap-bias))));
+        height: root.model.length * root.rowh - root.rowgap;
+
+        // ONE drag surface under the rows (declared first → lowest hit priority, so each row's checkbox
+        // TouchArea drawn on top still gets its clicks). Grabs the row under a press ON THE GRIP ZONE
+        // (the right-edge hamburger column), tracks the delta, commits the reorder on release. A press
+        // on the row BODY falls through to normal settings scrolling; only the grip starts a reorder.
+        property <length> gripw: 44px;
+        property <bool> over-grip: drag.has-hover && drag.mouse-x >= root.width - root.gripw;
+        // Freeze the enclosing settings Flickable while the pointer is over the grip column OR a reorder
+        // is in flight. **Driven by HOVER, not the press** (the v0.3.18→v0.3.19 fix): freezing only on the
+        // grip PRESS was too late — the Flickable had already grabbed that press as a candidate scroll and,
+        // frozen mid-gesture, never saw a clean release, so the whole settings page kept scroll-dragging
+        // after mouse-up (user report). Freezing on hover means the Flickable is already non-interactive
+        // when the grip is pressed, so it never grabs → no stale scroll-grab. The `drag-idx` term keeps it
+        // frozen through a drag whose cursor wanders out of the grip column, and releases cleanly on drop.
+        out property <bool> freeze-scroll: root.over-grip || root.drag-idx >= 0;
+        drag := TouchArea {
+            width: 100%; height: 100%;
+            mouse-cursor: root.drag-idx >= 0 ? MouseCursor.grabbing
+                        : (root.over-grip ? MouseCursor.grab : MouseCursor.default);
+            pointer-event(e) => {
+                if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left
+                    && self.mouse-x >= root.width - root.gripw) {
+                    root.drag-idx = Math.max(0, Math.min(root.model.length - 1, Math.floor(self.mouse-y / root.rowh)));
+                    root.drag-dy = 0px;
+                } else if (e.kind == PointerEventKind.up) {
+                    if (root.drag-idx >= 0 && root.drag-to != root.drag-idx) { root.moved(root.drag-idx, root.drag-to); }
+                    root.drag-idx = -1;
+                    root.drag-dy = 0px;
+                } else if (e.kind == PointerEventKind.cancel) {
+                    // grab lost (focus steal / popup close mid-drag) — abandon WITHOUT committing.
+                    root.drag-idx = -1;
+                    root.drag-dy = 0px;
+                }
+            }
+            moved => { if (self.pressed && root.drag-idx >= 0) { root.drag-dy = self.mouse-y - self.pressed-y; } }
+        }
+
+        // resting rows — the dragged one is hidden here and re-drawn as the floating overlay below
+        for pr[i] in root.model : RankRow {
+            width: 100%; height: root.rowh - root.rowgap;
+            visible: i != root.drag-idx;
+            label: pr.label; on: pr.enabled;
+            y: (root.drag-idx < 0)
+                ? i * root.rowh
+                : ((root.drag-to > root.drag-idx)
+                    ? ((i > root.drag-idx && i <= root.drag-to) ? (i - 1) * root.rowh : i * root.rowh)
+                    : ((i >= root.drag-to && i < root.drag-idx) ? (i + 1) * root.rowh : i * root.rowh));
+            animate y { duration: Theme.anim; easing: ease; }
+            toggled => { root.toggled(pr.mode); }
+        }
+        // floating dragged row — follows the pointer, drawn last so it sits above its neighbours
+        if root.drag-idx >= 0 : RankRow {
+            width: 100%; height: root.rowh - root.rowgap;
+            active: true;
+            label: root.model[root.di].label; on: root.model[root.di].enabled;
+            y: root.drag-idx * root.rowh + root.drag-dy;
+            toggled => { root.toggled(root.model[root.di].mode); }
+        }
+    }

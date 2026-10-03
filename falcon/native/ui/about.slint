@@ -1,0 +1,45 @@
+import { Theme } from "theme.slint";
+import { SolidPanel } from "panels.slint";
+import { IconBtn, PillBtn } from "controls.slint";
+import { CloseGlyph } from "glyphs.slint";
+
+export component AboutCard inherits SolidPanel {
+    in property <string> version;
+    in property <string> repository;
+    in property <string> error;
+    callback close-requested();
+    callback link-requested(int);
+    out property <length> preferred-card-height: about-box.preferred-height;
+    TouchArea {} // card background must not dismiss the outside-click scrim
+    about-box := VerticalLayout {
+        padding: 20px; spacing: Theme.space-4;
+        HorizontalLayout {
+            height: max(76px, about-identity.preferred-height); spacing: Theme.space-4;
+            about-icon := Image { width: 72px; height: 72px; source: @image-url("../assets/icons/app-256.png"); image-fit: contain; }
+            about-identity := VerticalLayout {
+                alignment: center; spacing: Theme.space-1; horizontal-stretch: 1;
+                about-title := Text { text: "Falcon Photo Viewer"; color: Theme.text; font-size: Theme.display-md; font-weight: 600; wrap: word-wrap; }
+                about-version := Text { text: root.version; color: Theme.text-mute; font-size: Theme.font-md; wrap: word-wrap; }
+                about-credit := Text { text: "Designed by Hancheng Wu"; color: Theme.text; font-size: Theme.font-body; wrap: word-wrap; }
+            }
+            about-x := IconBtn {
+                width: Theme.hit-primary; height: Theme.hit-primary;
+                clicked => { root.close-requested(); }
+                CloseGlyph { x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2; width: 16px; height: 16px; }
+            }
+        }
+        Flickable {
+            vertical-stretch: 1; min-height: 0px; max-height: 100000px;
+            preferred-height: body.preferred-height;
+            viewport-height: body.preferred-height;
+            body := VerticalLayout {
+                width: parent.width; spacing: 12px;
+                about-github := PillBtn { text: root.repository; clicked => { root.link-requested(0); } }
+                about-instagram := PillBtn { text: "Instagram · @hwuphoto"; clicked => { root.link-requested(1); } }
+                about-linkedin := PillBtn { text: "LinkedIn · Hancheng Wu"; clicked => { root.link-requested(2); } }
+                if root.error != "" : Text { text: root.error; color: Theme.warn; font-size: Theme.font-sm; wrap: word-wrap; }
+            }
+        }
+
+    }
+}

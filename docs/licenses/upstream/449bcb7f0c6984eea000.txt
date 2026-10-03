@@ -1,0 +1,13 @@
+                    // verbatim from FreeType:
+                    // "The score is the sum of two demerits indicating the
+                    //  `badness' of a fit, measured along the segments' main axis
+                    //  and orthogonal to it, respectively.
+                    //
+                    // - The less overlapping along the main axis, the worse it
+                    //   is, causing a larger demerit.
+                    //
+                    // - The nearer the orthogonal distance to a stem width, the
+                    //   better it is, causing a smaller demerit.  For simplicity,
+                    //   however, we only increase the demerit for values that
+                    //   exceed the largest stem width."
+                    // See <https://gitlab.freedesktop.org/freetype/freetype/-/blob/57617782464411201ce7bbc93b086c1b4d7d84a5/src/autofit/aflatin.c#L2054>

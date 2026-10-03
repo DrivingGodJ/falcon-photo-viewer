@@ -1,0 +1,32 @@
+[package]
+name = "falcon-nvjpeg"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+# dlopen the CUDA DLLs at runtime so the app builds + runs CUDA-free (PLAN §17.4).
+libloading = "0.8"
+# v0.9.1 (P5): NvJpegDecoder bridges this crate's CUDA context to falcon-decode's ImageDecoder trait
+# (it needs `Shot` + `jpeg_bytes` + the trait types). One-directional — falcon-decode does NOT depend
+# on falcon-nvjpeg, so there is no cycle.
+falcon-decode = { path = "../falcon-decode" }
+
+[features]
+# BENCH-ONLY (spikes-decode-bench, PLAN §38.2): adds a planar-YUV full-res decode used
+# to measure the no-colour-convert / half-the-bytes output path. Never enabled by the
+# app — the shipping decode path is unaffected.
+bench-yuv = []
+
+[dev-dependencies]
+# The probe example reads the test JPG + writes a PNG to eyeball nvJPEG colour,
+# and uses the pure-Rust decoder as a CPU timing baseline.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+jpeg-decoder = "0.3"
+
+# Unique example name so it doesn't collide with falcon-decode's `probe` when both
+# crates build together under the workspace default-members (`cargo test`/`clippy`).
+[[example]]
+name = "nvjpeg_probe"
+path = "examples/probe.rs"

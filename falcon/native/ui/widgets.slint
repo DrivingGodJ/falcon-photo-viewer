@@ -1,0 +1,263 @@
+// v0.9.5 (ui.rs extraction series): three Theme-only leaf components extracted
+// VERBATIM from the slint! macro in src/ui.rs (CacheBar, Star, Chip + ChipRole).
+// `export` added — they were macro-file-local; the macro imports them by name.
+
+import { Theme } from "theme.slint";
+
+    // One cache-status bar: a recessed pill track with an inner colour-coded fill sized to `frac`
+    // (0..1). The fill ANCHORS toward the current position — the BEFORE bar (frames behind the
+    // current shot) fills from its RIGHT edge, the AFTER bar from its LEFT — so the two fills grow
+    // toward the centre gap between them, reading as "cache extending outward from where you are".
+    // Colour is traffic-light: >50% green, 25–50% amber, <25% red. A non-zero fraction floors at a
+    // visible pill-dot so "a little cached" never renders as an empty (looks-broken) track.
+    export component CacheBar inherits Rectangle {
+        in property <float> frac;
+        in property <bool> anchor-right;   // BEFORE bar fills right→left; AFTER bar left→right
+        in property <length> bar-w: 26px;  // caller sizes each half ∝ its share of the cache window
+        width: root.bar-w;
+        height: 8px;
+        border-radius: self.height / 2;
+        background: Theme.block;
+        // v0.8.196 fix tail (skeptic B, R1): `fill` is named for the rig. The round's containment row
+        // measured THIS element's PARENT and its comment claimed it measured the fill — and the fill
+        // is the part that escaped: its width floors at `parent.height` (8 px) for any non-zero
+        // fraction, so a half narrower than 8 px paints past the track that contains it.
+        fill := Rectangle {
+            height: parent.height;
+            width: root.frac <= 0.0 ? 0px : max(parent.height, parent.width * root.frac);
+            x: root.anchor-right ? parent.width - self.width : 0px;
+            border-radius: parent.border-radius;
+            background: root.frac > 0.5 ? Theme.meter-good
+                      : (root.frac >= 0.25 ? Theme.warn : Theme.danger);
+            animate width { duration: Theme.anim; easing: ease; }
+            animate background { duration: Theme.anim; easing: ease; }
+        }
+    }
+
+    export component Star inherits Rectangle {
+        in property <int> index;
+        in property <int> rating;
+        in property <int> preview; // highest star currently hovered in the row (0 = none)
+        in property <length> box: 24px; // overall hit-box size (compact inline stars set this smaller)
+        callback clicked;
+        out property <bool> hov: root.enabled && ta.has-hover;
+        in property <bool> enabled: true; // P5: dim and swallow, without an opacity layer
+        property <color> star-tint: root.enabled ? Theme.star : Theme.star.with-alpha(0.35);
+        in property <bool> hit: true; // M6 (v0.8.19): input gate — false = input passes through (fading immersive chrome)
+        // ── v0.8.136 (V3, OWNER RULING) — THE STAR HAS NO HALO. Anywhere, ever. ───────────────────
+        // v0.8.130 gave a plural star its own glow; v0.8.133 moved that glow onto a circular carrier
+        // the size of the glyph because a shadow on the root box merged five stars into one slab;
+        // v0.8.135 then painted a glyph-shaped occluder between the two so the halo's core stopped
+        // washing the star it was supposed to decorate. Three waves of arithmetic to make a
+        // drop-shadow behave like a traced outline — and the owner's third feel-test called the
+        // result what it always structurally was: "a weird circle shape instead of star", with the
+        // occluder reading as an ugly opaque patch. A Slint drop-shadow paints the CASTER'S BOX
+        // blurred; a five-point star is not a box and never will be, so the affordance is retired
+        // rather than re-tuned a fourth time. `carrier`, `bgpath`, the `glow` input and the `bg`
+        // input are all DELETED — this component is byte-for-byte the pre-v0.8.130 star again, on
+        // every surface, in every state, which is exactly what "remove these glow" asks for.
+        //
+        // WHAT SAYS "THESE STARS ACT ON N PHOTOGRAPHS" INSTEAD: `StarBulkPill` below — the cluster
+        // sits ON a button-shaped face while its host's plural predicate holds. One control-sized
+        // signal instead of five glyph-sized ones. (v0.8.136 answered this with a glowing UNDERLINE;
+        // the owner's fourth feel-test retired that too — "too bright... a simpler and more
+        // consistent design" — and a pill is the shape the rest of this app already says "this is a
+        // control that is armed" with.)
+        background: transparent;
+        border-radius: Theme.radius-xs;
+        width: root.box; height: root.box * 22 / 24;
+        property <bool> filled: root.index <= root.rating;
+        property <bool> previewed: root.enabled && !root.filled && root.index <= root.preview;
+        Path {
+            // hover grows the star ~1.18× (Slint has no transform-scale; size the Path)
+            width: root.enabled && ta.has-hover ? root.box * 7 / 8 : root.box * 3 / 4;
+            height: root.enabled && ta.has-hover ? root.box * 7 / 8 : root.box * 3 / 4;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            viewbox-width: 24; viewbox-height: 24;
+            fill: root.filled ? root.star-tint : (root.previewed ? Theme.star.with-alpha(0.502) : transparent); // star at 50% (hover-preview only; v0.8.48: derived from the token — 0.502*255 -> the same 0x80 alpha byte — so preview stars stay hue-locked to the colour-managed filled stars beside them)
+            stroke: (root.filled || root.previewed) ? root.star-tint : (root.enabled ? Theme.text-mute : Theme.text-mute.with-alpha(0.35));
+            stroke-width: 1.5px;
+            animate width, height, fill, stroke { duration: Theme.anim; easing: ease; }
+            // React 5-point star, 24×24 viewbox. THE POLYGON IS THE REGULAR STAR — centre
+            // (12, 12.55), outer R 9.88, inner r 4.93, first outer vertex straight up — and every
+            // vertex below sits on it to within 0.1 of a viewbox unit. That sentence is the check:
+            // a transcription slip in this table is invisible in code review and unmistakable on the
+            // glass, so the construction is written down rather than the word "symmetric".
+            //
+            // v0.8.137 (W5, owner's fourth feel-test) — THREE VERTICES WERE ONE UNIT TOO LOW.
+            // "the bottom left spike seems shorter than the rest 4" (owner verbatim), and he was
+            // reading a real defect, not antialiasing: three CONSECUTIVE vertices in draw order —
+            // the inner-bottom notch, the bottom-left tip and the inner-lower-left notch — each
+            // carried y one full unit below the regular position (18.5/21.6/15.1 for 17.5/20.6/14.1).
+            // Pulling the notch on ONE side of a tip down while the tip itself is pushed down is
+            // exactly what shortens that arm and nothing else, which is why only one spike looked
+            // wrong. The bottom-left tip is now the mirror of (17.8, 20.6) and the inner-lower-left
+            // notch the mirror of (16.7, 14.1), which is the property to re-check by eye.
+            MoveTo { x: 12; y: 2.6; } LineTo { x: 14.9; y: 8.6; } LineTo { x: 21.4; y: 9.5; }
+            LineTo { x: 16.7; y: 14.1; } LineTo { x: 17.8; y: 20.6; } LineTo { x: 12; y: 17.5; }
+            LineTo { x: 6.2; y: 20.6; } LineTo { x: 7.3; y: 14.1; } LineTo { x: 2.6; y: 9.5; }
+            LineTo { x: 9.1; y: 8.6; } Close {}
+        }
+        ta := TouchArea { enabled: root.hit; clicked => { if (root.enabled) { root.clicked(); } } }
+    }
+
+    // ── v0.8.137 (W2, owner ruling): THE PLURAL PILL — the star cluster's armed face. ────────────
+    // The signal that these five stars would rate N photographs has now been three shapes. v0.8.130
+    // /133/135 tried a halo per glyph (a drop-shadow cannot trace a star). v0.8.136 replaced that
+    // with one glowing 2px rule under the cluster, and the owner looked at it once: "too bright...
+    // I want a simpler and more consistent design", with a sketch of the stars sitting on a plain
+    // pill. He is naming a grammar the app already has — an armed control in this app is a FILLED,
+    // ROUNDED, HALOED rectangle (the two counted cull buttons two cells to the left are exactly
+    // that) — so the star cluster becomes one too, instead of carrying a decoration of its own
+    // invention.
+    //
+    // THE FACE is `hover-flat` (#3a3a3a), the EXISTING neutral member of the *-flat family: the
+    // opaque flatten of Theme.hover over Theme.base, i.e. the tone every neutral surface in this app
+    // wears when the pointer is on it. Neutral is the point — the cull buttons carry MEANING in
+    // their accent/danger faces (pick, reject) and a rating carries none, so a coloured pill would
+    // have invented a meaning. THE HALO is the armed-button halo exactly: glow-select (55%), blur 6,
+    // offset 0. Opaque caster (L36-safe): the shadow's shape and the caster's shape are the same
+    // box, so the halo is a halo and not a smear through its own core.
+    //
+    // INVISIBLE, NOT UNMOUNTED (the difference from the line it replaces). The pill is present in
+    // BOTH states with a transparent face and no halo when unarmed, because its horizontal padding
+    // is what holds the cluster's position: mount-gating it would shift every star by that padding
+    // on arm and disarm, and "the stars must not move" is the half of this the owner asked for by
+    // name. It also buys the fade the underline could not have — a persistent element CAN animate
+    // its own paint, so `background` and `drop-shadow-color` ride Theme.anim like every other
+    // armed surface.
+    //
+    // PURE PAINT: no TouchArea. The stars keep their own per-star hover, preview and single-vs-bulk
+    // dispatch untouched; this element answers the pointer never.
+    export component StarBulkPill inherits Rectangle {
+        in property <bool> armed: false;
+        border-radius: Theme.radius-sm;
+        // v0.8.138 (X5, owner's fifth feel-test): the face DIMS, `Theme.hover-flat` #3a3a3a ->
+        // `Theme.block` #262626. He looked at the shipped pill and called it too bright. `block` is
+        // the token the app already uses for a raised surface sitting ON base (group cards, seg
+        // tracks, list rows, toasts), so this is a quieter member of the same family rather than a
+        // new grey — nothing is minted, and the CM transform still owns the value. Face ONLY: the
+        // halo, the radius, the geometry and the invisible unarmed state are all untouched, so the
+        // "the stars must not move" guarantee and the armed-button halo grammar are unchanged. [VD]
+        background: root.armed ? Theme.block : transparent;
+        drop-shadow-color: root.armed ? Theme.glow-select : transparent;
+        drop-shadow-blur: 6px;
+        drop-shadow-offset-y: 0px;
+        animate background, drop-shadow-color { duration: Theme.anim; easing: ease; }
+    }
+
+    // ── G10 (v0.8.44): THE small-pill primitive — one skeleton for every keycap-ish chip the UI
+    // grew (menu shortcut-peek, toast "+N" counter, filmstrip rating badge, Settings keybind key).
+    // TWO DIALECTS BY USER DECISION (binding): the quiet HINT dialect (menu chips — a hint, not a
+    // control) and the prominent KEYCAP dialect (the Settings rebind key — a real control) stay
+    // deliberately distinct. Per-role values are named HERE and only here — a new chip picks a
+    // role; it does not invent a fifth look.
+    //   role     size          radius     fill                       border             text
+    //   hint     18h × hug+12  radius-xs  well                       1px border-strong  text-mute · font-sm · 600
+    //   counter  24h × hug+12  radius-sm  well                       none               text-dim  · font-sm · 700
+    //   badge    18 × 18       radius-xs  badge-bg                   none               star      · font-sm · 700
+    //   keycap   96 × 28       radius-sm  well/well-hover/acc-soft   hairline/accent    text/accent · font-sm · 400
+    //
+    // v0.8.160 (Y6): COUNTER TAKES CONTROL GEOMETRY, because A9 made it one. It is the only chip in
+    // a row of `PillBtn`s and it is now clickable, so it wears the row's own hit height
+    // (`Theme.hit-compact` = 24px, the PillBtn constant) rather than the 18px read-out height, and
+    // the DESCRIPTION ramp (`font-sm`) rather than `font-xs` — L9 bans the tiny ramp for anything
+    // that is not a deliberate letter-spaced label, and a 9px hit target with a 24px neighbour is a
+    // Fitts problem besides. The COUNTER SEMANTICS are untouched: it still reads "+N".
+    // keycap state arrives via `active` (key-capture mode) + `hover` (the host row's TouchArea);
+    // the TouchArea itself stays at the call site (@children) so the wiring never moves.
+    export enum ChipRole { hint, counter, badge, keycap }
+    export component Chip inherits Rectangle {
+        in property <ChipRole> role: ChipRole.hint;
+        in property <string> text;
+        in property <bool> active: false; // keycap only: key-capture mode
+        // v0.8.154 (A9, owner ruling Q29): …and COUNTER, now that the toast's "+N" opens the events
+        // centre. It takes the SOLID hover ladder every other clickable chip in the app takes (well
+        // #0a0a0a → well-hover #2e2e2e) plus the digit-chip's text bump to full `Theme.text` — the
+        // v0.8.18 rule that text-dim washes out on well-hover. Left false by every other caller, so
+        // a chip that is still a read-out renders byte-identically to v0.8.153.
+        in property <bool> hover: false;  // keycap + counter: host row / own hover
+        height: root.role == ChipRole.keycap ? 28px
+              : (root.role == ChipRole.counter ? Theme.hit-compact : 18px); // v0.8.160 (Y6)
+        width: root.role == ChipRole.badge ? 18px
+             : (root.role == ChipRole.keycap ? 96px : ct.preferred-width + 12px);
+        border-radius: (root.role == ChipRole.hint || root.role == ChipRole.badge) ? Theme.radius-xs : Theme.radius-sm;
+        background: root.role == ChipRole.badge ? Theme.badge-bg
+                  : (root.role == ChipRole.keycap ? (root.active ? Theme.accent-soft : (root.hover ? Theme.well-hover : Theme.well))
+                  : ((root.role == ChipRole.counter && root.hover) ? Theme.well-hover : Theme.well)); // v0.8.154 (A9)
+        border-width: (root.role == ChipRole.hint || root.role == ChipRole.keycap) ? 1px : 0px;
+        border-color: (root.role == ChipRole.keycap && root.active) ? Theme.accent : Theme.border-strong;
+        animate background, border-color { duration: Theme.anim; easing: ease; } // keycap state fades; inert on the static roles
+        ct := Text {
+            text: root.text;
+            color: root.role == ChipRole.badge ? Theme.star
+                 : (root.role == ChipRole.counter ? (root.hover ? Theme.text : Theme.text-dim) // v0.8.154 (A9)
+                 : (root.role == ChipRole.keycap ? (root.active ? Theme.accent : Theme.text) : Theme.text-mute));
+            font-size: Theme.font-sm; // v0.8.160 (Y6, L9): the description ramp, counter included
+            font-weight: root.role == ChipRole.hint ? 600 : (root.role == ChipRole.keycap ? 400 : 700);
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        }
+        @children
+    }
+
+    // ── v1.0.0-rc (queue item 37, sheet 2.9 — owner ask 2026-09-07, verbatim: "the review panel
+    //    does not have the scroll bar like the filmstrip/grid, add it") — THE MINI VERTICAL SCROLL
+    //    BAR, ONE PLACE. ─────────────────────────────────────────────────────────────────────────
+    //
+    // This IS the dock grid's own right-edge band, lifted out of `main_window.slint` unchanged: an
+    // 8px band holding a 4px `Theme.block` track and a 6px proportional thumb with a 28px floor;
+    // `Theme.accent` at full opacity while the pointer is on the band or holding it, `Theme.text-mute`
+    // at 55% otherwise, both riding `Theme.anim`; a press or a drag anywhere in the band seeks to the
+    // cursor-CENTRED fraction of the travel. It is the filmstrip's top seek bar rotated vertical.
+    //
+    // WHY A COMPONENT AND NOT A SECOND COPY: the Review panel now shows the same bar, and the two
+    // would have been forty lines of identical arithmetic in two places — the drift this project's
+    // ledger keeps finding (L7 read the other way round: the two bars behave alike because they ARE
+    // one element, not because two people typed the same numbers).
+    //
+    // IT KNOWS NOTHING ABOUT ITS HOST'S SCROLLER. `seek(length)` hands back the viewport-y the host
+    // should apply, because the two hosts apply it to different things: the dock grid writes the root
+    // mirror `grid-vp-y` (its Flickable is bound `<=>` to that mirror) and the Review panel writes its
+    // Flickable's `viewport-y` directly — the recenter channel's own spelling, "what the wheel path
+    // does internally, no binding to lose".
+    //
+    // IT IS AN 8px BAND, and that is a HOST ASSUMPTION written down rather than left to be discovered
+    // (ledger L7): the track's `x: 2px` and the thumb's `x: 1px` centre a 4px and a 6px child inside
+    // exactly 8px. Both hosts set `width: 8px`; a host that sets anything else gets an off-centre
+    // track, which is why neither does.
+    //
+    // MOUNT IT UNDER AN `if content-h > vp-h`, never `visible:` (ledger L4 — an invisible element
+    // still occupies layout and still takes clicks; ledger L49 — the rig cannot see a `visible:` at
+    // all, so an `if` is the only gate a row can prove).
+    export component MiniVBar inherits Rectangle {
+        in property <length> vp-h;       // the viewport's height
+        in property <length> content-h;  // the content's (virtual) height
+        in property <length> vp-y;       // the live viewport-y (negative when scrolled)
+        callback seek(length);           // the viewport-y the host should apply (negative)
+        property <length> padt: 8px;
+        property <length> trackh: root.height - 2 * root.padt;
+        property <length> thumbh: max(28px, root.trackh * (root.vp-h / max(1px, root.content-h)));
+        property <float> frac: -root.vp-y / max(1px, root.content-h - root.vp-h);
+        barta := TouchArea {
+            // centre the thumb on the cursor: frac maps the thumb's travel range
+            moved => { if (self.pressed) { root.seek(-clamp((self.mouse-y - root.padt - root.thumbh / 2) / max(1px, root.trackh - root.thumbh), 0.0, 1.0) * (root.content-h - root.vp-h)); } }
+            pointer-event(e) => {
+                if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                    root.seek(-clamp((self.mouse-y - root.padt - root.thumbh / 2) / max(1px, root.trackh - root.thumbh), 0.0, 1.0) * (root.content-h - root.vp-h));
+                }
+            }
+        }
+        track := Rectangle { // track (centred in the 8px band)
+            x: 2px; y: root.padt; width: 4px; height: root.trackh;
+            border-radius: 2px; background: Theme.block;
+        }
+        thumb := Rectangle { // thumb (proportional height, accent while engaged)
+            x: 1px; y: root.padt + (root.trackh - root.thumbh) * max(0.0, min(1.0, root.frac));
+            width: 6px; height: root.thumbh;
+            border-radius: 3px;
+            background: barta.has-hover || barta.pressed ? Theme.accent : Theme.text-mute;
+            opacity: barta.has-hover || barta.pressed ? 1.0 : 0.55;
+            animate background, opacity { duration: Theme.anim; easing: ease; }
+        }
+    }

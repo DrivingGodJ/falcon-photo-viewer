@@ -1,0 +1,86 @@
+# Normal Falcon.app, sharing the toolbar tested in full04. Manual dispatch only.
+# The owner controls Actions usage. Tests and the packaged launch gate must pass
+# before the app artifact is published; failed launches still upload their logs.
+# One owner-started run per reviewed batch; CI tester artifacts are not published releases.
+name: macOS build (normal Falcon)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: test + build + launch + package (Apple Silicon)
+    runs-on: macos-15
+    env:
+      # Required on Mac: override .cargo/config.toml's Windows-absolute target path.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/falcon/target
+    defaults:
+      run:
+        working-directory: falcon
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release notices before compilation
+        working-directory: ${{ github.workspace }}
+        run: python3 scripts/release_materials.py
+      - name: Verify native icon packaging before compilation
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 scripts/test-icon-resources.py
+          python3 scripts/check-icon-resources.py --native
+      - name: Validated Rust toolchain and native architecture
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --no-self-update
+          rustup default 1.96.0
+          test "$(uname -m)" = arm64
+          rustc -vV
+          rustc -vV | grep -q '^host: aarch64-apple-darwin$'
+          git rev-parse HEAD
+      - name: Reuse the established Mac dependency cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: "falcon -> target"
+          shared-key: falcon-arm64
+      - name: Workspace and native title-bar move tests
+        run: cargo test --locked --workspace --features falcon-native/mac-native-tests
+      - name: Build normal Falcon
+        run: cargo build --locked --release --bin falcon
+      - name: Verify packaging and backend scope
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 scripts/test-mac-experiment-bundle.py
+          python3 scripts/test-winit-hosted-patch.py
+          python3 scripts/test-zune-jpeg-patch.py
+      - name: Package normal Falcon.app
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p dist
+          bash scripts/mac-bundle.sh falcon/target/release/falcon dist shipping
+          cp docs/platforms/macos/release-tester.md dist/Tester-instructions.txt
+          cp docs/platforms/macos/release-tester.zh-cn.md dist/Tester-instructions-zh-CN.txt
+          git rev-parse HEAD > dist/source-revision.txt
+          cd dist
+          shasum -a 256 falcon-*-macos-arm64.tgz > SHA256SUMS.txt
+      - name: Launch the actual normal app with an isolated test profile
+        working-directory: ${{ github.workspace }}
+        run: python3 scripts/test-mac-chrome-smoke.py "dist/Falcon.app/Contents/MacOS/falcon" "${{ runner.temp }}/falcon-normal-launch-check"
+      - name: Upload launch-check logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: falcon-normal-launch-check-logs-${{ github.run_number }}
+          path: ${{ runner.temp }}/falcon-normal-launch-check/
+          if-no-files-found: ignore
+      - name: Upload the normal app tester download
+        uses: actions/upload-artifact@v4
+        with:
+          name: falcon-macos-${{ github.run_number }}
+          path: |
+            dist/falcon-*-macos-arm64.tgz
+            dist/Tester-instructions.txt
+            dist/Tester-instructions-zh-CN.txt
+            dist/source-revision.txt
+            dist/SHA256SUMS.txt
+          if-no-files-found: error

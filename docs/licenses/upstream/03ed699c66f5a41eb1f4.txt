@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: LGPL-2.1
+// Copyright 2026 Daniel Vogelbacher <daniel@chaospixel.com>
+//
+// Initial version written by Roman Kuraev 2026 [1]
+// Unfortunately, it was incomplete and broken.
+// This implementation is a revisted and cleaned up version to
+// complete the algorithm.
+// Ref [1] https://github.com/naorunaoru/demosaic/blob/5050131e998b7f6414eef02eeb60f74b99d77451/src/xtrans/markesteijn_impl.rs
+

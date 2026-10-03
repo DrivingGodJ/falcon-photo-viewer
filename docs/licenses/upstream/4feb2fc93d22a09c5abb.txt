@@ -1,0 +1,2 @@
+//! The implementation here was originally ported from that of paper.js:
+//! https://github.com/paperjs/paper.js/blob/0deddebb2c83ea2a0c848f7c8ba5e22fa7562a4e/src/path/Curve.js#L2008

@@ -1,0 +1,16 @@
+# v0.8.145 (E2). NOT boilerplate — without this line the NV12 fixtures are corrupted on checkout.
+#
+# This repository runs `core.autocrlf=true`. Git decides text-vs-binary by looking for a NUL byte in
+# the first 8000 bytes of a file, and `heic_IMG_3258_t40_256x256.nv12` — 98 304 bytes of real luma
+# and chroma samples — contains **none**. Git would therefore classify it as TEXT and rewrite its
+# 145 `0x0A` bytes to `0x0D 0x0A` on checkout, silently changing 145 samples of the image.
+#
+# The failure that would have caused is worth spelling out, because it is invisible from here: the
+# working copy on THIS machine is already correct, so every test passes locally forever. The pinned
+# digests in `falcon_decode::yuv_kernel::GOLDEN_PINS` would only break on a FRESH CLONE — and they
+# would break as "the YUV kernel produces the wrong pixels", which is the last place anyone would
+# look for a line-ending bug. (Its sibling `heic_IMG_1826_t22_256x256.nv12` happens to carry 6 NUL
+# bytes early and would have survived by luck. Luck is not a fixture policy.)
+#
+# `binary` = `-text -diff`: never translate, never try to diff.
+*.nv12 binary

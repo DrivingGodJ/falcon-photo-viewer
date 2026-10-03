@@ -1,0 +1,5 @@
+/*
+Run-time CPU feature detection on x86_64 by using CPUID.
+
+Adapted from https://github.com/rust-lang/rust/blob/1.92.0/library/std_detect/src/detect/os/x86.rs.
+*/
