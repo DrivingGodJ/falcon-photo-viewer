@@ -594,6 +594,7 @@ class EndToEndNotices(unittest.TestCase):
             write('falcon/Cargo.toml', '[workspace]\nmembers=[]\n')
             write('falcon/about.toml', 'accepted=["MIT"]\n')
             write('falcon/vendor/winit/Cargo.toml', '[package]\nname="winit"\nversion="0.0.0"\n')
+            write('falcon/vendor/femtovg/Cargo.toml', '[package]\nname="femtovg"\nversion="0.25.1"\n')
             write(
                 'falcon/vendor/zune-jpeg/Cargo.toml',
                 '[package]\nname="zune-jpeg"\nversion="0.5.15"\n',

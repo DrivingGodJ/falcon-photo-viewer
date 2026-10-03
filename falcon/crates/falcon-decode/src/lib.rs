@@ -5991,7 +5991,14 @@ fn jpeg_source(shot: &Shot) -> Result<Vec<u8>> {
         let mut buf = Vec::new();
         std::fs::File::open(r)?.take(MAX_RAW_BYTES).read_to_end(&mut buf)?;
         let off = largest_embedded_jpeg(&buf).context("no embedded JPEG preview in raw")?;
-        Ok(buf[off..].to_vec())
+        // Reuse the RAW allocation rather than duplicating its sensor-data tail. Only the
+        // selected JPEG survives into decoding. If malformed/truncated, preserve the old
+        // decoder's error/fallback behaviour by keeping the remaining bytes.
+        let end = embedded_jpeg_end(&buf, off).unwrap_or(buf.len());
+        buf.copy_within(off..end, 0);
+        buf.truncate(end - off);
+        buf.shrink_to_fit();
+        Ok(buf)
     } else {
         bail!("shot {} has no files", shot.id)
     }
@@ -11147,6 +11154,39 @@ fn largest_embedded_jpeg(buf: &[u8]) -> Option<usize> {
     best.map(|(off, _)| off)
 }
 
+/// Exclusive end of one JPEG. Segment lengths protect embedded EXIF thumbnails and ICC
+/// payloads from being mistaken for the outer EOI; entropy accepts stuffing, restart
+/// markers and further progressive scans. An incomplete/invalid walk declines trimming.
+fn embedded_jpeg_end(buf: &[u8], start: usize) -> Option<usize> {
+    if buf.get(start..start.checked_add(2)?)? != [0xff, 0xd8] { return None; }
+    let mut p = start + 2;
+    let mut scan = false;
+    loop {
+        if scan {
+            while *buf.get(p)? != 0xff { p += 1; }
+        }
+        if *buf.get(p)? != 0xff { return None; }
+        while *buf.get(p)? == 0xff { p += 1; }
+        let marker = *buf.get(p)?;
+        p += 1;
+        match marker {
+            0xd9 => return Some(p),
+            0x00 if scan => continue, // entropy byte stuffing
+            0xd0..=0xd7 if scan => continue, // restart, still inside this scan
+            0x01 => continue, // standalone TEM marker
+            0x00 | 0xd8 | 0xd0..=0xd7 => return None,
+            _ => {
+                let size = u16::from_be_bytes([*buf.get(p)?, *buf.get(p + 1)?]) as usize;
+                if size < 2 { return None; }
+                p = p.checked_add(size)?;
+                if p > buf.len() { return None; }
+                // DNL may occur inside entropy without ending that scan.
+                scan = marker == 0xda || (marker == 0xdc && scan);
+            }
+        }
+    }
+}
+
 /// Find the next `FF <marker>` byte pair at/after `from`. Used to skip past a JPEG's EOI.
 fn find_marker(buf: &[u8], from: usize, marker: u8) -> Option<usize> {
     let mut i = from;
@@ -11282,6 +11322,45 @@ fn exif_string(f: &exif::Field) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    /// Restoring jpeg_source's buf[off..].to_vec() retains the multi-MB sensor tail.
+    /// A naive FF D9 trim instead cuts inside the APP1 thumbnail and fails byte equality.
+    #[test]
+    fn raw_preview_source_excludes_sensor_tail_and_preserves_jpeg_segments() {
+        for progressive in [false, true] {
+            let tiny = super::encode_jpeg_rgb(&[70; 3 * 2 * 2], 2, 2, 90).unwrap();
+            let mut jpeg = Vec::new();
+            let mut enc = jpeg_encoder::Encoder::new(&mut jpeg, 90);
+            enc.set_progressive(progressive);
+            enc.encode(&[110; 3 * 24 * 16], 24, 16, jpeg_encoder::ColorType::Rgb).unwrap();
+            // APP1 payloads may contain an entire nested JPEG (including its EOI).
+            let mut tagged = vec![0xff, 0xd8, 0xff, 0xe1];
+            tagged.extend_from_slice(&((tiny.len() + 2) as u16).to_be_bytes());
+            tagged.extend_from_slice(&tiny);
+            tagged.extend_from_slice(&jpeg[2..]);
+            let mut raw = vec![0x55; 64];
+            raw.extend_from_slice(&tiny);
+            raw.extend_from_slice(&[0x55; 32]);
+            raw.extend_from_slice(&tagged);
+            raw.resize(raw.len() + 4 * 1024 * 1024, 0x55);
+            let dir = std::env::temp_dir().join(format!("falcon_preview_tail_{}_{progressive}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("preview.cr3");
+            std::fs::write(&path, raw).unwrap();
+            let shot = Shot { id: 0, name: "preview".into(), raw: Some(path), jpg: None,
+                kind: SrcKind::Jpeg, has_raw: true, has_jpg: false, cloud_placeholder: false, sniffed: None };
+            let extracted = super::jpeg_source(&shot).unwrap();
+            assert_eq!(extracted.len(), tagged.len(), "retain only the selected preview");
+            assert_eq!(extracted, tagged, "metadata and every progressive scan stay intact");
+            assert!(extracted.capacity() < 2 * tagged.len(), "do not retain the RAW allocation");
+            let mut dec = jpeg_decoder::Decoder::new(std::io::Cursor::new(extracted));
+            let pixels = dec.decode().unwrap();
+            let mut expected = jpeg_decoder::Decoder::new(std::io::Cursor::new(jpeg));
+            assert_eq!(pixels, expected.decode().unwrap());
+            std::fs::remove_file(shot.raw.unwrap()).unwrap();
+            std::fs::remove_dir(dir).unwrap();
+        }
+    }
+
     use super::{
         brief_round, brief_shutter, choose_number_column, color_space_label, crop_region_rgba,
         crop_region_yuv, decode_jpeg, derive_fast_rgba, exif_rows, export_color_action,

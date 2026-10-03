@@ -468,6 +468,7 @@ def generate(tool, check=False):
         'falcon/about.toml',
         'falcon/vendor/winit/Cargo.toml',
         'falcon/vendor/zune-jpeg/Cargo.toml',
+        'falcon/vendor/femtovg/Cargo.toml',
     ]
     project_inputs += [
         'falcon/' + member + '/Cargo.toml' for member in workspace['workspace']['members']

@@ -28,6 +28,7 @@ exclude = [
     "spikes-native",
     "vendor/winit",
     "vendor/zune-jpeg",
+    "vendor/femtovg",
 ]
 
 # Locked 0.30.13 with an opt-in Mac hosted-view extension. All other platform
@@ -36,6 +37,8 @@ exclude = [
 winit = { path = "vendor/winit" }
 # Independently written AVX2 transpose; see vendor/zune-jpeg/FALCON-CHANGES.md.
 zune-jpeg = { path = "vendor/zune-jpeg" }
+# Keep scene pipelines across Slint's notifier clear pass (upstream issue #12030).
+femtovg = { path = "vendor/femtovg" }
 
 [workspace.package]
 edition = "2021"

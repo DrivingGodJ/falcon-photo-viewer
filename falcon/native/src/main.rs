@@ -1906,6 +1906,10 @@ mod mac_menu; // v0.9.22: the native NSMenu menu bar (graft onto muda's default 
 mod macos_open; // v0.9.15 (B-spike): the Apple-Events "odoc" (open-documents) delegate arm — Finder "Open With → Falcon"
 mod menubar_model; // v0.9.22: the menu-bar MODEL (tree/titles/enablement/fingerprint) — pure, Windows-unit-tested
 mod meta; // v0.9.4 (§66/P4a): the per-shot-metadata subsystem (owns the swap-cleared/reseeded metadata) — unit-tested
+mod memory_pressure;
+#[cfg(test)]
+#[path = "../../vendor/femtovg/src/renderer/wgpu/pipeline_cache.rs"]
+mod renderer_pipeline_cache_tests;
 mod platform; // v0.9.3 (§66): the per-OS user-visible-string + glyph table (PlatformStrings) — the P3 platform seam
 mod pool_gov; // v0.9.23 (one-pool): the macOS elastic decode-pool governor — pure decisions + width gate, Windows-unit-tested
 mod posture; // v0.9.9 (P6): TEMPORARY dev "posture benchmark" — the battery/posture measurement instrument (pure core; log-only)
@@ -5194,6 +5198,17 @@ fn elastic_pool_worker(
     }
 }
 
+/// Keep the reason for holding work separate: only a gesture protects the RAM cache
+/// from its final Disable step; either reason pauses speculative frame preparation.
+struct FastHolds {
+    gesture: bool,
+    frames: bool,
+}
+
+fn fast_holds(gesture: bool, memory: bool) -> FastHolds {
+    FastHolds { gesture, frames: gesture || memory }
+}
+
 /// The governor's thread-side handle (UI-thread owned): the pure state + everything needed to
 /// APPLY a decision (spawn slots / wake parked workers) and to assemble the next 1 Hz sample.
 #[cfg(target_os = "macos")]
@@ -5209,6 +5224,7 @@ struct MacPoolGov {
     pump: Arc<(Mutex<Pump>, Condvar)>,
     total_ram: u64,
     last_sample: Cell<Instant>,
+    memory: RefCell<memory_pressure::Pressure>,
     spawn: Box<dyn Fn(usize) -> bool>,
 }
 
@@ -5241,6 +5257,11 @@ impl MacPoolGov {
             return;
         };
         let zone = crate::l2::pressure_zone(avail, self.total_ram);
+        if self.memory.borrow_mut().sample(zone) {
+            log_event(&format!("RAM pressure: Mac background preparation {} (available {} MB)",
+                if self.memory.borrow().active { "paused; releasing speculative frames" } else { "resumed" },
+                avail / (1024 * 1024)));
+        }
         // v0.9.61 (A3 / J15): `inflight` comes out of the SAME lock as `queue_depth` — one
         // acquisition, two facts, and no new counter to keep in step. `Pump.inflight` already owns
         // "which fast decodes are running" panic-safely (the pop inserts, the completion removes),
@@ -5259,7 +5280,7 @@ impl MacPoolGov {
             zone,
             thumb_done,
             inflight,
-            held: fast_hold,
+            held: fast_hold || self.memory.borrow().active,
         };
         // Release the GovState borrow before the match arms so the Grow rollback (Fix A) can
         // re-borrow it (GovDecision is Copy, so the RefMut is dropped at this statement's end).
@@ -5424,7 +5445,8 @@ fn spawn_elastic_pool(
         thumb_done,
         pump,
         total_ram,
-        last_sample: Cell::new(Instant::now()),
+        last_sample: Cell::new(Instant::now() - Duration::from_secs(1)),
+        memory: RefCell::new(memory_pressure::Pressure::default()),
         spawn,
     })
 }
@@ -23090,6 +23112,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         // of the gate. See `support::fast_hold_engaged`.
         let fast_hold =
             support::fast_hold_engaged(publish_arm, Some(since_motion), Some(since_input));
+        // On unified-memory Macs, low RAM must free textures as well as reduce worker
+        // count. Gesture parking alone retains the very frames we need to release.
+        #[cfg(target_os = "macos")]
+        let memory_hold = if let Some(g) = &mac_pool_gov_t {
+            g.step(now, &app, fast_hold);
+            g.memory.borrow().active
+        } else { false };
+        #[cfg(target_os = "macos")]
+        let publish_gate = {
+            if memory_hold {
+                let explicit = support::ExplicitSet::new(c, compare_t.get(), cmp_a_idx_t.get(),
+                    cmp_b_idx_t.get(), len, fast_t.hover_pin.get(), det_awaited_t.load(Ordering::Relaxed));
+                memory_pressure::shed(&explicit, &fast_t, &detail_t, &fast_gen_t, &drain_buf,
+                    &parked_full, &det_sent, &parked_done_t);
+            }
+            mac_pool_gov_t.as_ref().map_or(publish_gate,
+                |g| g.memory.borrow().publish_gate(publish_gate))
+        };
+        #[cfg(not(target_os = "macos"))]
+        let memory_hold = false;
+        let holds = fast_holds(fast_hold, memory_hold);
         // v0.8.160 (P1/U3): the cap in force is NO LONGER COMPOSED HERE. `admission_cap(costly_cap,
         // lane_cap)` was one number with no idea whether this folder is lane-served, and the ONE
         // budget counter spent it on every format — so the lever tightened folders and formats it
@@ -23105,7 +23148,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // v0.8.179 (W4 wave 2): …and the fast tier's hold term — NOT the gate: this tier has no
             // paced posture (a paced 80-frame refill is ~20 s), so its answer is held-or-free and it
             // holds through a gesture's tail as well. See `support::fast_hold_engaged`.
-            fast_hold,
+            holds.frames,
         );
         mk!("up_fast");
 
@@ -23743,7 +23786,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // v0.8.179 (W4 wave 2): the dispatch hold's term, and deliberately a SEPARATE argument
             // from `settings_throttle` above — that one governs the costly concurrency budget (the
             // sheet's ruling), this one holds the ask itself while a gesture is live.
-            fast_hold || thumbnail_startup_hold,
+            holds.frames || thumbnail_startup_hold,
             // v0.8.195 (EFFICIENCY MODE, consumers 3 + 5): every format on the costly runway + cap,
             // and no stale-upgrade ask leaves after a scrub-dim grow. Both cuts compose with
             // machinery this step already owns; see its own parameter doc.
@@ -23818,7 +23861,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // `EFFICIENCY_LOG_QUIET_MS`, and the ones it swallows are counted onto the next line that
         // does print. A behaviour change still prints AT ONCE. The decision is a pure table
         // (`support::posture_log_decision`); this site only performs it.
-        let key = (publish_arm, fast_hold);
+        let key = (publish_arm, holds.gesture);
         match support::posture_log_decision(
             interact_gate_on.get(),
             key,
@@ -23840,7 +23883,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 pg_last_print.set(Some(now));
                 log_event(&format!(
                     "{}{}",
-                    support::publish_gate_posture_line(publish_arm, fast_hold),
+                    support::publish_gate_posture_line(publish_arm, holds.gesture),
                     support::posture_log_tally(swallowed, age)
                 ));
             }
@@ -24378,8 +24421,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         // pressure eviction keeps the visible neighbourhood, like every other L2 eviction.
         // v0.8.181 (pre-merge review): …and the fast tier's hold, which is the ONE thing in this app
         // that deliberately holds decoded RAM back for the length of a gesture. The controller may
-        // shed against it; it may not spend the irreversible step on it. Same `fast_hold` the two
-        // fast steps above took — one evaluation of the ladder per tick, read three times.
+        // shed against it; it may not spend the irreversible step on it. Only the gesture
+        // input applies here; a memory pause must still allow the cache's final Disable step.
         // v1.0.0-rc (FIX 2026-09-07, round X1 / F2): …and the fast tier's EXPLICIT SET, because a
         // pressure shed evicts by distance from `c` exactly as the deposit path does, and the
         // frames the user asked for are the farthest ones there are. Built here, from the same
@@ -24398,17 +24441,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             fast_t.hover_pin.get(),
             det_awaited_t.load(Ordering::Relaxed),
         );
-        step_l2_pressure(now, c, &l2_pressure_at, &l2_t, fast_hold, &l2_explicit);
+        step_l2_pressure(now, c, &l2_pressure_at, &l2_t, holds.gesture, &l2_explicit);
         mk!("l2_pressure");
 
         // 9a-bis) v0.9.23 (one-pool): the macOS elastic-pool GOVERNOR (1 Hz — floor r×L, ceiling
         // P-cores, grow-on-starvation / shrink-on-pressure via the valve's own zone constants).
         // Decision lines only; silent when stable. None under the classic hatch.
-        #[cfg(target_os = "macos")]
-        if let Some(g) = &mac_pool_gov_t {
-            g.step(now, &app, fast_hold);
-        }
-
         // 9b) perf diagnostics (~1.5 s; logged only on activity/slowness — see fn doc above).
         step_perf_log(
             c, now, &last_perf_log, &fast_uploads, &worst_tick_ms, &worst_tick_step, &fast_t.pump, &fast_t.cache, &drain_buf,
@@ -25684,6 +25722,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 mod tests {
     use super::*;
     use falcon_decode::SrcKind;
+
+    /// The old merged hold (gesture || memory) prevents Disable and invents a posture edge.
+    /// Exercise the production input split and real RAM-cache controller without a Mac.
+    #[test]
+    fn memory_pressure_does_not_mask_l2_disable_or_change_gesture_posture() {
+        let mut pressure = memory_pressure::Pressure::default();
+        pressure.sample(l2::PressureZone::Low);
+        for gesture in [false, true] {
+            let holds = fast_holds(gesture, pressure.active);
+            assert!(holds.frames, "low RAM still pauses speculative fast preparation");
+            let mut cache = L2Store::new(4 * 1024 * 1024 * 1024, 16 * 1024 * 1024 * 1024);
+            cache.set_effective_budget(l2::L2_RUNTIME_FLOOR, 0, &|_| false);
+            let action = cache.pressure_sample(0, 0, holds.gesture, &|_| false);
+            if gesture {
+                assert_eq!(action, l2::PressureAction::None, "a real gesture retains its existing protection");
+                assert_eq!(cache.effective_budget(), l2::L2_RUNTIME_FLOOR);
+            } else {
+                assert_eq!(action, l2::PressureAction::Disable { from: l2::L2_RUNTIME_FLOOR },
+                    "system memory pressure alone must allow the cache to empty");
+                assert_eq!(cache.effective_budget(), 0);
+            }
+            // These are the same gesture inputs used by the posture edge key and its line.
+            assert_eq!(holds.gesture, fast_holds(gesture, false).gesture,
+                "a memory transition must not masquerade as a gesture transition");
+        }
+    }
 
     // ───────── v0.8.107: which display is the window on, and when do we ask? ─────────
 

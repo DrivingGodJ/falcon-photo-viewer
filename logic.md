@@ -919,6 +919,13 @@ it, and each bundle has a contract test.
 
 ### Choosing the GPU backend
 
+Falcon pins FemtoVG 0.25.1 with a small wgpu pipeline-cache patch. Slint's rendering
+notifier flushes a background clear before drawing the scene. That clear is submitted
+normally but does not prune/reset the scene's pipeline cache; actual drawing flushes
+retain the original pruning policy. Otherwise every redraw discards and recompiles the
+scene pipelines (upstream Slint issue #12030). The patch retains drawing pipelines, not
+photo textures, and leaves shader code, colour conversion and render order unchanged.
+
 The GPU backend is the graphics interface wgpu uses: Vulkan or DX12 on Windows, Metal on Mac. The order of precedence is: the `WGPU_BACKEND` environment variable, then the Developer pin, then the saved memo, then auto-tune. The diagram shows that decision and the fallbacks that stop a bad choice from blocking startup.
 
 ```mermaid
@@ -3860,6 +3867,18 @@ Fixed limits do not work on a laptop with only built-in graphics. JPEG frames th
 
 ## Memory: GPU budgets, RAM cache and recovery
 
+On normal Mac builds, the existing once-per-second available-RAM reading also governs
+speculative image retention (`memory_pressure`). A low reading immediately pauses background
+preview/detail preparation and releases expendable texture-cache entries, queued previews and
+parked decoded/uploaded frames. The current photo, comparison photos, hovered preview and awaited
+frame retain their existing explicit-request protections. In-flight work keeps its accounting;
+later expendable arrivals are shed on subsequent ticks. Background work resumes after four calm
+samples above the existing recovery band. This uses the existing available-memory approximation,
+not a claim to observe every macOS memory-pressure event. Windows keeps its existing policy.
+The tick keeps gesture and combined preparation holds separate (`FastHolds`): the RAM-cache
+controller and gesture posture log read only the gesture input. Memory pressure therefore
+cannot postpone the controller's last-resort cache clear as if a gesture were still active.
+
 GPU memory and the RAM keep-alive cache react to different measurements. Running out of GPU memory
 (*OOM*, out of memory) is recoverable; losing the graphics device needs a clean restart.
 
@@ -5212,6 +5231,12 @@ A shot can hold a RAW file, a finished image (JPG, HEIC, PNG and so on) or both.
 
 ### Preview or RAW
 
+Embedded JPEG extraction keeps the existing largest-preview selection. After reading a
+RAW container, it moves only that JPEG to the start of the same allocation and releases
+the rest before decoding. Segment-aware end detection skips metadata payloads and handles
+progressive scans, so an EXIF thumbnail's EOI cannot cut the main preview short. If the
+stream is malformed or truncated, extraction keeps the old remaining-byte fallback.
+
 A new launch starts in finished-image (Preview) mode; RAW mode lasts only for the session. Photos that only have a finished image show "no RAW for this shot" inside the fixed-height selector box. RAW-only photos keep the Preview/RAW choice. Pairs use the finished image by default. The selector, the displayed pixels and the colour label always agree.
 
 The finished-image side of the selector names the format detected from the file's bytes (JPG, HEIC, PNG and so on), not its extension (`Shot::finished_format`, which also checks `has_jpg`). A RAW whose sibling file cannot be decoded shows Preview. The label updates whenever the current photo's facts change, even if its position in the folder does not, for example after a cloud file finishes downloading. This reads facts already in memory and never opens a file. In Compare, the selector shows the shared format when both halves match, **Images** when they differ or one half is a preview, and **Preview** for two RAW-only photos. Compare has one Preview/RAW switch for both halves.
@@ -6094,6 +6119,10 @@ The setting's caption states its scope: "Panel, toast and full-screen transition
 ### Immersive mode
 
 **Immersive mode** is entered and left with F (the `full` shortcut) or F11. Esc also leaves it.
+
+During folder discovery, F/F11 and the Mac fullscreen menu work once the first photo is ready,
+including while waiting at an unfinished batch edge. Real dialogs still own input, and View only
+still prevents editing until discovery completes. The existing Mac welcome-screen exception stays.
 
 - **Windows: cover the monitor, never change the window frame** (`immersive_enter` / `immersive_exit` in `main.rs`). Falcon never calls `set_fullscreen` on Windows. Leaving winit's fullscreen briefly puts the decorated window style back, which would flash a title-bar frame. Instead, entering saves the window's outer position, inner size and maximized state in physical pixels, on the first enter only. It then moves the window to cover the current monitor's exact bounds. Windows treats an undecorated window that exactly fills a monitor as full screen, so the taskbar drops behind it. Leaving restores the saved bounds. If the window was maximized, Falcon maximizes it again instead and lets Windows recompute the work area. The window style never changes, so nothing flashes. The saved bounds are virtual-desktop coordinates and stay valid even if a monitor is unplugged.
 - **macOS: native full screen.** A Mac window with a title bar cannot cover the menu bar, so immersive mode uses Mac full screen and coordinates with the green button (`immersive_fs_transition`). It requests full screen only if the window is not already in it. On exit it releases only a full screen that it started itself. F always works as the full-screen toggle (see [Mac fullscreen states](#mac-fullscreen-states)).

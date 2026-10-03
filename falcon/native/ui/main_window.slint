@@ -2811,38 +2811,19 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
         // with not registering because their parent, `export-open`, cannot be closed from the live
         // title bar.) The `changed settings-open` teardown closes it too, so it can never outlive
         // the panel it belongs to.
-        // ── v0.9.67 (OWNER RULING 08-08 (ii)): F WORKS ON THE WELCOME SCREEN ────────────────────
-        // `modal-open` contains `welcome-open`, and every fullscreen route reads `modal-open`, so F
-        // / F11 / ⌃⌘F / the View menu row were ALL inert on the welcome screen — the round-6 finding
-        // that explains why the tester's welcome-arm fullscreen (S3) could only have come from the
-        // green button. The owner's ruling is a NARROW exception: welcome stops counting as modal
-        // FOR THE FULLSCREEN ACTION and for nothing else.
-        //
-        // It is expressed as ONE list, not two: `modal-open-fs` is the whole modal set MINUS
-        // welcome, and `modal-open` is defined as that plus welcome. Re-typing the seven terms into
-        // a second predicate is precisely the hand-mirrored twin this property was created to
-        // delete, and the one that would rot first.
-        //
-        // Semantics ON welcome (the ruling's own reading): F toggles the OS fullscreen but does NOT
-        // enter immersive photo mode — there is no photograph to immerse in. `immersive` stays
-        // false, so the posture table's `(true, false, _)` row applies: Held, i.e. Falcon's bar and
-        // the traffic lights stay visible in a fullscreen welcome window. The (a)–(c) fixes are what
-        // make that state reliable rather than a race. `on_toggle_fullscreen`'s welcome arm is the
-        // half of the ruling that does that; this property is only the half that lets F through.
-        //
-        // AND IT IS macOS-ONLY, by construction rather than by preference. "Fullscreen without
-        // immersive" is a state that exists only where fullscreen is the OS's own: on Windows,
-        // Falcon's fullscreen IS immersive (v0.8.25 replaced winit's with manual borderless
-        // coverage, because `set_fullscreen(false)` re-applies WS_CAPTION and paints the decorated
-        // frame for a few frames — the "bright corner"). Letting F through on the Windows welcome
-        // screen would therefore mean entering chrome-less immersive over the welcome guide, which
-        // is neither what the ruling asked for nor a state anyone designed. `native-window-controls`
-        // is the platform seam already in this file (false on Windows), so off macOS this property
-        // IS `modal-open` and every consumer is byte-identical to v0.9.66.
+        // Fullscreen shares the actual-dialog list with editing, but has two narrower
+        // exceptions. A ready photo permits fullscreen during discovery on both platforms.
+        // On Mac, the welcome guide also permits native fullscreen without entering
+        // immersive photo mode (on_toggle_fullscreen keeps the toolbar and traffic lights).
+        // Windows fullscreen is immersive, so its welcome guide continues to block it.
         out property <bool> dialog-open: root.about-open || root.settings-open || root.loading-open || root.confirm-kind != 0 || root.export-open || root.rot-reminder-open || root.display-del-confirm || root.assoc-prompt-open;
         out property <bool> modal-open-base: root.opening-boundary-wait || (root.opening-photo && !root.photo-open-edits) || root.dialog-open;
         out property <bool> modal-open: root.modal-open-base || root.welcome-open; // v0.8.67 (D): + welcome. v0.9.16: the assoc popup rides the base.
-        out property <bool> modal-open-fs: root.native-window-controls ? root.modal-open-base : root.modal-open;
+        // Fullscreen only needs the ready photo, including while waiting at a batch edge.
+        // Keep real dialogs and the Windows welcome guide in charge of their input.
+        out property <bool> modal-open-fs: root.dialog-open
+            || (!root.native-window-controls && root.welcome-open)
+            || (!root.photo-ready && (root.opening-boundary-wait || (root.opening-photo && !root.photo-open-edits)));
         // v0.8.120 (design-sweep O8/O9): the SCRIM-BEARING subset of `modal-open` — the modals that
         // draw a full-window scrim ABOVE every panel the title bar's four panel buttons open. Those
         // panels all mount BEFORE the confirm overlay, so clicking the gear / Browse speed /

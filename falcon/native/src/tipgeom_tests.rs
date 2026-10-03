@@ -29662,6 +29662,89 @@ fn raw_selector_is_authoritative_and_no_raw_message_preserves_panel_geometry() {
     assert!(texts.iter().any(|s| s == "Preview"));
 }
 
+/// Real Open-menu row clicks must close the menu and dispatch the chosen picker,
+/// both after discovery and while the verified first batch is available.
+#[test]
+fn open_menu_rows_receive_real_pointer_clicks_while_browsing_and_scanning() {
+    use std::{rc::Rc, cell::Cell};
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot_titlebar();
+    app.set_motion_ui(false);
+    app.set_welcome_open(false);
+    app.set_empty_state(false);
+    app.set_count_all(1406);
+    app.set_photo_ready(true);
+    app.set_photo(slint::Image::from_rgba8(slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(16,16)));
+    let image_calls = Rc::new(Cell::new(0));
+    let folder_calls = Rc::new(Cell::new(0));
+    let i = image_calls.clone(); app.on_open_folder(move || i.set(i.get()+1));
+    let f = folder_calls.clone(); app.on_open_folder_direct(move || f.set(f.get()+1));
+    for opening in [false, true] {
+        app.set_opening_photo(opening);
+        for (label, calls) in [("Image…", &image_calls), ("Folder…", &folder_calls)] {
+            for fraction in [0.1, 0.5, 0.9] {
+                app.set_open_menu_x(8.); app.set_open_menu_y(4.);
+                app.set_open_menu_open(true);
+                app.global::<ui::Tip>().set_text("Open…".into());
+                hover(&app, 300., 300.);
+                let row = E::find_by_element_type_name(&app, "MenuItem")
+                    .find(|e| e.accessible_label().is_some_and(|s| s == label)).unwrap();
+                let p = row.absolute_position(); let s = row.size();
+                assert!(s.width > 100. && s.height > 20.);
+                let before = calls.get();
+                click(&app, p.x + s.width*fraction, p.y + s.height/2.,
+                    i_slint_core::items::PointerEventButton::Left);
+                assert!(!app.get_open_menu_open(), "{label} closes after pointer click, opening={opening}");
+                assert_eq!(calls.get(), before + 1, "{label} dispatches once");
+            }
+        }
+    }
+}
+
+/// Restoring modal-open-fs to modal-open(-base) blocks the ready-batch F11 event.
+#[test]
+fn opening_ready_photo_allows_fullscreen_without_unlocking_edits() {
+    use slint::platform::{Key, WindowEvent as W};
+    use std::{cell::Cell, rc::Rc};
+    for native in [false, true] {
+        let app = boot();
+        app.set_native_window_controls(native);
+        app.set_welcome_open(false);
+        app.set_opening_photo(true);
+        app.set_photo_open_edits(false);
+        let calls = Rc::new(Cell::new(0));
+        let c = calls.clone();
+        app.on_toggle_fullscreen(move || c.set(c.get() + 1));
+        let press = || {
+            app.window().dispatch_event(W::KeyPressed { text: Key::F11.into() });
+            app.window().dispatch_event(W::KeyReleased { text: Key::F11.into() });
+        };
+        assert!(app.get_modal_open_fs(), "keep the guard before the first photo is ready");
+        press();
+        assert_eq!(calls.get(), 0);
+        app.set_photo_ready(true);
+        app.set_empty_state(false);
+        for boundary in [false, true] {
+            app.set_opening_wait_dir(if boundary { 1 } else { 0 });
+            assert!(app.get_modal_open(), "View only must still protect edits");
+            assert!(!app.get_modal_open_fs(), "fullscreen needs no complete folder");
+            press();
+        }
+        assert_eq!(calls.get(), 2, "F11 reaches its real callback during discovery and edge waits");
+        app.set_settings_open(true);
+        assert!(app.get_modal_open_fs());
+        press();
+        app.set_settings_open(false);
+        app.set_confirm_kind(6);
+        assert!(app.get_modal_open_fs());
+        press();
+        assert_eq!(calls.get(), 2, "real dialogs still own input");
+        app.set_confirm_kind(0);
+        app.set_welcome_open(true);
+        assert_eq!(app.get_modal_open_fs(), !native, "keep the existing Mac welcome exception");
+    }
+}
+
 #[test]
 fn opening_photo_accepts_inspection_before_collection_ready() {
     use crate::*;

@@ -11,7 +11,8 @@ import tomllib
 FILES = ('LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.txt', 'REBUILDING.md')
 SUPPLEMENTS = ('falcon/native/assets/fonts/Inter-OFL.txt', 'falcon/vendor/winit/LICENSE',
                'docs/third-party/winit-hosted-view.txt', 'docs/third-party/chromium-chrome02.txt',
-               'falcon/vendor/zune-jpeg/FALCON-CHANGES.md')
+               'falcon/vendor/zune-jpeg/FALCON-CHANGES.md',
+               'falcon/vendor/femtovg/FALCON-CHANGES.md')
 FONTS = tuple('falcon/native/assets/fonts/Inter-'+face+'.ttf'
               for face in ('Regular', 'Medium', 'SemiBold', 'Bold'))
 
@@ -73,7 +74,7 @@ def validate(root):
         raise ValueError('Generated third-party notices changed')
     manifests = tomllib.loads((root/'falcon/Cargo.toml').read_text(encoding='utf-8'))
     inputs = {'falcon/Cargo.toml', 'falcon/about.toml', 'falcon/vendor/winit/Cargo.toml',
-              'falcon/vendor/zune-jpeg/Cargo.toml'}
+              'falcon/vendor/zune-jpeg/Cargo.toml', 'falcon/vendor/femtovg/Cargo.toml'}
     inputs.update('falcon/'+member+'/Cargo.toml' for member in manifests['workspace']['members'])
     if set(inventory.get('project_inputs', {})) != inputs:
         raise ValueError('Licence inventory does not cover the current project manifests')
