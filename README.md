@@ -16,6 +16,8 @@ project's README and a record of the design thinking behind it.
 
 ![Falcon workflow: browse bursts, view RAW and EXIF, check focus at 1:1, rate and flag, and export picks.](docs/images/falcon-workflow.png)
 
+[Watch the video on YouTube](https://youtu.be/8WgWWsSTLuU).
+
 ## Contents
 
 - [Why I built it](#why-i-built-it)
