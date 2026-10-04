@@ -318,6 +318,51 @@ pub(crate) fn donor_readiness(
     }
 }
 
+/// One step of the CI launch check's toolbar round trip (`FALCON_MAC_PROBE_SMOKE_OUT` only): press
+/// the toolbar's Grid button, see the grid flip, press again, see it flip back.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum SmokeStep {
+    /// The last press has not run yet; look again on the next tick.
+    Wait,
+    /// Queue a Grid press, then continue in this phase.
+    Press(u8),
+    /// The round trip is over: `true` when the grid flipped and flipped back.
+    Finish(bool),
+}
+
+/// How long the launch check waits for a queued press to run before it fails.
+pub(crate) const SMOKE_PRESS_LIMIT_MS: u128 = 10_000;
+
+/// `phase` is 0 before the first press, then the number of presses queued. `delivered` counts the
+/// presses that have run, and `waited_ms` is the time since the first press was queued.
+///
+/// A press is queued from the timer callback so it runs outside the host's borrow, like a real
+/// click. A due timer can fire before that queued work runs (for example from Slint's display-link
+/// frame tick on macOS 14+, which runs timers outside winit's delivery of queued work), so on a slow
+/// machine the next tick can arrive before the press has run (1.0.12's first cloud run). Each step
+/// therefore waits for its press to be delivered, never for a tick.
+pub(crate) fn smoke_round_trip(
+    phase: u8,
+    delivered: u32,
+    grid_open: bool,
+    original: bool,
+    waited_ms: u128,
+) -> SmokeStep {
+    match phase {
+        0 => SmokeStep::Press(1),
+        p if delivered < u32::from(p) => {
+            if waited_ms >= SMOKE_PRESS_LIMIT_MS {
+                SmokeStep::Finish(false)
+            } else {
+                SmokeStep::Wait
+            }
+        }
+        1 if grid_open == original => SmokeStep::Finish(false),
+        1 => SmokeStep::Press(2),
+        _ => SmokeStep::Finish(grid_open == original),
+    }
+}
+
 #[cfg(target_os = "macos")]
 #[path = "mac_experiment_native.rs"]
 mod native;
@@ -334,6 +379,27 @@ pub(crate) use native::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Falsifier: drop the `delivered` guard (check the grid on the tick after a press, as the check
+    // did in 1.0.12's first cloud run) and the slow-machine step below fails instead of waiting.
+    #[test]
+    fn the_launch_check_waits_for_each_toolbar_press() {
+        use SmokeStep::*;
+        assert_eq!(smoke_round_trip(0, 0, false, false, 0), Press(1));
+        // A slow machine: the next tick comes before press 1 has run.
+        assert_eq!(smoke_round_trip(1, 0, false, false, 240), Wait);
+        assert_eq!(smoke_round_trip(1, 1, true, false, 300), Press(2));
+        assert_eq!(smoke_round_trip(2, 1, true, false, 320), Wait);
+        assert_eq!(smoke_round_trip(2, 2, false, false, 400), Finish(true));
+        // Starting from an open grid works the same way.
+        assert_eq!(smoke_round_trip(1, 1, false, true, 300), Press(2));
+        assert_eq!(smoke_round_trip(2, 2, true, true, 400), Finish(true));
+        // Real failures still fail: a press that runs without flipping the grid, a second press
+        // that leaves it flipped, and a press that never runs.
+        assert_eq!(smoke_round_trip(1, 1, false, false, 300), Finish(false));
+        assert_eq!(smoke_round_trip(2, 2, true, false, 400), Finish(false));
+        assert_eq!(smoke_round_trip(1, 0, false, false, SMOKE_PRESS_LIMIT_MS), Finish(false));
+        assert_eq!(smoke_round_trip(2, 1, true, false, SMOKE_PRESS_LIMIT_MS), Finish(false));
+    }
     // O2 falsifier: route by selection alone; a failed native host would keep
     // suppressing the in-window toolbar's positioning and fullscreen observers.
     #[test]

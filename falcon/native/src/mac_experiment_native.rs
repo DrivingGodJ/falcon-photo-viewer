@@ -546,6 +546,8 @@ struct Host {
     attached_frame_baseline: u64,
     smoke_phase: u8,
     smoke_original_grid: bool,
+    /// When the launch check queued its first Grid press (`super::smoke_round_trip`).
+    smoke_started: Option<Instant>,
     colour_dirty: bool,
     last_tip: slint::SharedString,
     last_state: Option<crate::ui::ToolbarState>,
@@ -600,6 +602,7 @@ impl Host {
             attached_frame_baseline: 0,
             smoke_phase: 0,
             smoke_original_grid: false,
+            smoke_started: None,
             colour_dirty: true,
             last_tip: slint::SharedString::default(),
             last_state: None,
@@ -1518,20 +1521,29 @@ pub(crate) fn start(app: &MainWindow) {
                         // Drawn is not visible: the report carries whether AppKit cut the toolbar off.
                         let geometry = unsafe { (host.clip_state(), host.bar_h) };
                         if super::full_toolbar() && std::env::var_os("FALCON_MAC_PROBE_SMOKE_OUT").is_some() {
-                            match host.smoke_phase {
-                                0 => {
-                                    host.smoke_original_grid = app.get_grid_open();
-                                    host.smoke_phase = 1;
+                            // Each step waits for its queued press to have run, never for the
+                            // next tick (see `super::smoke_round_trip`).
+                            let delivered = SMOKE_PRESSES.with(Cell::get);
+                            let waited_ms = host.smoke_started.map_or(0, |t| now.duration_since(t).as_millis());
+                            match super::smoke_round_trip(host.smoke_phase, delivered, app.get_grid_open(), host.smoke_original_grid, waited_ms) {
+                                super::SmokeStep::Wait => {}
+                                super::SmokeStep::Press(next) => {
+                                    if host.smoke_phase == 0 {
+                                        host.smoke_original_grid = app.get_grid_open();
+                                        host.smoke_started = Some(now);
+                                    }
+                                    host.smoke_phase = next;
                                     // Run outside the Host borrow, like a real pointer callback.
                                     let _ = slint::invoke_from_event_loop(smoke_toggle_grid);
                                 }
-                                1 => {
-                                    if app.get_grid_open() == host.smoke_original_grid { finish_smoke(&app, false, geometry); }
-                                    else { host.smoke_phase = 2; let _ = slint::invoke_from_event_loop(smoke_toggle_grid); }
-                                }
-                                _ => {
-                                    app.set_mac_smoke_toolbar_ok(app.get_grid_open() == host.smoke_original_grid);
-                                    finish_smoke(&app, app.get_mac_smoke_toolbar_ok() && !app.get_welcome_open() && !app.get_assoc_prompt_open(), geometry);
+                                super::SmokeStep::Finish(ok) => {
+                                    record(format!(
+                                        "smoke: toolbar round trip {} after {waited_ms} ms (presses queued {} delivered {delivered}; grid open {}, originally {})",
+                                        if ok { "passed" } else { "FAILED" },
+                                        host.smoke_phase, app.get_grid_open(), host.smoke_original_grid
+                                    ));
+                                    app.set_mac_smoke_toolbar_ok(ok);
+                                    finish_smoke(&app, ok && !app.get_welcome_open() && !app.get_assoc_prompt_open(), geometry);
                                 }
                             }
                         } else { finish_smoke(&app, !app.get_welcome_open() && !app.get_assoc_prompt_open(), geometry); }
@@ -1570,16 +1582,31 @@ pub(crate) fn record_main_input(event: &i_slint_backend_winit::winit::event::Win
     }
 }
 
+thread_local! {
+    /// Launch-check Grid presses that have run, so each step can wait for its own.
+    static SMOKE_PRESSES: Cell<u32> = const { Cell::new(0) };
+}
+
 fn smoke_toggle_grid() {
-    let bar = HOST.with(|slot| {
+    let target = HOST.with(|slot| {
         let slot = slot.borrow();
-        match &slot.as_ref()?.bar {
-            Some(Bar::Full(bar)) => Some(bar.as_weak()),
+        let host = slot.as_ref()?;
+        match &host.bar {
+            Some(Bar::Full(bar)) => Some((bar.as_weak(), host.app.clone())),
             _ => None,
         }
     });
-    if let Some(bar) = bar.and_then(|b| b.upgrade()) {
-        bar.invoke_action("grid".into(), 0.0, bar.get_host_height());
+    let press = SMOKE_PRESSES.with(|n| {
+        n.set(n.get() + 1);
+        n.get()
+    });
+    match target.and_then(|(bar, app)| Some((bar.upgrade()?, app.upgrade()?))) {
+        Some((bar, app)) => {
+            let before = app.get_grid_open();
+            bar.invoke_action("grid".into(), 0.0, bar.get_host_height());
+            record(format!("smoke: toolbar Grid press {press} ran; grid open {before} -> {}", app.get_grid_open()));
+        }
+        None => record(format!("smoke: toolbar Grid press {press} found no full toolbar")),
     }
 }
 
