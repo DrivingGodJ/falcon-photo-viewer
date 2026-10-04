@@ -79,6 +79,17 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN" "$CONTENTS/MacOS/falcon"
 chmod 755 "$CONTENTS/MacOS/falcon"
 
+# --- languages (CFBundleLocalizations) ------------------------------------------------------
+# English plus every language pack in the language list, read AT CI TIME like the version, so
+# macOS draws its own parts of the app (open panels, the Window menu's system rows) in the
+# language Falcon speaks (docs/development/translations.md). An empty list gives English only.
+LANGUAGE_LIST="$REPO_ROOT/falcon/native/translations/languages.json"
+LOCALIZATIONS="$(python3 -c '
+import json, sys
+codes = ["en"] + [entry["code"] for entry in json.load(open(sys.argv[1], encoding="utf-8"))["languages"]]
+print("".join("\n\t\t<string>%s</string>" % code for code in codes))
+' "$LANGUAGE_LIST")"
+
 # --- Info.plist (numeric bundle version + complete Cargo/source provenance) --------------------------
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -111,6 +122,11 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 	<string>falcon</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.photography</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>$LOCALIZATIONS
+	</array>
 	<!-- v0.9.16 (Round B assoc): the FULL viewer doc-type set — every Settings association family
 	     (support.rs ASSOC_FAMILIES, minus the deliberately-unsupported avif/tga), system UTIs where
 	     Apple declares one and UTImportedTypeDeclarations below where none exists. Role Viewer +

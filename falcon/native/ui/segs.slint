@@ -14,6 +14,17 @@ import { Theme } from "theme.slint";
         out property <bool> hovered: ta.has-hover; // exposed so hover-glass panels can OR child hovers
         in property <bool> hit: true; // M6 (v0.8.19): input gate — false = input passes through (fading immersive chrome)
         property <int> n: max(1, root.opts.length);
+        // Language packs (round 2): the width this pill needs to show its widest label in full:
+        // every cell that label plus Theme.space-1 a side, plus the 2px track insets. A call site
+        // tuned to a fixed English width takes max(<that width>, this) while Settings → Developer
+        // → Widen controls to fit text is on. The measurers carry the cell labels' exact font spec
+        // (HudChip's `ma`/`mb` idiom); three cover every pill in the app (all have two cells today).
+        // They are transparent and silent rather than `visible: false` so the rig can measure them
+        // (L49: the rig cannot see an invisible element at all).
+        out property <length> fit-width: root.n * (max(fitm0.preferred-width, max(fitm1.preferred-width, fitm2.preferred-width)) + 2 * Theme.space-1) + 4px;
+        fitm0 := Text { text: root.opts[0]; color: transparent; accessible-role: none; font-size: Theme.font-sm; font-weight: 700; }
+        fitm1 := Text { text: root.opts[1]; color: transparent; accessible-role: none; font-size: Theme.font-sm; font-weight: 700; }
+        fitm2 := Text { text: root.opts[2]; color: transparent; accessible-role: none; font-size: Theme.font-sm; font-weight: 700; }
         property <int> hov-seg: ta.has-hover ? Math.max(0, Math.min(root.n - 1, Math.floor(ta.mouse-x / (root.width / root.n)))) : -1;
         // FIX-E: port Seg's canonical drag-select (click-and-drag) into SegPill.
         property <int> drag-seg: -1;   // last segment emitted this drag (dedup)
@@ -413,7 +424,7 @@ import { Theme } from "theme.slint";
         }
         Text { // Custom label (or the committed custom value)
             visible: !root.editing;
-            text: root.custom > 0 ? root.custom + root.suffix : "Custom";
+            text: root.custom > 0 ? root.custom + root.suffix : @tr("falcon" => "Custom");
             color: root.custom > 0 ? root.lbl-on : root.lbl-off;
             font-size: Theme.font-md; font-weight: 600;
             x: 3px + (root.custom-pw - self.width) / 2; y: (parent.height - self.height) / 2;

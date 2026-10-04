@@ -35,6 +35,10 @@ import { Theme, Tip } from "theme.slint";
         // The badge is mount-gated in both hosts, and a destroyed TouchArea never fires
         // `changed has-hover` — so hover is PUSHED to the host, which latches it (the v0.8.98 rule).
         callback hover-changed(bool);
+        // Language packs (round 2): the width the badge's current words need — its row's preferred
+        // width, padding included. The compare bar sizes its fixed-width badge to max(<the tuned
+        // width>, this) while Settings → Developer → Widen controls to fit text is on.
+        out property <length> fit-width: fblay.preferred-width;
         // N25: only claim SHARP 1:1 (solid accent "Focus 1:1") when the full-res detail is actually
         // shown. At 1:1 over the still-loading proxy → amber "Loading…" (no accent), so a sharpness
         // judgement is never made on an upscaled proxy.
@@ -69,7 +73,7 @@ import { Theme, Tip } from "theme.slint";
         border-color: root.sharp ? Theme.accent
             : (root.softzoom ? Theme.warn : (root.compact ? Theme.border-strong : Theme.border));
         animate background { duration: Theme.anim; easing: ease; }
-        HorizontalLayout {
+        fblay := HorizontalLayout {
             padding-left: root.compact ? Theme.space-2 : Theme.space-3;
             padding-right: root.compact ? Theme.space-2 : Theme.space-3;
             spacing: Theme.space-1;
@@ -79,10 +83,10 @@ import { Theme, Tip } from "theme.slint";
             // v0.8.119 (design-sweep Y69): "Fit" means zoom == 1.0 and nothing else; the band
             // between Fit and 1:1 reads "Zoomed" (the percentage beside it stays the precise value).
             fbtext := Text {
-                text: root.sharp ? "Focus 1:1"
-                    : (root.stalled ? "Not sharp"
-                    : (root.softzoom ? "Loading…"
-                    : (root.fitloading ? "Loading…" : (root.zoom > 1.0 ? "Zoomed" : "Fit"))));
+                text: root.sharp ? @tr("falcon" => "Focus 1:1")
+                    : (root.stalled ? @tr("falcon" => "Not sharp")
+                    : (root.softzoom ? @tr("falcon" => "Loading…")
+                    : (root.fitloading ? @tr("falcon" => "Loading…") : (root.zoom > 1.0 ? @tr("falcon" => "Zoomed") : @tr("falcon" => "Fit")))));
                 color: root.sharp ? Theme.text-on-accent : (root.softzoom ? Theme.warn : Theme.text-mute);
                 font-size: root.compact ? Theme.font-sm : Theme.font-md;
                 font-weight: root.compact ? 700 : 600;
@@ -333,6 +337,9 @@ import { Theme, Tip } from "theme.slint";
         // L20: it is stated INSIDE the enabled arm, so a faded button cannot render a live rim —
         // the "Empty → Bin" fade stays the one disabled treatment in this row of controls.
         in property <int> rim: 0;
+        // The label's own width, for a caller that sizes the button to fit it (the welcome footer
+        // under Settings → Developer → Widen controls to fit text).
+        out property <length> label-width: label-text.preferred-width;
         callback clicked;
         height: 34px;
         border-radius: Theme.radius-ctrl;
@@ -356,7 +363,7 @@ import { Theme, Tip } from "theme.slint";
         animate background { duration: Theme.anim; easing: ease; }
         // v0.8.46: the v0.8.38 G5 Enter-target ring (hairline inset marker) was REMOVED here —
         // owner-revoked ("remove this blue line design"). Enter mappings + the G5 severity ladder stay.
-        Text {
+        label-text := Text {
             text: root.label;
             color: !root.enabled ? Theme.text-mute : ((root.primary || ta.has-hover) ? (root.variant == 3 ? Theme.text-on-star : Theme.text-on-accent) : Theme.text);
             font-size: Theme.font-md; font-weight: 600;

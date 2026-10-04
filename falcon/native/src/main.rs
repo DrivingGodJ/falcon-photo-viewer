@@ -17,6 +17,9 @@
 #[cfg(test)]
 #[path = "../../crates/test-support/fixture_paths.rs"]
 mod fixture_paths;
+// First, so its message macros (`tr_format!`, `tr_plural!`, `tr_noop!`) reach every module below.
+#[macro_use]
+mod i18n;
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -1315,11 +1318,13 @@ fn mac_assoc_rows_build() -> Vec<MacAssocRow> {
         .enumerate()
         .map(|(i, (label, exts))| {
             let current_id = mac_assoc::family_current(exts);
+            // Language packs (round 2): one message per line; the app's name is a value (macOS
+            // gives it in the system's language), and "Falcon" is the product name.
             let current = match current_id.as_deref() {
-                Some(id) if id.eq_ignore_ascii_case(FALCON_BUNDLE_ID) => "Default: Falcon".to_string(),
-                Some(id) => format!("Default: {}", mac_assoc::app_display_name(id)),
+                Some(id) if id.eq_ignore_ascii_case(FALCON_BUNDLE_ID) => tr_format!("Default: {app}", app = "Falcon"),
+                Some(id) => tr_format!("Default: {app}", app = mac_assoc::app_display_name(id)),
                 // No per-user preference recorded — the OS falls back to its own pick.
-                None => "Default: system default".to_string(),
+                None => i18n::tr("Default: system default").to_string(),
             };
             let utis = mac_assoc::resolve_utis(exts);
             let legacy_uti = utis.first().cloned().unwrap_or_default();
@@ -1327,8 +1332,8 @@ fn mac_assoc_rows_build() -> Vec<MacAssocRow> {
             let reset_enabled = utis.iter().any(|uti| {
                 assoc_reset_target(map.get(uti).map(String::as_str), &mac_assoc::all_handlers(uti)).is_some()
             });
-            let note = if !mac_experiment::associations_allowed() { "unavailable in test builds" }
-                else if reset_enabled { "" } else { "no previous default to restore" };
+            let note = if !mac_experiment::associations_allowed() { i18n::tr("unavailable in test builds") }
+                else if reset_enabled { "" } else { i18n::tr("no previous default to restore") };
             MacAssocRow {
                 label: (*label).into(),
                 current: current.into(),
@@ -1726,17 +1731,17 @@ impl Drop for PostureDoneGuard {
 /// ones the user can remap in Settings (kept to printable chars so capture / compare
 /// / display all stay trivial — a first prototype, polish later).
 const ACTIONS: &[(&str, &str, &str)] = &[
-    ("rate1", "Rate ★ 1", "1"),
-    ("rate2", "Rate ★ 2", "2"),
-    ("rate3", "Rate ★ 3", "3"),
-    ("rate4", "Rate ★ 4", "4"),
-    ("rate5", "Rate ★ 5", "5"),
-    ("rate0", "Clear rating", "0"),
-    ("flag", "Flag / pick photo", "p"),
-    ("reject", "Reject photo", "x"),
-    ("unflag", "Clear flag + reject", "u"),
-    ("nextunrated", "Jump to next unrated", "n"),
-    ("compare", "Compare A | B", "c"),
+    ("rate1", tr_noop!("Rate ★ 1"), "1"),
+    ("rate2", tr_noop!("Rate ★ 2"), "2"),
+    ("rate3", tr_noop!("Rate ★ 3"), "3"),
+    ("rate4", tr_noop!("Rate ★ 4"), "4"),
+    ("rate5", tr_noop!("Rate ★ 5"), "5"),
+    ("rate0", tr_noop!("Clear rating"), "0"),
+    ("flag", tr_noop!("Flag / pick photo"), "p"),
+    ("reject", tr_noop!("Reject photo"), "x"),
+    ("unflag", tr_noop!("Clear flag + reject"), "u"),
+    ("nextunrated", tr_noop!("Jump to next unrated"), "n"),
+    ("compare", tr_noop!("Compare A | B"), "c"),
     // v0.8.92 (L25): with the panel ON the key toggles min ⇄ expanded and, by InfoKeyAction's TYPE,
     // can never turn it fully off — that lives ONLY on the Settings "Info panel" seg's Off cell
     // (v0.8.93 ruling 2 replaced the old two-state toggle with the three-cell seg).
@@ -1755,14 +1760,14 @@ const ACTIONS: &[(&str, &str, &str)] = &[
     // Still 28 chars, so the CONTROLS row's ~200px label budget beside its 96px keycap is untouched
     // (this list's longest label is at that budget — the label may never grow); the off-state
     // substitute is SHORTER, so it cannot breach it either.
-    ("info", "Minimise / expand info panel", "i"),
-    ("selpanel", "Toggle Review panel", "s"), // v0.8.38 (G6): open/close the Selection panel (top-left exclusivity)
-    ("zoom", "Reset zoom", "z"),
-    ("full", "Immersive / fullscreen", "f"),
+    ("info", tr_noop!("Minimise / expand info panel"), "i"),
+    ("selpanel", tr_noop!("Toggle Review panel"), "s"), // v0.8.38 (G6): open/close the Selection panel (top-left exclusivity)
+    ("zoom", tr_noop!("Reset zoom"), "z"),
+    ("full", tr_noop!("Immersive / fullscreen"), "f"),
     // v0.8.0: manual display rotation. Shift+R arrives as the text "R" and the keymap lookup is
     // case-sensitive, so "r"/"R" bind distinctly without a modifier handler.
-    ("rotcw", "Rotate 90° CW", "r"),
-    ("rotccw", "Rotate 90° CCW", "R"),
+    ("rotcw", tr_noop!("Rotate 90° CW"), "r"),
+    ("rotccw", tr_noop!("Rotate 90° CCW"), "R"),
 ];
 
 /// v0.8.65 (C3/H4+M7): the BASIC shortcuts — the fixed system keys that were hardcoded in the
@@ -1775,13 +1780,13 @@ const ACTIONS: &[(&str, &str, &str)] = &[
 /// + immersive exit + the capture-cancel key itself, not one rebindable action), the grid ↑/↓ rows
 /// (grid-gated compound arms) and mouse Click — all informational rows in the section instead.
 const BASIC_ACTIONS: &[(&str, &str, &str)] = &[
-    ("prev", "Previous photo", "Left"),
-    ("next", "Next photo", "Right"),
-    ("first", "First photo", "Home"),
-    ("last", "Last photo", "End"),
-    ("cmpswap", "Compare: swap active half", "Tab"),
-    ("cmppin", "Compare: pin active half", "Space"),
-    ("delete", "Delete photo…", "Del"),
+    ("prev", tr_noop!("Previous photo"), "Left"),
+    ("next", tr_noop!("Next photo"), "Right"),
+    ("first", tr_noop!("First photo"), "Home"),
+    ("last", tr_noop!("Last photo"), "End"),
+    ("cmpswap", tr_noop!("Compare: swap active half"), "Tab"),
+    ("cmppin", tr_noop!("Compare: pin active half"), "Space"),
+    ("delete", tr_noop!("Delete photo…"), "Del"),
 ];
 
 /// The canonical special-key tokens the FocusScope's `key-token` emits (its Rust twin). A capture
@@ -2002,10 +2007,10 @@ impl IccFailure {
     pub(crate) fn message(self) -> &'static str {
         match self {
             IccFailure::Unreadable => {
-                "Couldn't read that file — is the drive connected?"
+                i18n::tr("Couldn't read that file — is the drive connected?")
             }
             IccFailure::NotMatrixTrc => {
-                "That profile isn't a supported display profile (needs a matrix/TRC ICC)"
+                i18n::tr("That profile isn't a supported display profile (needs a matrix/TRC ICC)")
             }
         }
     }
@@ -2117,27 +2122,46 @@ fn custom_icc_failure_state(persisted_gamut: i32, path: &str, display: &str) -> 
     // both would be two identical sentences about two different screens. Empty (the boot arm, which
     // runs pre-show — winit enumerates zero monitors then) reproduces the v0.8.105 copy byte for
     // byte; the first post-show resolution recomposes it with the name.
-    let on = if display.is_empty() { String::new() } else { format!(" for {display}") };
-    let subject = if auto {
-        format!("Your auto-detected monitor profile{on}")
-    } else {
-        format!("Your monitor profile “{file}”{on}")
-    };
-    let saved_subject = if auto {
-        format!("Your auto-detected monitor profile{on}")
-    } else {
-        format!("Your saved monitor profile “{file}”{on}")
-    };
+    // Language packs: every case is one whole sentence (which profile, whether a screen is named,
+    // what this session shows), so a pack can order the profile, the screen and the verdict.
     let session = if persisted_gamut == 4 { 0 } else { persisted_gamut };
-    let warn = if persisted_gamut == 4 {
-        format!(
-            "{subject} isn't available — showing sRGB for now. \
-             Falcon will try it again next launch."
+    let warn = match (persisted_gamut == 4, auto, display.is_empty()) {
+        (true, true, true) => i18n::tr(
+            "Your auto-detected monitor profile isn't available — showing sRGB for now. Falcon will try it again next launch.",
         )
-    } else {
+        .to_string(),
+        (true, true, false) => tr_format!(
+            "Your auto-detected monitor profile for {display} isn't available — showing sRGB for now. Falcon will try it again next launch.",
+            display = display
+        ),
+        (true, false, true) => tr_format!(
+            "Your monitor profile “{file}” isn't available — showing sRGB for now. Falcon will try it again next launch.",
+            file = file
+        ),
+        (true, false, false) => tr_format!(
+            "Your monitor profile “{file}” for {display} isn't available — showing sRGB for now. Falcon will try it again next launch.",
+            file = file,
+            display = display
+        ),
         // Not the active gamut, so nothing about THIS session's colour changed — but the Custom chip
         // would otherwise silently stop working, so the card still says why.
-        format!("{saved_subject} isn't available. Falcon will try it again next launch.")
+        (false, true, true) => i18n::tr(
+            "Your auto-detected monitor profile isn't available. Falcon will try it again next launch.",
+        )
+        .to_string(),
+        (false, true, false) => tr_format!(
+            "Your auto-detected monitor profile for {display} isn't available. Falcon will try it again next launch.",
+            display = display
+        ),
+        (false, false, true) => tr_format!(
+            "Your saved monitor profile “{file}” isn't available. Falcon will try it again next launch.",
+            file = file
+        ),
+        (false, false, false) => tr_format!(
+            "Your saved monitor profile “{file}” for {display} isn't available. Falcon will try it again next launch.",
+            file = file,
+            display = display
+        ),
     };
     (session, warn, auto)
 }
@@ -2235,11 +2259,11 @@ type WmLogoDrop = (u64, WmLogoSource, PathBuf, Result<(Vec<u8>, u32, u32), Strin
 /// these are the three sentences the async hop must not homogenise.
 fn wm_logo_fail_name(src: WmLogoSource) -> &'static str {
     match src {
-        WmLogoSource::Preset => "missing logo file",
+        WmLogoSource::Preset => i18n::tr("missing logo file"),
         // The type chip is a MODE switch, not a file action: it says nothing, exactly as it did
         // when the load was inline. A user who never picked a PNG must not be told one failed.
         WmLogoSource::TypeSwitch => "",
-        WmLogoSource::Picker => "load failed — use an RGBA PNG",
+        WmLogoSource::Picker => i18n::tr("load failed — use an RGBA PNG"),
     }
 }
 
@@ -2603,14 +2627,14 @@ fn copy_filename_with_feedback(
 ) {
     if name.is_empty() {
         log_event("copy filename: no shot loaded — nothing to copy");
-        show_transient_toast(a, counts_unread, toast_left, "No photo open — nothing to copy", 5_000);
+        show_transient_toast(a, counts_unread, toast_left, i18n::tr("No photo open — nothing to copy"), 5_000);
         return;
     }
     if copy_text_to_clipboard(name) {
-        show_transient_toast(a, counts_unread, toast_left, &format!("Filename copied — {name}"), 5_000);
+        show_transient_toast(a, counts_unread, toast_left, &tr_format!("Filename copied — {name}", name = name), 5_000);
     } else {
         log_event(&format!("copy filename: clipboard write FAILED for {name}"));
-        notif.borrow_mut().push(NotifEntry::warn("Couldn't copy the filename", Instant::now()));
+        notif.borrow_mut().push(NotifEntry::warn(i18n::tr("Couldn't copy the filename"), Instant::now()));
     }
 }
 
@@ -2649,7 +2673,9 @@ fn note_offscreen_edit(
     toast_left: &Cell<i32>,
     shots: &Mutex<Arc<Vec<Shot>>>,
     idx: usize,
-    verb: &str,
+    // Language packs (round 2): the whole sentence for the named photo (`support::edit_on_subject`
+    // and its rating twin), so no verb is ever glued to a name here.
+    say: impl Fn(&str) -> String,
 ) {
     let name = shots
         .lock()
@@ -2663,7 +2689,7 @@ fn note_offscreen_edit(
     // The em-dash form every other one-line status in the app uses ("Folder changed — nothing
     // marked"): what happened, then to what. `seq_stem` is the same name the thumbnail badge and
     // the delete confirm show, so the sentence points at something the photographer can find.
-    show_transient_toast(a, counts_unread, toast_left, &format!("{verb} — {name}"), 5_000);
+    show_transient_toast(a, counts_unread, toast_left, &say(&name), 5_000);
 }
 
 /// v0.8.121 (Round-B fix F13 = audit Y5/Y9, L22/L27): the welcome card's third status line is
@@ -2701,10 +2727,10 @@ fn push_profile_error(a: &MainWindow, notif: &Rc<RefCell<Vec<NotifEntry>>>, why:
 fn arm_custom_icc(a: &MainWindow, path: &std::path::Path, notif: &Rc<RefCell<Vec<NotifEntry>>>) {
     match install_custom_icc(path) {
         Ok(label) => {
-            let chip = format!("Custom: {label}");
+            let chip = support::custom_chip_label(&label);
             // v0.8.76: long labels move the Custom chip to its own full-width Settings row
             // (Slint can't measure text pre-layout — the length check lives here in Rust).
-            a.set_custom_gamut_long(support::custom_gamut_label_is_long(&chip));
+            a.set_custom_gamut_long(support::custom_gamut_label_is_long(&chip, fit_text(a)));
             a.set_custom_gamut_label(chip.into());
             a.set_custom_icc_path(path.to_string_lossy().to_string().into());
             // v0.8.100 (A4): a profile is installed again — the boot-failure state is over. This is
@@ -3090,8 +3116,8 @@ fn apply_active_display(
     if !entry.icc_path.is_empty() {
         match install_custom_icc(std::path::Path::new(&entry.icc_path)) {
             Ok(label) => {
-                let chip = format!("Custom: {label}");
-                app.set_custom_gamut_long(support::custom_gamut_label_is_long(&chip));
+                let chip = support::custom_chip_label(&label);
+                app.set_custom_gamut_long(support::custom_gamut_label_is_long(&chip, fit_text(app)));
                 app.set_custom_gamut_label(chip.into());
                 app.set_custom_icc_path(entry.icc_path.as_str().into());
                 app.set_custom_icc_failed(false);
@@ -3110,7 +3136,7 @@ fn apply_active_display(
                 app.set_custom_icc_warn(warn.as_str().into());
                 app.set_custom_icc_auto(auto);
                 let chip = support::entry_custom_label(&entry.icc_path);
-                app.set_custom_gamut_long(support::custom_gamut_label_is_long(&chip));
+                app.set_custom_gamut_long(support::custom_gamut_label_is_long(&chip, fit_text(app)));
                 app.set_custom_gamut_label(chip.into());
                 // v0.8.108 (audit A11): this session has now PROVED that this display's profile does
                 // not load. The fact belongs to the display, not to the live scalars, so the card
@@ -3127,8 +3153,9 @@ fn apply_active_display(
         // This display has no profile of its own. The Custom chip must NOT keep the previous
         // display's profile name — it would offer to select a profile that is not this screen's.
         app.set_custom_icc_path("".into());
-        app.set_custom_gamut_label("Custom…".into());
-        app.set_custom_gamut_long(false);
+        app.set_custom_gamut_label(i18n::tr("Custom…").into());
+        // The same gate as every other Custom label (false for the English bare form, as before).
+        app.set_custom_gamut_long(support::custom_gamut_label_is_long(i18n::tr("Custom…"), fit_text(app)));
         app.set_custom_icc_failed(false);
         app.set_custom_icc_warn("".into());
         app.set_custom_icc_auto(false);
@@ -3235,9 +3262,11 @@ fn adopt_reconnected_displays(
             .filter(|n| !n.is_empty())
             .unwrap_or_else(|| e.name.clone());
         let chip = support::gamut_chip_label(e.gamut, &support::entry_custom_label(&e.icc_path));
+        // The log stays English; `chip` above is the toast's, in this run's language.
+        let chip_log = support::gamut_chip_label(e.gamut, &support::entry_custom_label_log(&e.icc_path));
         log_event(&format!(
             "display colour: adopted {old} → {new} — same monitor ({name}), different port; \
-             keeping {chip}"
+             keeping {chip_log}"
         ));
         colors.borrow_mut().insert(new.clone(), e);
         done.push(Adopted { key: new, name, chip });
@@ -3399,6 +3428,12 @@ fn apply_picked_icc(
     }
 }
 
+/// Settings → Developer → Widen controls to fit text: on, the label cut-offs Rust owns are skipped
+/// (`support::auto_detect_label`, `support::custom_gamut_label_is_long`).
+fn fit_text(app: &MainWindow) -> bool {
+    app.global::<Theme>().get_fit_text()
+}
+
 /// v0.8.107: (re)compose the Settings colour card's section model.
 ///
 /// Every field is built HERE, in Rust, so the card has no colour logic of its own beyond mounting
@@ -3453,7 +3488,7 @@ fn rebuild_display_sections(
             head: support::display_section_head(name, &chip, true, expanded).as_str().into(),
             // v0.8.109 (V8): the Auto-detect pill's label is composed and LENGTH-GATED in Rust — the
             // pill has no elide and its label is its minimum width, inside a 296 px card.
-            auto_label: support::auto_detect_label(name, true).as_str().into(),
+            auto_label: support::auto_detect_label(name, true, fit_text(app)).as_str().into(),
             expanded,
             gamut: g,
             custom_label: label.as_str().into(),
@@ -3509,10 +3544,10 @@ fn rebuild_display_sections(
             key: key.into(),
             name: name.into(),
             head: support::display_section_head(name, &chip, false, is_open(key)).as_str().into(),
-            auto_label: support::auto_detect_label(name, false).as_str().into(),
+            auto_label: support::auto_detect_label(name, false, fit_text(app)).as_str().into(),
             expanded: is_open(key),
             gamut: e.gamut,
-            custom_long: support::custom_gamut_label_is_long(&label),
+            custom_long: support::custom_gamut_label_is_long(&label, fit_text(app)),
             custom_label: label.as_str().into(),
             custom_failed: did_fail,
             custom_warn: warn.as_str().into(),
@@ -3553,13 +3588,13 @@ fn rebuild_display_sections(
         if support::live_owns(live, k) {
             continue;
         }
-        let name = if e.name.is_empty() { "Display" } else { e.name.as_str() };
+        let name = if e.name.is_empty() { i18n::tr("Display") } else { e.name.as_str() };
         // A DISCONNECTED row carries the strength its ENTRY recorded (there is no live identity to
         // read it from) and never a unit contradiction — see `unit_mismatch`'s note.
         rows.push(entry_row(k, name, e, false, e.weak, false));
     }
     if !rows.iter().any(|r| r.active) {
-        rows.insert(0, live_row("", "This display", false, false));
+        rows.insert(0, live_row("", i18n::tr("This display"), false, false));
     }
     // v0.8.108 (owner ruling 8, audit A13): a ONE-ROW card carries no section header at all — a
     // single-display machine reads a card VISUALLY AND GEOMETRICALLY IDENTICAL to v0.8.106's (same
@@ -4104,18 +4139,22 @@ pub(crate) fn pinch_zoom_steps(acc: f32, delta: f32, step: f32, cap: i32) -> (i3
 /// XMP sidecars exist for the shot's file(s), a tail notes they go too. Pure → the single/pair/sidecar
 /// variants are unit-tested without a `Shot` or the filesystem.
 pub(crate) fn delete_popup_body(display_name: &str, is_pair: bool, sidecars: usize) -> String {
+    // Language packs (round 2): whole messages — the pair sentence with the bin noun as `{bin}`,
+    // and the sidecar note as one counted message that carries the body it follows.
     let head = if is_pair {
         // v0.9.3 (§66): trash noun from the platform table (Windows="Recycle Bin", pinned byte-identical).
-        format!("{display_name} — RAW + image pair, both files go to the {}", platform::PLATFORM.trash_noun)
+        tr_format!(
+            "{name} — RAW + image pair, both files go to the {bin}",
+            name = display_name,
+            bin = platform::bin_noun()
+        )
     } else {
         display_name.to_string()
     };
-    let tail = match sidecars {
-        0 => String::new(),
-        1 => " (its XMP sidecar goes too)".to_string(),
-        n => format!(" ({n} XMP sidecars go too)"),
-    };
-    format!("{head}{tail}")
+    match sidecars {
+        0 => head,
+        n => tr_plural!(n, "{body} (its XMP sidecar goes too)", "{body} ({n} XMP sidecars go too)", body = head),
+    }
 }
 
 /// v0.8.28: the ONE delete-capture path. The Delete KEY and BOTH context-menu Delete… items funnel here,
@@ -4135,7 +4174,7 @@ fn open_delete_confirm(
     // through either this fn or `open_bulk_delete`, so a stale `del-bulk` can never survive into a
     // single delete — which is why no dismissal path has to remember to reset it.
     app.set_del_bulk(false);
-    app.set_delete_title("Delete photo?".into());
+    app.set_delete_title(i18n::tr("Delete photo?").into());
     let is_pair = shot.raw.is_some() && shot.jpg.is_some();
     // display name: the stem for a pair, else the single file's own name (with extension).
     let display_name = if is_pair {
@@ -5741,14 +5780,14 @@ pub(crate) fn should_halt_gpu_pumps(gpu_lost: bool) -> bool {
 /// a dialog failure must never itself crash the clean-exit path.
 fn show_device_lost_prompt() {
     let _ = std::panic::catch_unwind(|| {
+        // Language packs (round 2): both texts are marked (the description is one line so the
+        // checker can read it); the OK button is the system's own.
         rfd::MessageDialog::new()
             .set_level(rfd::MessageLevel::Error)
-            .set_title("Falcon — graphics device lost")
-            .set_description(
-                "The graphics device was lost (a GPU driver reset or update, or the GPU was \
-                 disconnected).\n\nFalcon can't keep rendering and needs to be restarted. Your \
-                 ratings and picks were saved.",
-            )
+            .set_title(i18n::tr("Falcon — graphics device lost"))
+            .set_description(i18n::tr(
+                "The graphics device was lost (a GPU driver reset or update, or the GPU was disconnected).\n\nFalcon can't keep rendering and needs to be restarted. Your ratings and picks were saved.",
+            ))
             .set_buttons(rfd::MessageButtons::Ok)
             .show();
     });
@@ -5768,6 +5807,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     log_init(boot.diagnostic_logging);
     support::init_writer(); // v0.8.36 (ITEM 1): spawn the durable background writer before any save can enqueue
     support::replay_startup_notes(startup_notes);
+    // This run's interface language, before any window or message exists. Owner ruling (4 October):
+    // follow the system's preferred languages unless one is chosen in Settings; a change applies at
+    // the next start.
+    let (system_languages, language) = i18n::init(&boot.language);
+    log_event(&format!("boot: language {language} (saved choice {:?}, system {system_languages:?})", boot.language));
     // THE killer line, logged FIRST: everything BEFORE main() — the AV scan window, OneDrive/loader
     // hydration, DLL init — is invisible to an Instant started in main(). GetProcessTimes' creation stamp
     // captures it. Windows-only (the field target); other OSes skip silently. `pre_main_ms` (0 if
@@ -6030,6 +6074,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let t_win = std::time::Instant::now();
     let app = MainWindow::new()?;
     log_event(&format!("boot: MainWindow::new in {} ms", t_win.elapsed().as_millis()));
+    // The first window has just registered Slint's bundled languages and guessed one from the
+    // system; replace the guess with this run's choice before anything is drawn.
+    i18n::select_for_slint();
 
     // Bundle Inter (SIL OFL — see assets/fonts/Inter-OFL.txt) so the app renders in the SAME font as the
     // Figma design system → design⇄code consistency on ANY machine, no OS install needed. (Temporary
@@ -6413,7 +6460,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     app.set_nvjpeg_avail(accel_avail);
     app.set_use_nvjpeg(accel_avail);
     app.set_empty_state(true);
-    app.set_empty_text("No folder open".into());
+    support::set_empty_stage_text(&app, tr_noop!("No folder open"));
 
     // ── shared state ──
     // Current folder path (for last-folder memory + the picker's start directory). When nothing is
@@ -7407,7 +7454,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                             pairs
                                 .iter()
                                 .filter(|(k, _)| k != "Model") // folded-grid-only, exactly as the docked build filters it
-                                .map(|(k, v)| ExifRow { k: k.as_str().into(), v: v.as_str().into() })
+                                // Language packs (round 2): the key above stays English; only the
+                                // drawn label is translated (`support::exif_row_shown`).
+                                .map(|(k, v)| support::exif_row_shown(k, v))
                                 .collect()
                         })
                         .unwrap_or_default();
@@ -9085,7 +9134,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // v0.9.3 (§66): the remaining table-routed UI strings/flags — the reveal-in-file-manager verb
         // and the FILE ASSOCIATIONS card visibility. Windows values byte-equal the pre-refactor literals
         // (pinned by windows_strings_unchanged); the macOS arm swaps them to Finder / Info.plist wording.
-        app.set_reveal_verb(platform::PLATFORM.reveal_verb.into());
+        app.set_reveal_verb(i18n::tr(platform::PLATFORM.reveal_verb).into());
         app.set_file_assoc_visible(platform::PLATFORM.file_assoc_visible);
         app.set_cmyk_route_visible(platform::PLATFORM.cmyk_route_visible);
         // v0.9.9 (P6): the accel-toggle label — nvJPEG on Windows (byte-identical to the old .slint
@@ -9101,7 +9150,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // the dialog itself is unreachable before the probe runs (its button needs count > 0).
         app.set_empty_confirm_title(platform::empty_confirm_title(0).into());
         app.set_empty_confirm_body(platform::empty_rejected_confirm_body().into());
-        app.set_empty_confirm_label(platform::PLATFORM.empty_to_trash.into());
+        app.set_empty_confirm_label(i18n::tr(platform::PLATFORM.empty_to_trash).into());
         // v1.0 MERGE TAIL [B-R3, L26]: the kind-8 Overwrite WARN BODY joins its two siblings on the
         // routed side. The merge routed this dialog’s BUTTONS and left its body typing the other
         // OS’s bin three lines above them.
@@ -9110,7 +9159,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // false on macOS (Low Power Mode is not read at v1.0), so the Windows half of the predicate
         // is not named there. Windows keeps the pre-tail literal, byte for byte.
         app.set_efficiency_auto_clause(platform::efficiency_auto_clause().into());
-        app.set_delete_confirm_label(platform::PLATFORM.move_to_trash.into());
+        app.set_delete_confirm_label(i18n::tr(platform::PLATFORM.move_to_trash).into());
         // v0.8.71 (Round B assoc): the HEIC row's conditional availability — a boot-time READ-ONLY
         // WIC codec-registry probe (no decode, session-cached; a codec installed mid-session enables
         // next launch). Codec absent → the row fades + disables (its explanation line mounts under
@@ -9138,7 +9187,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // repair does not wait for a Settings visit; `assoc_repair_type_name` is silent when there is
         // nothing to do and never creates a key on a box that never registered.
         if let Err(e) = assoc_upgrade_icons(settings.distinct_raw_icons) {
-            app.set_assoc_status(slint::format!("Couldn't update the file icons: {e}"));
+            app.set_assoc_status(tr_format!("Couldn't update the file icons: {error}", error = e).into());
             log_event(&format!("assoc: icon upgrade failed: {e}"));
         }
         if assoc_repair_type_name() {
@@ -9146,12 +9195,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         // v0.8.65 (C3/M9, the M12 pattern): the colour card's OS-concept copy — Windows byte-identical
         // (pinned); the Mac arm names ColorSync / System Settings → Displays.
-        app.set_gamut_copy(platform::PLATFORM.gamut_copy.into());
+        app.set_gamut_copy(i18n::tr(platform::PLATFORM.gamut_copy).into());
         // v0.8.119 (design-sweep O24): the Selection panel's Empty invoker speaks the platform's
         // trash noun, like the confirm dialog it opens (L26 — one noun per OS, every surface).
-        app.set_empty_action_label(platform::PLATFORM.empty_action_label.into());
+        app.set_empty_action_label(i18n::tr(platform::PLATFORM.empty_action_label).into());
         // v0.8.119 (design-sweep O29): why the GPU-decode row is dead, when it is.
-        app.set_accel_unavail_note(platform::PLATFORM.accel_unavail_note.into());
+        app.set_accel_unavail_note(i18n::tr(platform::PLATFORM.accel_unavail_note).into());
         // v0.8.119 (design-sweep O28): the two DEVELOPER engine rows macOS forces off. `l2_allowed()`
         // is the platform policy the ram_l2 write sites already AND in; publishing it here makes the
         // ROWS say what the engine does, instead of rendering a raw persisted flag as if it were the
@@ -9167,7 +9216,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         app.set_dev_levers_note(if levers_live {
             slint::SharedString::new()
         } else {
-            "Off on macOS: one unified memory pool serves the GPU and the app, so a second CPU-side byte cache double-books it, and the decode pool is sized from that same budget. Set FALCON_CLASSIC_POOLS=1 to restore the Windows-style pools for a comparison run.".into()
+            i18n::tr("Off on macOS: one unified memory pool serves the GPU and the app, so a second CPU-side byte cache double-books it, and the decode pool is sized from that same budget. Set FALCON_CLASSIC_POOLS=1 to restore the Windows-style pools for a comparison run.").into()
         });
         // v0.8.125 (C6a / Round-B W1-5): the Empty-./Rejected confirm BODY is published a few
         // hundred lines below, beside its headline — the Mac arm hoisted both there. What THIS
@@ -9399,6 +9448,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         app.set_dev_hud(settings.dev_hud);
         app.set_diagnostic_logging(settings.diagnostic_logging);
+        app.set_language_options(slint::ModelRc::new(slint::VecModel::from(
+            i18n::app_picker_options().into_iter().map(slint::SharedString::from).collect::<Vec<_>>(),
+        )));
+        app.set_language_sel(i18n::app_picker_index(&settings.language));
+        app.global::<Theme>().set_fit_text(settings.fit_text_widths);
+        // The bare Custom chip's row follows the same gate as a loaded profile's (the restore below
+        // re-decides it when a profile loads); English with the toggle off is false, as before.
+        app.set_custom_gamut_long(support::custom_gamut_label_is_long(i18n::tr("Custom…"), settings.fit_text_widths));
         app.set_distinct_raw_icons(settings.distinct_raw_icons);
         app.set_auto_orient(settings.auto_orient); // v0.8.0: mirror the persisted flag into the toggle
         // (Theme.opaque is a constant `true` since W2/v0.3.57 — the glass mode is retired.)
@@ -9470,9 +9527,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         if !settings.custom_icc_path.is_empty() {
             match install_custom_icc(std::path::Path::new(&settings.custom_icc_path)) {
                 Ok(label) => {
-                    let chip = format!("Custom: {label}");
+                    let chip = support::custom_chip_label(&label);
                     // v0.8.76: same full-row gate as arm_custom_icc (the boot-restore arm).
-                    app.set_custom_gamut_long(support::custom_gamut_label_is_long(&chip));
+                    app.set_custom_gamut_long(support::custom_gamut_label_is_long(&chip, fit_text(&app)));
                     app.set_custom_gamut_label(chip.into());
                     app.set_custom_icc_path(settings.custom_icc_path.as_str().into());
                 }
@@ -9722,6 +9779,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     app.on_diagnostic_logging_toggled(|enabled| {
         support::set_diagnostic_logging(enabled);
     });
+    let lw = app.as_weak();
+    app.on_language_picked(move |row| {
+        // The row is saved by the periodic settings snapshot; only the restart note needs Rust.
+        if let Some(a) = lw.upgrade() {
+            a.set_language_restart(i18n::app_picker_needs_restart(row));
+        }
+    });
     app.on_toggle_hud(move || {
         if let Some(a) = aw.upgrade() {
             let v = a.get_dev_hud();
@@ -9784,7 +9848,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         &a,
                         &tcu,
                         &tleft,
-                        "Both halves are pinned — unpin one to move it.",
+                        i18n::tr("Both halves are pinned — unpin one to move it."),
                         10_000,
                     );
                 }
@@ -9894,7 +9958,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(a) = awz.upgrade() {
             let f = fps.clamp(1.0, 120.0);
             a.set_scrub_fps(f);
-            a.set_fps_text(if f >= 120.0 { "Max (up to 120 fps)".into() } else { slint::format!("{} fps", f.round() as i32) });
+            a.set_fps_text(support::fps_title(f));
         }
     });
     let un = use_nvjpeg.clone();
@@ -9932,7 +9996,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "Auto — the posture follows {}",
                     // "Auto follows your power source[ and Windows' Battery saver]." → the clause
                     // this line has always spoken in the third person, minus the trailing stop.
-                    platform::efficiency_auto_clause()
+                    platform::efficiency_auto_clause_english()
                         .trim_start_matches("Auto follows ")
                         .trim_end_matches('.')
                 ),
@@ -10095,14 +10159,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                         gen_g.load(Ordering::Relaxed),
                     ),
                     "cull key ignored: the focused compare half is still loading (G1 gate)",
-                    "Still loading — press again when this half appears",
+                    i18n::tr("Still loading — press again when this half appears"),
                 )
             } else {
                 let c = *cur.borrow();
                 (
                     shown.borrow().as_ref().map(|(i, _, _)| *i) != Some(c),
                     "cull key ignored: current shot not on stage yet (G1 gate)",
-                    "Still loading — press again when the photo appears",
+                    i18n::tr("Still loading — press again when the photo appears"),
                 )
             };
             if blocked {
@@ -10347,7 +10411,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         &tleft,
                         &np_sos,
                         &sd_sos.borrow(),
-                        &format!("{what} on {name} — not shown while both halves are pinned"),
+                        &support::not_shown_while_pinned(what, &name), // language packs (round 2): whole messages
                         10_000,
                         // v0.8.186 (U3), DECLARED LIMITATION: no stamp. `show_or_say` is the shared
                         // VISIBILITY nudge — a dozen callers, most of them plain edits with no act
@@ -10560,7 +10624,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 BulkOp::Clear => support::bulk_done_sentence("Unmarked", applied),
                 _ => support::bulk_done_sentence(word, applied),
             };
-            log_event(&format!("bulk: {sentence} (of {total} selected)"));
+            // Language packs (round 2): the log keeps the English sentence; the card shows `sentence`.
+            let sentence_en = match op {
+                BulkOp::Rate(v) => support::bulk_rate_done_english(applied, v),
+                BulkOp::Clear => support::bulk_done_sentence_english("Unmarked", applied),
+                _ => support::bulk_done_sentence_english(word, applied),
+            };
+            log_event(&format!("bulk: {sentence_en} (of {total} selected)"));
             // ~5 s on the mode-free card. The count sits where the user is looking, and no
             // photograph moves under them (F-P1).
             show_transient_toast(&a, &tcu, &tleft, &sentence, 5_000);
@@ -10669,7 +10739,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let idxs = support::bulk_targets(&ss.borrow()); // v0.8.132 (OQ2 (a))
             if idxs.is_empty() {
                 log_event("bulk delete: the selection resolved to no targets — nothing opened");
-                show_transient_toast(&a, &tcu, &tleft, "Nothing to delete — the selection is empty", 5_000);
+                show_transient_toast(&a, &tcu, &tleft, i18n::tr("Nothing to delete — the selection is empty"), 5_000);
                 return;
             }
             let snap = shots_bd.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -10704,7 +10774,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     &a,
                     &tcu,
                     &tleft,
-                    "Nothing to delete — those photos have left this folder",
+                    i18n::tr("Nothing to delete — those photos have left this folder"),
                     5_000,
                 );
                 return;
@@ -10885,7 +10955,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // rotation is invisible until the photographer navigates to it. `idx` is resolved above
             // (the -1 = current form is already folded in), so this compares the RESOLVED target.
             if idx != *current.borrow() {
-                note_offscreen_edit(&a, &tcu_ro, &tleft_ro, &shots_ro, idx, "Rotated");
+                note_offscreen_edit(&a, &tcu_ro, &tleft_ro, &shots_ro, idx, |name| support::edit_on_subject("Rotated", name));
             }
         });
     }
@@ -10954,7 +11024,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             sel_gen_br.set(sel_gen_br.get().wrapping_add(1));
             let sentence = support::bulk_rotate_sentence(turns.len(), cw, animated, unreadable);
-            log_event(&format!("bulk-rotate: {sentence} ({} targets)", targets.len()));
+            log_event(&format!(
+                "bulk-rotate: {} ({} targets)",
+                support::bulk_rotate_sentence_english(turns.len(), cw, animated, unreadable), // logs stay English
+                targets.len()
+            ));
             // NO ask-first toast: a rotation states its own direction and ONE Ctrl+Z reverts the batch.
             // (The digits ask because a bulk RATING's direction is decided at press time — see
             // `bulk_rate_target` — which does not apply here.)
@@ -11170,7 +11244,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         // and JUMPED the stage to the lowest reverted index. It also reaches a
                         // CHANNEL now: the two grouped arms logged nothing at all.
                         let sentence = support::bulk_edit_sentence(verb, "reverted", applied, total);
-                        log_event(&format!("bulk-undo: {sentence}"));
+                        log_event(&format!("bulk-undo: {}", support::bulk_edit_sentence_english(verb, "reverted", applied, total)));
                         // v0.8.184 (W1): F-P1 rule 1 said SAY IT and never navigate — which makes
                         // this sentence the whole of the feedback, and the Events-header pill can
                         // raise it with the events panel covering the card.
@@ -11196,7 +11270,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if let Some(a) = awz_u.upgrade() {
                     if applied > 0 {
                         let sentence = support::bulk_edit_sentence("Rotation", "reverted", applied, total);
-                        log_event(&format!("bulk-undo: {sentence}"));
+                        log_event(&format!(
+                            "bulk-undo: {}",
+                            support::bulk_edit_sentence_english("Rotation", "reverted", applied, total)
+                        ));
                         say_edit_result(&a, &tcu_u, &tleft_u, &np_u, &sd_u.borrow(), &sentence, 5_000, Some(seq));
                     }
                 }
@@ -11287,7 +11364,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         // v0.8.131 (F-P1 rules 1+2): the undo arm's twin — one card sentence, one
                         // log line, no navigation.
                         let sentence = support::bulk_edit_sentence(verb, "re-applied", applied, total);
-                        log_event(&format!("bulk-redo: {sentence}"));
+                        log_event(&format!("bulk-redo: {}", support::bulk_edit_sentence_english(verb, "re-applied", applied, total)));
                         say_edit_result(&a, &tcu_h, &tleft_h, &np_h, &sd_h.borrow(), &sentence, 5_000, Some(seq)); // v0.8.184 (W1)
                     }
                 }
@@ -11306,7 +11383,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if let Some(a) = awz_h.upgrade() {
                     if applied > 0 {
                         let sentence = support::bulk_edit_sentence("Rotation", "re-applied", applied, total);
-                        log_event(&format!("bulk-redo: {sentence}"));
+                        log_event(&format!(
+                            "bulk-redo: {}",
+                            support::bulk_edit_sentence_english("Rotation", "re-applied", applied, total)
+                        ));
                         say_edit_result(&a, &tcu_h, &tleft_h, &np_h, &sd_h.borrow(), &sentence, 5_000, Some(seq));
                     }
                 }
@@ -11447,8 +11527,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // v0.8.155 (D1b): the edit landed on a photo that is not on screen — say which.
                     // Gated on `changed` so a no-op re-rate (clicking the star that is already set)
                     // stays silent: nothing happened, so there is nothing to report.
-                    let verb = if n >= 1 { format!("Rated {n}") } else { "Rating cleared".to_string() };
-                    note_offscreen_edit(&a, &tcu_sr, &tleft_sr, &shots_sr, idx, &verb);
+                    let say = |name: &str| {
+                        if n >= 1 {
+                            support::rated_on_subject(n, name)
+                        } else {
+                            support::edit_on_subject("Rating cleared", name)
+                        }
+                    };
+                    note_offscreen_edit(&a, &tcu_sr, &tleft_sr, &shots_sr, idx, say);
                 }
             }
         });
@@ -11495,7 +11581,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // moves one bit and never reached it. Its comment claimed the opposite; the
                     // string is gone. See `mark_verb` for why exclusivity makes that total.
                     note_offscreen_edit(
-                        &a, &tcu_am, &tleft_am, &shots_am, idx, support::mark_verb(oldm, newm),
+                        &a, &tcu_am, &tleft_am, &shots_am, idx,
+                        |name| support::edit_on_subject(support::mark_verb(oldm, newm), name),
                     );
                 }
             }
@@ -11735,7 +11822,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // B3). Synthetic mode makes its OWN images, so it needs no open folder.
         if !synthetic && shots_bench.lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
             if let Some(a) = awz.upgrade() {
-                a.set_bench_text("no photos to benchmark".into());
+                a.set_bench_text(i18n::tr("no photos to benchmark").into());
             }
             return;
         }
@@ -11769,7 +11856,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         if let Some(a) = awz.upgrade() {
             a.set_bench_running(true);
-            a.set_bench_text(if synthetic { "generating test images…".into() } else { "benchmarking…".into() });
+            a.set_bench_text(if synthetic { i18n::tr("generating test images…").into() } else { i18n::tr("benchmarking…").into() });
         }
         let shots_bench = shots_bench.clone();
         let bench_tx_cb = bench_tx_cb.clone();
@@ -12361,11 +12448,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             bench_recommendation(a.get_bench_sub_fps(), a.get_bench_super_fps(), w, screen_long());
         let f = support::bench_rec_scrub_fps(fps);
         a.set_scrub_fps(f);
-        a.set_fps_text(if f >= 120.0 {
-            "Max (up to 120 fps)".into()
-        } else {
-            slint::format!("{} fps", f.round() as i32)
-        });
+        a.set_fps_text(support::fps_title(f));
         a.set_quality_super(if sup { 1 } else { 0 });
         // v0.8.160 (B4/U11): no latch write. `bench-rec-applied` is a binding over the pair this
         // block just wrote against the pair the card recommends, so it turns true HERE and turns
@@ -12652,8 +12735,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let tx = tx.clone();
             std::thread::spawn(move || {
                 let picked = rfd::FileDialog::new()
-                    .add_filter("ICC / ICM colour profile", &["icc", "icm"])
-                    .set_title("Choose a monitor / display colour profile")
+                    .add_filter(i18n::tr("ICC / ICM colour profile"), &["icc", "icm"])
+                    .set_title(i18n::tr("Choose a monitor / display colour profile"))
                     .pick_file();
                 let _ = tx.send((PickKind::Icc, picked));
             });
@@ -12813,9 +12896,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                         // the recovery, and the welcome's own recovery control ("or pick the gamut
                         // yourself") is right there.
                         const MSG: &str =
-                            "Couldn't detect a monitor colour profile — use Load profile instead";
-                        set_welcome_note(&a, MSG); // v0.8.121 (F13): the FOURTH writer, same helper (L27)
-                        notif.borrow_mut().push(NotifEntry::warn(MSG, Instant::now()));
+                            tr_noop!("Couldn't detect a monitor colour profile — use Load profile instead");
+                        set_welcome_note(&a, i18n::tr(MSG)); // v0.8.121 (F13): the FOURTH writer, same helper (L27)
+                        notif.borrow_mut().push(NotifEntry::warn(i18n::tr(MSG), Instant::now()));
                     }
                 }
             }
@@ -12939,6 +13022,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         app.on_reset_display_expansion(move || {
             let Some(a) = awz.upgrade() else { return };
             reset_display_expansion(&open, active.borrow().as_ref());
+            rebuild_display_sections(
+                &a,
+                &live.borrow(),
+                &colors.borrow(),
+                active.borrow().as_ref(),
+                &open.borrow(),
+                &failed.borrow(),
+            );
+        });
+    }
+    {
+        // Settings → Developer → Widen controls to fit text takes effect at once: the Custom chip's
+        // own row and every section's Auto-detect pill are re-decided under the new setting.
+        let awz = app.as_weak();
+        let colors = display_colors.clone();
+        let active = display_active.clone();
+        let live = display_live.clone();
+        let open = display_open.clone();
+        let failed = display_failed.clone();
+        app.on_fit_text_toggled(move || {
+            let Some(a) = awz.upgrade() else { return };
+            let label = a.get_custom_gamut_label();
+            a.set_custom_gamut_long(support::custom_gamut_label_is_long(&label, fit_text(&a)));
             rebuild_display_sections(
                 &a,
                 &live.borrow(),
@@ -13131,7 +13237,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     log_event(&format!("assoc: registered/updated (families {on:?})"));
                 }
                 Err(e) => {
-                    a.set_assoc_status(slint::format!("Couldn't write the registration: {e}"));
+                    a.set_assoc_status(tr_format!("Couldn't write the registration: {error}", error = e).into());
                     log_event(&format!("assoc: register FAILED: {e}"));
                 }
             }
@@ -13310,7 +13416,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let which = if a.get_welcome_open() {
                     "the welcome guide".to_string()
                 } else {
-                    format!("the empty stage (\"{}\")", a.get_empty_text())
+                    // Language packs (round 2): the card shows its message translated; the log names it
+                    // by the English message recorded where it was published (logs stay English).
+                    format!("the empty stage (\"{}\")", support::empty_stage_text_english())
                 };
                 match went {
                     Some(now_fs) => log_event(&format!(
@@ -13929,7 +14037,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // to make room destroys deliberate state; doing nothing at all is the L15 no-op. So the
             // fifth request says so, in the app's own transient-toast grammar, and logs it.
             if fe.borrow().len() >= support::FLOAT_EXIF_MAX {
-                show_transient_toast(&a, &tcu_fe, &tleft_fe, support::FLOAT_EXIF_FULL_MSG, 4_000);
+                show_transient_toast(&a, &tcu_fe, &tleft_fe, i18n::tr(support::FLOAT_EXIF_FULL_MSG), 4_000);
                 log_event("float-exif: refused — four panels are already open");
                 return;
             }
@@ -13941,7 +14049,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // panel, no sentence, no log entry to find afterwards. It is a REFUSAL, and this door
             // already has the grammar for one two lines up; it uses the same.
             let Some(shot) = snap.get(t) else {
-                show_transient_toast(&a, &tcu_fe, &tleft_fe, support::FLOAT_EXIF_GONE_MSG, 4_000);
+                show_transient_toast(&a, &tcu_fe, &tleft_fe, i18n::tr(support::FLOAT_EXIF_GONE_MSG), 4_000);
                 log_event(&format!(
                     "float-exif: refused — shot {t} is no longer in the folder ({} shots)",
                     snap.len()
@@ -14124,7 +14232,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             None => {
                 notif_cs.borrow_mut().push(NotifEntry::warn(
-                    "Nothing to copy for this photo",
+                    i18n::tr("Nothing to copy for this photo"),
                     std::time::Instant::now(),
                 ));
             }
@@ -14526,7 +14634,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // has no keycap, so the message is generic.
             if is_pua {
                 *cf_k.borrow_mut() =
-                    Some((action.clone(), "That key can't be bound here".to_string()));
+                    Some((action.clone(), i18n::tr("That key can't be bound here").to_string()));
                 kbm_k.set_vec(keybind_rows(&km_k.borrow(), &cap_k.borrow(), &cf_k.borrow()));
                 bbm_k.set_vec(basic_rows(&km_k.borrow(), &cap_k.borrow(), &cf_k.borrow()));
                 return;
@@ -14537,7 +14645,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             if let Some(holder) = capture_conflict(&km_k.borrow(), &action, &text) {
                 *cap_k.borrow_mut() = None;
                 *cf_k.borrow_mut() =
-                    Some((action.clone(), format!("{} is taken by “{holder}”", pretty_key(&text))));
+                    Some((action.clone(), tr_format!("{key} is taken by “{holder}”", key = pretty_key(&text), holder = holder)));
                 kbm_k.set_vec(keybind_rows(&km_k.borrow(), &None, &cf_k.borrow()));
                 bbm_k.set_vec(basic_rows(&km_k.borrow(), &None, &cf_k.borrow()));
                 if let Some(a) = awz.upgrade() {
@@ -15501,11 +15609,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if new_len == 0 {
                     // M2: distinguish "folder unreadable" (scan IO error) from "folder genuinely has no
                     // photos" — the honest empty-state, not the misleading "No photos" one.
-                    a.set_empty_text(if scan_err {
-                        "Couldn't read this folder".into()
-                    } else {
-                        "No photos in this folder".into()
-                    });
+                    support::set_empty_stage_text(
+                        &a,
+                        if scan_err { tr_noop!("Couldn't read this folder") } else { tr_noop!("No photos in this folder") },
+                    );
                 }
             }
             // D2 (v0.3.61): the resume ask — Falcon's settings remember the last-viewed shot for
@@ -15530,7 +15637,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     if let Some(idx) = new_arc.iter().position(|s| s.name == lv) {
                         if idx != start {
                             notif_ap.borrow_mut().push(
-                                NotifEntry::info(format!("You were at {lv} last time — resume?"), Instant::now())
+                                NotifEntry::info(tr_format!("You were at {photo} last time — resume?", photo = lv), Instant::now())
                                     .with_jump_to(idx as i32)
                                     .in_dir(&dir.display().to_string()), // v0.8.120 (O6)
                             );
@@ -15722,7 +15829,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 scan_hud.borrow_mut().remember(&a);
                 a.set_opening_wait_dir(0);
                 a.set_scanning(true);
-                a.set_path_text(slint::format!("Scanning {}…", hud_dir(&dir)));
+                a.set_path_text(tr_format!("Scanning {folder}…", folder = hud_dir(&dir)).into());
                 // v0.8.116 (D-A): the scanning overlay names a folder, not a photo — tiers absent, and
                 // cleared so no previous folder's filename survives into this string's tier choice.
                 a.set_path_mid("".into());
@@ -16380,16 +16487,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 const OTHER_IMG_EXTS: &[&str] = &["avif", "jxl", "gif", "bmp", "tga"];
                 let all_photos: Vec<&str> =
                     FIN_EXTS.iter().chain(RAW_EXTS).chain(OTHER_IMG_EXTS).copied().collect();
+                // Language packs (round 2): the title and the worded filter names are marked; the
+                // format names ("JPEG", "RAW", "PNG / TIFF / HEIC / WebP") stay as they are.
                 let mut dlg = rfd::FileDialog::new()
-                    .set_title("Open a photo (or any photo in a folder)")
-                    .add_filter("All photos", &all_photos)
+                    .set_title(i18n::tr("Open a photo (or any photo in a folder)"))
+                    .add_filter(i18n::tr("All photos"), &all_photos)
                     .add_filter("JPEG", &["jpg", "jpeg"])
                     .add_filter("RAW", RAW_EXTS)
                     .add_filter(
                         "PNG / TIFF / HEIC / WebP",
                         &["png", "apng", "tif", "tiff", "heic", "heif", "webp"],
                     )
-                    .add_filter("All files", &["*"]);
+                    .add_filter(i18n::tr("All files"), &["*"]);
                 if !start.is_empty() {
                     dlg = dlg.set_directory(&start);
                 }
@@ -16416,7 +16525,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let tx = tx.clone();
             let start = cur_dir.borrow().clone();
             std::thread::spawn(move || {
-                let mut dlg = rfd::FileDialog::new().set_title("Open a folder of photos");
+                let mut dlg = rfd::FileDialog::new().set_title(i18n::tr("Open a folder of photos"));
                 if !start.is_empty() {
                     dlg = dlg.set_directory(&start);
                 }
@@ -16668,7 +16777,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // an offer, and taking it would restore folder A's selection into folder B.
             if !support::restore_offer_live(&stash_dir, &scanned_r.borrow().dir().to_string()) {
                 a.set_toast_restore(false);
-                show_transient_toast(&a, &tcu, &tleft, "That selection belonged to another folder", 5_000);
+                show_transient_toast(&a, &tcu, &tleft, i18n::tr("That selection belonged to another folder"), 5_000);
                 log_event("selection: restore refused — the stash names a folder that is no longer open");
                 return;
             }
@@ -16684,7 +16793,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .count();
             if landing == 0 {
                 a.set_toast_restore(false);
-                show_transient_toast(&a, &tcu, &tleft, "Those photos are no longer in this folder", 5_000);
+                show_transient_toast(&a, &tcu, &tleft, i18n::tr("Those photos are no longer in this folder"), 5_000);
                 log_event(&format!("selection: restore landed nothing of {} photo(s) — set untouched", keys.len()));
                 return;
             }
@@ -16839,7 +16948,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             match support::bulk_ask_verdict(&ask, armed, sgen.get(), gen_y.load(Ordering::Relaxed), &dir_y.borrow()) {
                 support::AskVerdict::Apply => apply(BulkOp::Rate(ask.stars), &ask.targets),
                 support::AskVerdict::NotArmed => {
-                    show_transient_toast(&a, &tcu, &tleft, "Not applied — bulk editing is no longer armed", 5_000);
+                    show_transient_toast(&a, &tcu, &tleft, i18n::tr("Not applied — bulk editing is no longer armed"), 5_000);
                     log_event("bulk: [Yes] arrived with bulk no longer armed — nothing applied");
                 }
                 support::AskVerdict::MovedOn => {
@@ -16879,7 +16988,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 return; // A-2
             }
             let Some(man) = mf.borrow().clone() else {
-                show_transient_toast(&a, &tcu, &tleft, "Falcon didn't export this folder — nothing to compare against", 6_500);
+                show_transient_toast(&a, &tcu, &tleft, i18n::tr("Falcon didn't export this folder — nothing to compare against"), 6_500);
                 return;
             };
             let snap = shots_ne.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -17092,9 +17201,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                             &tcu_oto,
                             &toast_left_oto,
                             if raw_only {
-                                "1:1 needs this photo's true size — this RAW has no finished file to measure, so only its embedded preview is on screen."
+                                i18n::tr("1:1 needs this photo's true size — this RAW has no finished file to measure, so only its embedded preview is on screen.")
                             } else {
-                                "1:1 needs this photo's true size, which isn't known yet."
+                                i18n::tr("1:1 needs this photo's true size, which isn't known yet.")
                             },
                             10_000,
                         );
@@ -17371,9 +17480,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                             &tcu_nu,
                             &tleft_nu,
                             if free_b {
-                                "Unpinned B to show the next unrated photo"
+                                i18n::tr("Unpinned B to show the next unrated photo")
                             } else {
-                                "Unpinned A to show the next unrated photo"
+                                i18n::tr("Unpinned A to show the next unrated photo")
                             },
                             10_000,
                         );
@@ -17558,7 +17667,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 return;
             }
-            if !start("Applying rotations…") {
+            if !start(i18n::tr("Applying rotations…")) {
                 return; // another op already running
             }
             // Feedback matches the sibling Selection batch ops (copy/move): the "Applying rotations…"
@@ -17606,9 +17715,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 let (k, f) = (applied.len(), failed.len());
                 let msg = if f > 0 {
-                    format!("rotation apply: {k} written, {f} failed ({})", failed.join(", "))
+                    tr_format!(
+                        "rotation apply: {written} written, {failed} failed ({names})",
+                        written = k,
+                        failed = f,
+                        names = failed.join(", ")
+                    )
                 } else {
-                    format!("rotation apply: {k} written")
+                    tr_format!("rotation apply: {written} written", written = k)
                 };
                 *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some((msg, OpSeverity::from_err(f > 0), -1, None));
             });
@@ -17651,7 +17765,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 quit_cl.set(true);
                 log_event("close requested mid-op — finishing the file operation first");
                 notif_cl.borrow_mut().push(NotifEntry::success(
-                    "Finishing the file operation — Falcon closes when it's done (close again to force)",
+                    i18n::tr("Finishing the file operation — Falcon closes when it's done (close again to force)"),
                     Instant::now(),
                 ));
                 return;
@@ -17730,7 +17844,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 &a,
                                 &tcu_cr,
                                 &toast_left_cr,
-                                "Finish the open dialog first — Falcon still has unapplied rotations to review.",
+                                i18n::tr("Finish the open dialog first — Falcon still has unapplied rotations to review."),
                                 10_000,
                             );
                         }
@@ -17806,7 +17920,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         app.on_copy_picks(move |content: i32| {
             if photo_gate.upgrade().is_some_and(|a| a.get_opening_photo()) { return; }
             let dir = cur_dir_cp.borrow().clone();
-            if dir.is_empty() || !start("Copying picks…") {
+            if dir.is_empty() || !start(i18n::tr("Copying picks…")) {
                 return;
             }
             let snap = shots_cp.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -17858,7 +17972,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if pend > 0 {
                     notice_cp.set(true);
                     notif_cp.borrow_mut().push(NotifEntry::warn(
-                        format!("{pend} pick(s) have unapplied rotations — Apply rotations first if you want them upright elsewhere"),
+                        tr_plural!(
+                            pend,
+                            "{n} pick(s) have unapplied rotations — Apply rotations first if you want them upright elsewhere",
+                            "{n} pick(s) have unapplied rotations — Apply rotations first if you want them upright elsewhere"
+                        ),
                         Instant::now(),
                     ));
                 }
@@ -17880,18 +17998,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // exactly the PNG folder the owner was looking at. `CopyContent::JpgOnly` selects
                 // `Shot::jpg`, the finished-image slot of whatever format; the count was always
                 // right and only the noun was wrong.
-                let what = match content {
-                    CopyContent::RawOnly => "RAW",
-                    CopyContent::JpgOnly => "image",
-                    CopyContent::Both => "file",
+                // Language packs (round 2): one whole counted head per mode (English keeps "(s)" for
+                // every count), and each ` · ` clause its own counted message (support::clause_*).
+                let head = match content {
+                    CopyContent::RawOnly => tr_plural!(ok, "Copied {n} RAW(s) → ./Picks", "Copied {n} RAW(s) → ./Picks"),
+                    CopyContent::JpgOnly => tr_plural!(ok, "Copied {n} image(s) → ./Picks", "Copied {n} image(s) → ./Picks"),
+                    CopyContent::Both => tr_plural!(ok, "Copied {n} file(s) → ./Picks", "Copied {n} file(s) → ./Picks"),
                 };
                 // The "no-content" note names the MISSING file for the chosen mode (a RAW-only copy
                 // skips image-only picks → "had no RAW"; an image-only copy skips RAW-only picks →
                 // "had no image"). Both can't hit no_content (every capture has ≥1 file), so its
                 // label is unused.
-                let missing = match content {
-                    CopyContent::JpgOnly => "image",
-                    _ => "RAW",
+                let no_content = match (nc, content) {
+                    (0, _) => String::new(),
+                    (_, CopyContent::JpgOnly) => tr_plural!(nc, " · {n} had no image", " · {n} had no image"),
+                    _ => tr_plural!(nc, " · {n} had no RAW", " · {n} had no RAW"),
                 };
                 // v0.8.128 (A1.3): `att` is the count the "skip (exists)" line used to swallow — an
                 // existing destination whose size does not match its source (the truncation class,
@@ -17903,9 +18024,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // it "needs attention" in error styling described the feature as a fault. Neither
                 // says "edited": intent is unobservable, and a size that differs is all we know.
                 let msg = format!(
-                    "Copied {ok} {what}(s) → ./Picks{}{}{}{}{}{}",
-                    if sk > 0 { format!(" · {sk} already there") } else { String::new() },
-                    if nc > 0 { format!(" · {nc} had no {missing}") } else { String::new() },
+                    "{head}{}{}{}{}{}{}",
+                    support::clause_already_there(sk),
+                    no_content,
                     // v1.0.0-rc (queue item 27, sheet 2.2b, OWNER RULING): the copy KEPT the file and
                     // says so. Placed with the content facts and above the diagnostics, because it is
                     // news about what travelled rather than about what went wrong — the severity is
@@ -17916,8 +18037,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // which the MOVE composer below also consumes and the F-8 row asserts - the
                     // COUNTED half of F-P9's "counted AND logged" rule had no test at all.
                     divergence_clauses(dv_dest, dv_src),
-                    if att > 0 { format!(" · {att} need attention (see log)") } else { String::new() },
-                    if fail > 0 { format!(" · {fail} FAILED (see log)") } else { String::new() }
+                    support::clause_need_attention(att),
+                    support::clause_failed(fail)
                 );
                 // v0.8.131 (F-P9 rule 2): `att` no longer feeds the error styling on its own — only
                 // a real failure does. (It still sends the reader to the log, in its own clause.)
@@ -18009,7 +18130,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         app.on_move_rejects(move || {
             if photo_gate.upgrade().is_some_and(|a| a.get_opening_photo()) { return; }
             let dir = cur_dir_mv.borrow().clone();
-            if dir.is_empty() || !start("Moving rejects…") {
+            if dir.is_empty() || !start(i18n::tr("Moving rejects…")) {
                 return;
             }
             let snap = shots_mv.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -18020,7 +18141,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if pend > 0 {
                     notice_mv.set(true);
                     notif_mv.borrow_mut().push(NotifEntry::warn(
-                        format!("{pend} moved photo(s) have unapplied rotations — Apply rotations first if you want them upright elsewhere"),
+                        tr_plural!(
+                            pend,
+                            "{n} moved photo(s) have unapplied rotations — Apply rotations first if you want them upright elsewhere",
+                            "{n} moved photo(s) have unapplied rotations — Apply rotations first if you want them upright elsewhere"
+                        ),
                         Instant::now(),
                     ));
                 }
@@ -18044,11 +18169,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // copy. ./Rejected carries no manifest of its own, so `dv_dest` is only ever
                 // non-zero where one exists — but the clause is here so the two paths cannot drift.
                 let msg = format!(
-                    "Moved {ok} file(s) → ./Rejected{}{}{}{}",
-                    if sk > 0 { format!(" · {sk} skipped") } else { String::new() },
+                    "{}{}{}{}{}",
+                    support::moved_to_rejected_text(ok), // language packs (round 2): whole messages
+                    support::clause_skipped(sk),
                     divergence_clauses(dv_dest, dv_src), // v0.8.134 (F-8): the copy path's own composer
-                    if att > 0 { format!(" · {att} need attention (see log)") } else { String::new() },
-                    if fail > 0 { format!(" · {fail} FAILED (see log)") } else { String::new() }
+                    support::clause_need_attention(att),
+                    support::clause_failed(fail)
                 );
                 // Hand the undo pairs (tagged with THIS op's folder) to the tick — the tick only accepts
                 // them if that folder is still current, so a folder switch mid-move can't produce a
@@ -18105,7 +18231,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // panel open (the surface two of these invokers live ON) a toast is painted behind it.
             // The sentence is the house form, word for word the delete path's own refusal
             // ("Busy with another file operation — delete cancelled").
-            if !start("Undoing move…") {
+            if !start(i18n::tr("Undoing move…")) {
                 log_event("undo-move: a file op is in progress — refused");
                 if let Some(a) = awz_um.upgrade() {
                     say_edit_result(
@@ -18114,7 +18240,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         &tleft_um,
                         &np_um,
                         &sd_um.borrow(),
-                        "Busy with another file operation — undo cancelled",
+                        i18n::tr("Busy with another file operation — undo cancelled"),
                         10_000,
                         None, // a refusal describes no act — nothing for a rim to point at
                     );
@@ -18135,9 +18261,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let _guard = OpGuard { busy: busy.clone(), slot: slot.clone(), kind: 3, origin: None };
                 let (ok, sk, fail) = undo_moves(&moves);
                 let msg = format!(
-                    "Undid — restored {ok} file(s) to the folder{}{}",
-                    if sk > 0 { format!(" · {sk} skipped") } else { String::new() },
-                    if fail > 0 { format!(" · {fail} FAILED (see log)") } else { String::new() }
+                    "{}{}{}",
+                    // Language packs (round 2): whole counted messages ("file(s)" for every count).
+                    tr_plural!(ok, "Undid — restored {n} file(s) to the folder", "Undid — restored {n} file(s) to the folder"),
+                    support::clause_skipped(sk),
+                    support::clause_failed(fail)
                 );
                 if !dir.is_empty() {
                     *rl.lock().unwrap_or_else(|e| e.into_inner()) = Some((PathBuf::from(&dir), Some(land)));
@@ -18157,7 +18285,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         app.on_empty_rejected(move || {
             if photo_gate.upgrade().is_some_and(|a| a.get_opening_photo()) { return; }
             let dir = cur_dir_er.borrow().clone();
-            if dir.is_empty() || !start("Emptying ./Rejected…") {
+            if dir.is_empty() || !start(i18n::tr("Emptying ./Rejected…")) {
                 return;
             }
             *last_move_er.borrow_mut() = None; // recycling the moved files makes the undo invalid
@@ -18225,7 +18353,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             &app,
                             &tcu_dk,
                             &toast_left_dk,
-                            "Delete needs a single photo — exit compare, or use the right-click menu on a thumbnail",
+                            i18n::tr("Delete needs a single photo — exit compare, or use the right-click menu on a thumbnail"),
                             10_000,
                         );
                     }
@@ -18313,7 +18441,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     &app,
                     &tcu_dr,
                     &toast_left_dr,
-                    "Busy with another file operation — delete cancelled",
+                    i18n::tr("Busy with another file operation — delete cancelled"),
                     10_000,
                 );
                 app.set_confirm_kind(0);
@@ -18350,7 +18478,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         targets.len() - ok_targets.len(),
                         targets.len()
                     ));
-                    show_transient_toast(&app, &tcu_dr, &toast_left_dr, "Folder changed — delete cancelled", 10_000);
+                    show_transient_toast(&app, &tcu_dr, &toast_left_dr, i18n::tr("Folder changed — delete cancelled"), 10_000);
                     app.set_confirm_kind(0);
                     return;
                 }
@@ -18415,7 +18543,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     *rl_dr.lock().unwrap_or_else(|e| e.into_inner()) =
                         Some((PathBuf::from(&dir), ok_targets.first().copied()));
                     if fail > 0 {
-                        msg.push_str(" — folder re-checked");
+                        msg = tr_format!("{result} — folder re-checked", result = msg); // language packs (round 2): one message
                     }
                 }
                 if can_recover {
@@ -18447,6 +18575,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         gen: live_gen,
                         idx: recovered_shots.first().copied().unwrap_or_else(|| ok_targets.first().copied().unwrap_or(0)),
                         name: format!("{} photos", recovered_shots.len().max(1)),
+                        photos: recovered_shots.len().max(1), // language packs (round 2): shown translated
                         files: recover_files,
                         op_time,
                         seq: rec_seq.unwrap_or(0), // v0.8.186 (U1): stamped when the record is armed
@@ -18499,7 +18628,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 *del_pending_dr.borrow_mut() = None;
                 // F2: an AUDIBLE refusal — a neutral/info toast so a red button that "does nothing" is never
                 // silent. Matches the kind-0 severity the informational toasts use (the log line stays too).
-                show_transient_toast(&app, &tcu_dr, &toast_left_dr, "Folder changed — delete cancelled", 10_000);
+                show_transient_toast(&app, &tcu_dr, &toast_left_dr, i18n::tr("Folder changed — delete cancelled"), 10_000);
                 app.set_confirm_kind(0);
                 return;
             }
@@ -18574,7 +18703,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 *rl_dr.lock().unwrap_or_else(|e| e.into_inner()) = Some((PathBuf::from(&dir), Some(idx))); // v0.8.34 (C3/G1): land on the deleted slot → the NEXT shot (clamped by post_op_land)
                 // F5: a partial failure has now been reconciled to disk — say so on the danger toast.
                 if fail > 0 {
-                    msg.push_str(" — folder re-checked");
+                    msg = tr_format!("{result} — folder re-checked", result = msg); // language packs (round 2): one message
                 }
             }
             // v0.8.37 (FIX A1): on a CLEAN recycle (something left, nothing failed) record everything a
@@ -18595,6 +18724,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     gen: live_gen,
                     idx,
                     name: name.clone(),
+                    photos: 0, // one photograph: `name` is its name
                     files: recover_files,
                     op_time,
                     seq: rec_seq.unwrap_or(0), // v0.8.186 (U1): stamped when the record is armed
@@ -18722,9 +18852,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             // v0.9.18: Windows lists the Recycle Bin and matches by original path + op_time; macOS renames
             // each captured (original, in-Trash) pair back — no bin scan, so it takes the pairs instead.
             #[cfg(not(target_os = "macos"))]
-            let (recovered, _failed, msg) = support::recover_recycled_files(&rec.name, &rec.files, rec.op_time);
+            let (recovered, _failed, msg) = support::recover_recycled_files(&rec.name, &rec.shown_name(), &rec.files, rec.op_time);
             #[cfg(target_os = "macos")]
-            let (recovered, _failed, msg) = support::recover_recycled_files(&rec.name, &rec.files, &rec.trash_paths);
+            let (recovered, _failed, msg) = support::recover_recycled_files(&rec.shown_name(), &rec.files, &rec.trash_paths);
             *delete_record_rc.borrow_mut() = None; // consumed; the rescan reconciles the view to the bin's actual state
             if !live_dir.is_empty() {
                 *rl_rc.lock().unwrap_or_else(|e| e.into_inner()) = Some((PathBuf::from(&live_dir), Some(rec.idx)));
@@ -18801,7 +18931,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         targets.len() - ok_targets.len(),
                         targets.len()
                     ));
-                    show_transient_toast(&app, &tcu_fr, &toast_left_fr, "Folder changed — nothing marked", 10_000);
+                    show_transient_toast(&app, &tcu_fr, &toast_left_fr, i18n::tr("Folder changed — nothing marked"), 10_000);
                     return;
                 }
                 bulk_fr(BulkOp::Set(MARK_REJECT), &ok_targets);
@@ -18823,7 +18953,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ));
                 *del_pending_fr.borrow_mut() = None;
                 // F2: same audible refusal as the recycle path — never silently mark/close.
-                show_transient_toast(&app, &tcu_fr, &toast_left_fr, "Folder changed — delete cancelled", 10_000);
+                show_transient_toast(&app, &tcu_fr, &toast_left_fr, i18n::tr("Folder changed — delete cancelled"), 10_000);
                 app.set_confirm_kind(0);
                 return;
             }
@@ -19008,8 +19138,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let base_title = awz
                 .upgrade()
                 .map(|a| a.get_out_web_progress_title().to_string())
-                .unwrap_or_else(|| "Exporting".to_string());
-            if !start(&format!("{base_title}…")) {
+                .unwrap_or_else(|| i18n::tr("Exporting").to_string());
+            // Language packs (round 2): the toast's trailing ellipsis is part of a message.
+            if !start(&tr_format!("{title}…", title = base_title)) {
                 return;
             }
             // v0.8.134 (R2): the progress card's title is CAPTURED here, not bound live. Its
@@ -19118,9 +19249,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 if a.get_wm_type() != 0 && wm_cache_ex.borrow().is_none() {
                     let why = if a.get_wm_type() == 2 {
-                        "Watermark not ready — the text didn't render (check the font/characters). Nothing exported."
+                        i18n::tr("Watermark not ready — the text didn't render (check the font/characters). Nothing exported.")
                     } else {
-                        "Watermark not ready — the logo PNG is missing or failed to load. Re-pick it. Nothing exported."
+                        i18n::tr("Watermark not ready — the logo PNG is missing or failed to load. Re-pick it. Nothing exported.")
                     };
                     pending_ew.borrow_mut().push(NotifEntry::error(why, Instant::now()));
                     log_event("web-export: BLOCKED — watermark requested but wm_cache is None (would have shipped clean)");
@@ -19335,7 +19466,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             &app,
                             &tcu_cpp,
                             &toast_left_cpp,
-                            &format!("Path copied — {txt}"),
+                            &tr_format!("Path copied — {path}", path = txt),
                             5_000,
                         );
                     } else {
@@ -19347,7 +19478,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         log_event(&format!("copy path: clipboard write FAILED for {txt}"));
                         notif_cpp
                             .borrow_mut()
-                            .push(NotifEntry::warn("Couldn't copy the path", Instant::now()));
+                            .push(NotifEntry::warn(i18n::tr("Couldn't copy the path"), Instant::now()));
                     }
                 }
                 None => {
@@ -19356,7 +19487,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         &app,
                         &tcu_cpp,
                         &toast_left_cpp,
-                        "No photo open — nothing to copy",
+                        i18n::tr("No photo open — nothing to copy"),
                         5_000,
                     );
                 }
@@ -19428,8 +19559,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let tx = tx.clone();
             std::thread::spawn(move || {
                 let picked = rfd::FileDialog::new()
-                    .add_filter("PNG image", &["png"])
-                    .set_title("Choose a watermark PNG (transparent)")
+                    .add_filter(i18n::tr("PNG image"), &["png"])
+                    .set_title(i18n::tr("Choose a watermark PNG (transparent)"))
                     .pick_file();
                 let _ = tx.send((PickKind::Watermark, picked));
             });
@@ -21531,15 +21662,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                     match support::advanced_colour_boot_warn(ev.now.mode, &name, is_srgb) {
                         Some(msg) if !colour_boot_warned.get() => {
                             colour_boot_warned.set(true);
-                            Some((support::NotifLevel::Warn, msg))
+                            // Language packs (round 2): the log line keeps the English sentence.
+                            let en = support::advanced_colour_boot_warn_english(ev.now.mode, &name, is_srgb);
+                            Some((support::NotifLevel::Warn, msg, en.unwrap_or_default()))
                         }
                         _ => None,
                     }
                 }
-                Some(prev) => support::colour_settings_changed_msg(prev, &ev.now, &name, is_srgb),
+                Some(prev) => support::colour_settings_changed_msg(prev, &ev.now, &name, is_srgb).map(|(l, m)| {
+                    (l, m, support::colour_settings_changed_log(prev, &ev.now, &name, is_srgb).unwrap_or_default())
+                }),
             };
-            let Some((level, msg)) = said else { continue };
-            log_event(&format!("display colour: {msg}"));
+            let Some((level, msg, msg_en)) = said else { continue };
+            log_event(&format!("display colour: {msg_en}"));
             // Both channels, one sentence (the F13/O39 discipline): the events centre keeps it, and
             // the transient toast puts it in front of someone who is culling and not looking at the
             // bell. `show_transient_toast` is the v0.8.121 (F22) grammar.
@@ -22799,7 +22934,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         app.set_export_total(export_progress_t.total.load(Ordering::Relaxed) as i32);
         let export_status = export_progress_t.status();
         app.set_export_filename(export_status.filename.into());
-        app.set_export_phase(export_status.phase.into());
+        app.set_export_phase(i18n::tr(export_status.phase).into()); // language packs (round 2): the worker's English id, translated where shown
         app.set_export_stopping(export_progress_t.cancel.load(Ordering::Relaxed));
 
         // 0/0b/0c/0d/0e) drain off-thread worker results into UI state (see fn docs above).
@@ -24042,7 +24177,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ));
                 say_edit_result(
                     &app, &toast_counts_unread_t, &toast_left_t, &notif_pending_t,
-                    &scanned_dir_t.borrow(), support::ANIMATED_ROTATE_RESET, 6_000, None,
+                    &scanned_dir_t.borrow(), i18n::tr(support::ANIMATED_ROTATE_RESET), 6_000, None,
                 );
             }
         }
@@ -24181,13 +24316,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut p = notif_pending_t.borrow_mut();
                 if d & 1 != 0 {
                     p.push(NotifEntry::warn(
-                        "GPU YUV convert unavailable — full-res frames use the standard upload path (same quality, slightly slower).",
+                        i18n::tr("GPU YUV convert unavailable — full-res frames use the standard upload path (same quality, slightly slower)."),
                         now,
                     ));
                 }
                 if d & 2 != 0 {
                     p.push(NotifEntry::warn(
-                        "A frame upload crashed and was skipped — the photo reloads automatically.",
+                        i18n::tr("A frame upload crashed and was skipped — the photo reloads automatically."),
                         now,
                     ));
                 }
@@ -24652,11 +24787,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // The two RECORD arms always raise a result row of their own; these cover the
                     // case where the photographer dismissed or cleared it while the reversal lived.
                     Some(support::UndoArm::Delete(_)) if undo_row < 0 => {
-                        rec.as_ref().map_or_else(String::new, |r| format!("Deleted — {}", r.name))
+                        rec.as_ref().map_or_else(String::new, |r| tr_format!("Deleted — {photo}", photo = r.shown_name()))
                     }
                     Some(support::UndoArm::Move(_)) if undo_row < 0 => mv.as_ref().map_or_else(
                         String::new,
-                        |(_, p, _)| format!("Moved {} file(s) → ./Rejected", p.len()),
+                        |(_, p, _)| support::moved_to_rejected_text(p.len()),
                     ),
                     // Either nothing is reversible, or a live row already carries the act — and in
                     // that second case the ACCENT RIM is on that row, which is the same cue in the
@@ -28470,7 +28605,7 @@ mod tests {
         let matched = support::match_recycled_items(&bin, &[f.clone()], op_time);
         assert_eq!(matched.len(), 1, "our recycled file is matched in the bin");
         // 3) recover via the exact production function.
-        let (rec, failed, msg) = support::recover_recycled_files("RECOVER_ME", &[f.clone()], op_time);
+        let (rec, failed, msg) = support::recover_recycled_files("RECOVER_ME", "RECOVER_ME", std::slice::from_ref(&f), op_time);
         eprintln!("recover_recycled_files → recovered={rec} failed={failed} msg={msg:?}");
         assert_eq!((rec, failed), (1, 0), "the file was restored");
         // 4) it is BACK, byte-identical.

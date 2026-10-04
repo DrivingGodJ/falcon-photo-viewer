@@ -796,7 +796,7 @@ import { FlagGlyph, ArchiveGlyph, GridGlyph, FilmFrameBlock, LeafGlyph } from "g
             flagbtn := CullButton {
                 hit: root.hit;
                 min-w: 70px;
-                label: root.bulk-armed ? root.bulk-flag-label : "Flag";
+                label: root.bulk-armed ? root.bulk-flag-label : @tr("falcon" => "Flag");
                 on: root.shown-flag; glow: root.bulk-armed;
                 fill-hover: Theme.accent-hover-flat; // v0.8.48: the v0.8.17 Fix-C opaque flatten of accent-soft-hover over the EXIF panel's guaranteed-solid Theme.base (hot ORs flagbtn.hovered) is the accent-hover-flat TOKEN now, recomputed by Rust from the TRANSFORMED accent/base — stays pixel-identical to the translucent composite in any output gamut, still artifact-safe if a lift returns. Rest fill stays translucent.
                 toggled => { if (root.bulk-armed) { root.bulk-mark(0); } else { root.set-flag(!root.flagged); } }
@@ -804,7 +804,7 @@ import { FlagGlyph, ArchiveGlyph, GridGlyph, FilmFrameBlock, LeafGlyph } from "g
             rejbtn := CullButton {
                 hit: root.hit;
                 min-w: 86px;
-                label: root.bulk-armed ? root.bulk-reject-label : "Reject";
+                label: root.bulk-armed ? root.bulk-reject-label : @tr("falcon" => "Reject");
                 danger: true; on: root.shown-reject; glow: root.bulk-armed;
                 fill-hover: Theme.danger-hover-flat; // v0.8.48: the v0.8.17 Fix-C opaque flatten of danger-soft-hover over Theme.base is the danger-hover-flat TOKEN now (transformed-ingredient recompute) -- same rationale as Flag.
                 toggled => { if (root.bulk-armed) { root.bulk-mark(1); } else { root.set-reject(!root.rejected); } }

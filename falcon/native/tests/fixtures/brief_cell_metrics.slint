@@ -6,5 +6,7 @@ export component BriefCellMetrics inherits Window {
     default-font-family: "Inter";
     in property <string> sample;
     out property <length> line-height: cell.preferred-height;
+    // Language packs (round 2, batch 5): the width the text asks for, unsqueezed.
+    out property <length> text-width: cell.preferred-width;
     cell := BriefCell { text: root.sample; }
 }

@@ -38,8 +38,9 @@ pub(crate) fn wire_preference(app: &crate::MainWindow, update: impl Fn(bool) -> 
                 Ok(()) => { a.set_distinct_raw_icons(next); a.set_assoc_status("".into()); }
                 Err(e) => {
                     let restore = update(!next);
-                    let note = restore.err().map(|e| format!(" Couldn't restore the previous icons: {e}")).unwrap_or_default();
-                    a.set_assoc_status(slint::format!("Couldn't update the RAW icons: {e}{note}"));
+                    // Two whole sentences, each its own message (a language pack orders each).
+                    let note = restore.err().map(|e| format!(" {}", tr_format!("Couldn't restore the previous icons: {error}", error = e))).unwrap_or_default();
+                    a.set_assoc_status(format!("{}{note}", tr_format!("Couldn't update the RAW icons: {error}", error = e)).into());
                 }
             }
         }

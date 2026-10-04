@@ -161,7 +161,7 @@ pub(crate) fn drain_bench(rx: &Receiver<Option<BenchResult>>, running: &Cell<boo
         running.set(false);
         app.set_bench_running(false);
         let Some(r) = r else {
-            app.set_bench_text("no photos to benchmark".into());
+            app.set_bench_text(i18n::tr("no photos to benchmark").into());
             continue;
         };
         app.set_benchmarked(true);
@@ -182,10 +182,23 @@ pub(crate) fn drain_bench(rx: &Receiver<Option<BenchResult>>, running: &Cell<boo
         // v0.9.60 (W2-5c): the live source for the provenance, written by the SAME drain that
         // writes the numbers it describes (the BenchLat pattern one line above).
         set_bench_prov(support::BenchProv { src_fmt: r.src_fmt.clone(), pool_w: r.pool_w });
+        // Language packs (round 2): the readout is one message; the provenance tail is its own ` · `
+        // clause, separator included.
         app.set_bench_text(slint::format!(
-            "Faster preview {}: {} · Sharper preview {}: {} · Full {}: {} fps (browse-sustained; decode {}/{}, upload {}/{}){}",
-            r.sub_res, r.sub_fps, r.super_res, r.super_fps, r.full_res, r.full_fps,
-            r.sub_decode, r.super_decode, r.sub_upload, r.super_upload,
+            "{}{}",
+            tr_format!(
+                "Faster preview {sub_res}: {sub_fps} · Sharper preview {super_res}: {super_fps} · Full {full_res}: {full_fps} fps (browse-sustained; decode {sub_decode}/{super_decode}, upload {sub_upload}/{super_upload})",
+                sub_res = r.sub_res,
+                sub_fps = r.sub_fps,
+                super_res = r.super_res,
+                super_fps = r.super_fps,
+                full_res = r.full_res,
+                full_fps = r.full_fps,
+                sub_decode = r.sub_decode,
+                super_decode = r.super_decode,
+                sub_upload = r.sub_upload,
+                super_upload = r.super_upload
+            ),
             // "" on Windows by construction — the row's bytes there are unchanged.
             support::bench_provenance_tail(&r.src_fmt, r.full_gpu, r.pool_w, r.synthetic, r.synth_mp)
         ));
@@ -1698,7 +1711,7 @@ pub(crate) fn step_wheel_advance(
                             app,
                             toast.counts_unread,
                             toast.left,
-                            support::WHEEL_WAIT_TOAST,
+                            i18n::tr(support::WHEEL_WAIT_TOAST),
                             10_000, // the cull gate's own linger, passed the same way it passes it
                         );
                     }
@@ -3390,8 +3403,25 @@ pub(crate) fn step_cache_meter(
         app.set_cache_frac_after(frac_after);
         app.set_cache_len_before(len_before);
         app.set_cache_len_after(len_after);
-        // "Sharp" while zoomed (full-res banking), "Cache" otherwise (fast-scrub proxies).
-        let tier = if zoomed { "Sharp" } else { "Cache" };
+        // "Sharp" while zoomed (full-res banking), "Cache" otherwise (fast-scrub proxies). Language
+        // packs (round 2): each tier's readout is one whole message.
+        let readout = if zoomed {
+            tr_format!(
+                "Sharp · behind {behind_cached}/{behind_avail} · ahead {ahead_cached}/{ahead_avail}",
+                behind_cached = behind_cached,
+                behind_avail = behind_avail,
+                ahead_cached = ahead_cached,
+                ahead_avail = ahead_avail
+            )
+        } else {
+            tr_format!(
+                "Cache · behind {behind_cached}/{behind_avail} · ahead {ahead_cached}/{ahead_avail}",
+                behind_cached = behind_cached,
+                behind_avail = behind_avail,
+                ahead_cached = ahead_cached,
+                ahead_avail = ahead_avail
+            )
+        };
         let leaf = leaf_tip;
         // v0.8.196 (WAVE 2, §C): THE LEAF'S TIP RIDES THIS ONE, and that is a deliberate deviation
         // from §1C's "Tip on the leaf" — recorded in the round's §C. The meter already owns a
@@ -3402,14 +3432,10 @@ pub(crate) fn step_cache_meter(
         // documented leave paths (L22), and split one indicator's explanation across two tooltips
         // with two different dwells. One hover writer, one sentence, the leaf's clause first.
         app.set_cache_meter_tip(if leaf.is_empty() {
-            slint::format!(
-                "{tier} · behind {behind_cached}/{behind_avail} · ahead {ahead_cached}/{ahead_avail}"
-            )
+            readout.into()
         } else {
-            slint::format!(
-                "{leaf} · {tier} · behind {behind_cached}/{behind_avail} · ahead \
-                 {ahead_cached}/{ahead_avail}"
-            )
+            // The leaf's sentence, then the readout: one message, so a pack can order the two.
+            tr_format!("{leaf} · {readout}", leaf = leaf, readout = readout).into()
         });
     }
 }
@@ -5414,10 +5440,12 @@ impl GifPlay {
 
     /// The honest panel line for this GIF.
     fn anim_info(&self) -> String {
+        // Language packs (round 2): counted messages whose two English forms are the same, so
+        // English keeps "frames" at any count while a pack can pluralise.
         if self.too_large {
-            format!("GIF · {} frames (too large to animate)", self.total_frames)
+            tr_plural!(self.total_frames, "GIF · {n} frames (too large to animate)", "GIF · {n} frames (too large to animate)")
         } else if self.animated {
-            format!("GIF · animated · {} frames", self.total_frames)
+            tr_plural!(self.total_frames, "GIF · animated · {n} frames", "GIF · animated · {n} frames")
         } else {
             "GIF".to_string()
         }
@@ -5636,9 +5664,9 @@ pub(crate) fn step_display(
         // generic notice — built here since the slint! macro has no string interpolation.
         let fmt = shots.get(c).and_then(|s| s.finished_format()).unwrap_or_default();
         let note = if fmt.is_empty() {
-            "This format is currently unsupported".to_string()
+            i18n::tr("This format is currently unsupported").to_string()
         } else {
-            format!("{fmt} is currently unsupported")
+            tr_format!("{format} is currently unsupported", format = fmt)
         };
         app.set_cur_unsupported_note(note.into());
     }
@@ -5732,7 +5760,7 @@ pub(crate) fn step_display(
                 // reads it as a corrupt/unsupported-variant file. Pinned by windows_strings_unchanged.
                 crate::platform::heic_decode_failed_text()
             } else {
-                "Couldn't decode this file — it may be corrupt or unreadable".to_string()
+                i18n::tr("Couldn't decode this file — it may be corrupt or unreadable").to_string()
             }
             .into(),
         );
@@ -6860,7 +6888,7 @@ pub(crate) fn sync_current_source_labels(app: &MainWindow, shot: Option<&Shot>) 
     let raw = shot.is_some_and(|s| s.has_raw);
     let finished = shot.is_some_and(|s| s.has_jpg);
     let format = shot.and_then(Shot::finished_format);
-    let label = if finished { format.as_deref().unwrap_or("Image") } else { "Image" };
+    let label = if finished { format.as_deref().unwrap_or_else(|| i18n::tr("Image")) } else { i18n::tr("Image") };
     if app.get_cur_has_raw() != raw {
         app.set_cur_has_raw(raw);
     }
@@ -6882,11 +6910,11 @@ pub(crate) fn sync_compare_source_labels(app: &MainWindow, a: Option<&Shot>, b: 
     let af = a.filter(|s| s.has_jpg).and_then(Shot::finished_format);
     let bf = b.filter(|s| s.has_jpg).and_then(Shot::finished_format);
     let label = if raw_only {
-        "Preview"
+        i18n::tr("Preview")
     } else if af.is_some() && af == bf {
         af.as_deref().unwrap()
     } else {
-        "Images"
+        i18n::tr("Images")
     };
     if app.get_cmp_has_raw() != (a_raw || b_raw) {
         app.set_cmp_has_raw(a_raw || b_raw);
@@ -9938,15 +9966,17 @@ pub(crate) fn copy_text_to_clipboard(s: &str) -> bool {
 
 /// Toast text for a completed copy — names the FILE (stem) + the filetype copied, e.g.
 /// "HWU_7781 RAW + JPG copied to clipboard" (user: show filename + type, not a bare file count).
+///
+/// Language packs (round 2): one whole message per kind; the file name and the format name are
+/// values, and "image" — the word for a missing format or name — is its own message.
 pub(crate) fn copy_result_text(shot: &Shot, kind: i32, _n: usize) -> String {
-    let fin = shot.finished_format().unwrap_or_else(|| "image".to_string());
-    let what = match kind {
-        2 => format!("RAW + {fin}"),
-        1 => "RAW".to_string(),
-        _ => fin,
-    };
-    let name = if shot.name.is_empty() { "image" } else { shot.name.as_str() };
-    format!("{name} {what} copied to clipboard")
+    let fin = shot.finished_format().unwrap_or_else(|| i18n::tr("image").to_string());
+    let name = if shot.name.is_empty() { i18n::tr("image") } else { shot.name.as_str() };
+    match kind {
+        2 => tr_format!("{photo} RAW + {format} copied to clipboard", photo = name, format = fin),
+        1 => tr_format!("{photo} RAW copied to clipboard", photo = name),
+        _ => tr_format!("{photo} {format} copied to clipboard", photo = name, format = fin),
+    }
 }
 
 /// Copy the shot's file(s) for `kind` (0 finished / 1 RAW / 2 both) and post a success/failure toast to
@@ -9967,12 +9997,12 @@ pub(crate) fn do_copy_kind(shot: &Shot, kind: i32, notif_pending: &RefCell<Vec<N
     // "nothing to copy". Now: n==0 → warn "nothing to copy"; write ok → success; write failed on a
     // non-empty set → error "clipboard unavailable" (there WAS something; the OS clipboard refused it).
     let (text, k, log) = if n == 0 {
-        ("Nothing to copy for this photo".to_string(), 2, "copy to clipboard: nothing applicable to copy".to_string())
+        (i18n::tr("Nothing to copy for this photo").to_string(), 2, "copy to clipboard: nothing applicable to copy".to_string())
     } else if copy_files_to_clipboard(&paths) {
         (copy_result_text(shot, kind, n), 1, format!("copied {n} file(s) to clipboard (kind {kind})"))
     } else {
         (
-            "Couldn't copy — the clipboard may be in use by another app".to_string(),
+            i18n::tr("Couldn't copy — the clipboard may be in use by another app").to_string(),
             3,
             format!("copy to clipboard: the clipboard was unavailable for {n} file(s) (kind {kind})"),
         )
@@ -10061,14 +10091,16 @@ pub(crate) fn bulk_copy_toast(shots: &[&Shot], set: &support::BulkCopySet, kind:
 /// Compact relative timestamp for the events list.
 pub(crate) fn rel_time(created: Instant, now: Instant) -> String {
     let s = now.saturating_duration_since(created).as_secs();
+    // Language packs (round 2): counted messages, so a pack can inflect its unit; English keeps
+    // one abbreviated form for every count.
     if s < 5 {
-        "just now".to_string()
+        i18n::tr("just now").to_string()
     } else if s < 60 {
-        format!("{s}s ago")
+        tr_plural!(s, "{n}s ago", "{n}s ago")
     } else if s < 3600 {
-        format!("{}m ago", s / 60)
+        tr_plural!(s / 60, "{n}m ago", "{n}m ago")
     } else {
-        format!("{}h ago", s / 3600)
+        tr_plural!(s / 3600, "{n}h ago", "{n}h ago")
     }
 }
 
@@ -11046,12 +11078,12 @@ pub(crate) fn step_persistence(
                                 panel_lru.borrow_mut().retain(|(d, _)| d != &dir); // v0.8.89: now a json folder
                             }
                             if save_warned.replace(false) {
-                                notif_pending.borrow_mut().push(NotifEntry::success("Ratings saved.", now));
+                                notif_pending.borrow_mut().push(NotifEntry::success(i18n::tr("Ratings saved."), now));
                             }
                         }
                         Err(e) => {
                             if !save_warned.replace(true) {
-                                notif_pending.borrow_mut().push(NotifEntry::error(format!("⚠ Ratings not saved — {e}"), now));
+                                notif_pending.borrow_mut().push(NotifEntry::error(tr_format!("⚠ Ratings not saved — {error}", error = e), now));
                             }
                         }
                     }
@@ -11147,8 +11179,11 @@ pub(crate) fn cloud_placeholders_in(order: &[usize], is_cloud: impl Fn(usize) ->
 pub(crate) fn unapplied_rotation_notice(n: usize) -> String {
     match n {
         0 => String::new(),
-        1 => "1 photo has unapplied rotation — Apply rotations first if you want it to travel.".to_string(),
-        n => format!("{n} photos have unapplied rotation — Apply rotations first if you want them to travel."),
+        n => tr_plural!(
+            n,
+            "{n} photo has unapplied rotation — Apply rotations first if you want it to travel.",
+            "{n} photos have unapplied rotation — Apply rotations first if you want them to travel."
+        ),
     }
 }
 
@@ -11168,8 +11203,11 @@ pub(crate) fn cloud_placeholder_picks(marks: &[u8], mark_bit: u8, is_cloud: impl
 pub(crate) fn cloud_download_notice(n: usize) -> String {
     match n {
         0 => String::new(),
-        1 => "1 cloud-only file will be downloaded by this operation.".to_string(),
-        n => format!("{n} cloud-only files will be downloaded by this operation."),
+        n => tr_plural!(
+            n,
+            "{n} cloud-only file will be downloaded by this operation.",
+            "{n} cloud-only files will be downloaded by this operation."
+        ),
     }
 }
 
@@ -11460,7 +11498,10 @@ pub(crate) fn step_settle_exif(
         // replace a managed proxy's answer while both are already known.
         let cs_sig = (c, out_gamut, source, unreadable, raw_develop);
         if cs_built.get() != Some(cs_sig) {
-            if let Some(src) = source {
+            // Language packs (round 2): `chip_english` is the chip as English writes it, for the
+            // trace line below, which stays English while the chip itself may draw a translated
+            // "Custom".
+            let chip_english = if let Some(src) = source {
                 let dst = Gamut::from_i32(out_gamut as i32);
                 let converting = src != dst;
                 app.set_cs_converting(converting);
@@ -11470,20 +11511,29 @@ pub(crate) fn step_settle_exif(
                 // `label()` for every modeled gamut, so no ordinary photograph's chip changes. `dst`
                 // stays on `label`: a destination is always a settings gamut.
                 let src_name = src.display_name();
+                // Language packs (round 2): the drawn names. Colour-space names stay as they are;
+                // only the custom output's generic "Custom" is translated (`gamut_name_shown`,
+                // byte-identical to `src_name` / `dst.label()` in English). The arrow joins two
+                // names and has no words of its own, so the chip is not a message.
+                let (src_shown, dst_shown) = (support::gamut_name_shown(src), support::gamut_name_shown(dst));
                 app.set_cs_chip(if converting {
-                    slint::format!("{} → {}", src_name, dst.label())
+                    slint::format!("{} → {}", src_shown, dst_shown)
                 } else {
-                    src_name.clone().into()
+                    src_shown.as_str().into()
                 });
-                app.set_cs_note(if converting {
-                    slint::format!(
-                        "Converting {} → {} for display (your chosen output gamut). Make sure it matches your monitor's mode.",
-                        src_name,
-                        dst.label()
-                    )
-                } else {
-                    slint::format!("{} — shown directly (matches your output gamut).", src_name)
-                });
+                app.set_cs_note(
+                    if converting {
+                        tr_format!(
+                            "Converting {source} → {output} for display (your chosen output gamut). Make sure it matches your monitor's mode.",
+                            source = src_shown,
+                            output = dst_shown
+                        )
+                    } else {
+                        tr_format!("{source} — shown directly (matches your output gamut).", source = src_shown)
+                    }
+                    .into(),
+                );
+                if converting { format!("{} → {}", src_name, dst.label()) } else { src_name }
             } else if unreadable {
                 // v0.8.96: the same honest blank chip, but a note that does not promise a reading
                 // that can never arrive. The placeholder card on the stage already says WHY the file
@@ -11491,18 +11541,20 @@ pub(crate) fn step_settle_exif(
                 // states only what the chip itself cannot know.
                 app.set_cs_converting(false);
                 app.set_cs_chip("—".into());
-                app.set_cs_note("Colour space unavailable for this photo.".into());
+                app.set_cs_note(i18n::tr("Colour space unavailable for this photo.").into());
+                "—".to_string()
             } else {
                 // The honest blank (V3): no claim about a shot whose colour space nobody has read yet.
                 app.set_cs_converting(false);
                 app.set_cs_chip("—".into());
-                app.set_cs_note("Reading this photo's colour space…".into());
-            }
+                app.set_cs_note(i18n::tr("Reading this photo's colour space…").into());
+                "—".to_string()
+            };
             cs_built.set(Some(cs_sig));
             static TRACE_VIEW: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
             if *TRACE_VIEW.get_or_init(||std::env::var_os("FALCON_TRACE_VIEW_STATE").is_some()) {
                 log_event(&format!("colour-chip: gen={gen_now} shot={c} raw={} detail={} source={source:?} label={}",
-                    app.get_raw_mode(),app.get_detail_live(),app.get_cs_chip()));
+                    app.get_raw_mode(),app.get_detail_live(),chip_english));
             }
         }
         // prefetch the source dimensions for the shot we LANDED on (off-thread) so the first zoom
@@ -11576,6 +11628,10 @@ pub(crate) fn step_settle_exif(
                 .or_else(|| exif_retry.borrow().contains_key(&c).then(Vec::new));
             if let Some(pairs) = render {
                 // Folded-view grid: pick the essentials by label (empty when absent).
+                // Language packs (round 2, PLAN §4): "label" here is the row's English KEY from
+                // falcon-decode, never the drawn text, so every pick holds in any language. The
+                // values are the camera's and are not translated; only the words Falcon adds around
+                // them ("ISO", "AWB", the Kelvin unit) are messages.
                 {
                     let pick = |label: &str| -> slint::SharedString {
                         pairs.iter().find(|(k, _)| k == label).map(|(_, v)| v.as_str()).unwrap_or("").into()
@@ -11583,13 +11639,14 @@ pub(crate) fn step_settle_exif(
                     let iso = pairs
                         .iter()
                         .find(|(k, _)| k == "ISO")
-                        .map(|(_, v)| format!("ISO {v}"))
+                        .map(|(_, v)| tr_format!("ISO {iso}", iso = v))
                         .unwrap_or_default();
                     // WB cell = mode (EXIF) + computed Kelvin: auto → "AWB 5650K", else the temp alone.
+                    // ("Auto" is the camera's VALUE as the exif crate writes it, never translated.)
                     let wb_mode = pairs.iter().find(|(k, _)| k == "White balance").map(|(_, v)| v.as_str());
                     let wb = match (wb_mode, wb_k) {
-                        (Some("Auto"), Some(k)) => format!("AWB {k}K"),
-                        (_, Some(k)) => format!("{k}K"),
+                        (Some("Auto"), Some(k)) => tr_format!("AWB {kelvin}K", kelvin = k),
+                        (_, Some(k)) => tr_format!("{kelvin}K", kelvin = k),
                         (Some(m), None) => m.to_string(),
                         (None, None) => String::new(),
                     };
@@ -11615,19 +11672,23 @@ pub(crate) fn step_settle_exif(
                         files: pick("Files"),
                     });
                 }
-                let mut rows: Vec<ExifRow> = pairs
+                // Language packs (round 2, PLAN §4): the expanded rows are assembled on their English
+                // KEYS — the "Model" filter and the "Color temp" insertion after "White balance" read
+                // the key — and only then published with their drawn labels
+                // (`support::exif_row_shown`), so no lookup ever meets translated text.
+                let mut keyed: Vec<(String, String)> = pairs
                     .into_iter()
                     .filter(|(k, _)| k != "Model") // folded-grid-only; expanded shows full "Camera"
-                    .map(|(k, v)| ExifRow { k: k.into(), v: v.into() })
                     .collect();
                 // Expanded list: add a "Color temp" row right after White balance when known.
                 if let Some(k) = wb_k {
-                    let ct = ExifRow { k: "Color temp".into(), v: slint::format!("{k} K") };
-                    match rows.iter().position(|r| r.k.as_str() == "White balance") {
-                        Some(i) => rows.insert(i + 1, ct),
-                        None => rows.push(ct),
+                    let ct = ("Color temp".to_string(), tr_format!("{kelvin} K", kelvin = k));
+                    match keyed.iter().position(|(key, _)| key == "White balance") {
+                        Some(i) => keyed.insert(i + 1, ct),
+                        None => keyed.push(ct),
                     }
                 }
+                let rows: Vec<ExifRow> = keyed.iter().map(|(k, v)| support::exif_row_shown(k, v)).collect();
                 exif_model.set_vec(rows);
                 exif_built.set(Some(sig));
             }
@@ -13058,8 +13119,8 @@ pub(crate) fn step_selection(
             app.set_out_include_raw_label(support::include_raw_only_label(n_raw).into());
             // The caption rides the same publish: one worded string, one producer, and it costs a
             // pointer copy on a pass that runs only when something in the key has moved.
-            app.set_include_raw_caption(support::RAW_ONLY_CAPTION.into());
-            app.set_raw_develop_caption(crate::raw_export::RAW_DEVELOP_CAPTION.into());
+            app.set_include_raw_caption(i18n::tr(support::RAW_ONLY_CAPTION).into());
+            app.set_raw_develop_caption(i18n::tr(crate::raw_export::RAW_DEVELOP_CAPTION).into());
             app.set_include_rejects_default(support::include_rejects_default(filt_o));
             app.set_out_col1_title(support::out_col1_title(filt_o).into());
             app.set_out_copy_label(support::out_col1_label(filt_o, false).into());

@@ -136,7 +136,7 @@ import { FilmItem } from "structs.slint";
                 x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
             }
             if root.loading : Text {
-                text: "Loading…"; color: Theme.text-mute; font-size: Theme.font-sm;
+                text: @tr("falcon" => "Loading…"); color: Theme.text-mute; font-size: Theme.font-sm;
                 horizontal-alignment: center; vertical-alignment: center;
                 width: 100%; height: 100%;
             }

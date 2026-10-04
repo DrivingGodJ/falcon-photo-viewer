@@ -19,7 +19,7 @@ pub(crate) fn wire(app: &MainWindow, open: impl Fn(&str) -> std::io::Result<()> 
         let Some(url) = target(kind) else { return };
         match open(url) {
             Ok(()) => app.set_about_error("".into()),
-            Err(e) => app.set_about_error(slint::format!("Couldn't open the link: {e}")),
+            Err(e) => app.set_about_error(tr_format!("Couldn't open the link: {error}", error = e).into()),
         }
     });
 }

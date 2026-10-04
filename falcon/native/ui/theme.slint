@@ -226,6 +226,12 @@
         // and the welcome panel's three columns adopt it verbatim — never a copied 320 literal
         // anywhere, so the two surfaces can never drift (the hand-mirrored-constants gotcha).
         out property <length> section-w: 320px;
+        // Settings → Developer "Widen controls to fit text" (owner ruling, 4 October). Off keeps
+        // every width tuned to English exactly as it is. On, those widths grow to fit their text so a
+        // translation's layout can be checked: each site keeps ONE width binding and takes
+        // max(<tuned width>, <its text's preferred width>) when this is set (ledger L47). Saved as
+        // `Settings.fit_text_widths`.
+        in-out property <bool> fit-text: false;
     }
 
     // ── G11 (v0.8.44): shared delayed-tooltip channel. Hover hosts (the five unlabeled title-bar

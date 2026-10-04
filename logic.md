@@ -42,10 +42,11 @@ Names in backticks (functions, types, constants, Slint properties and callbacks)
 24. [Platform rules and the Mac](#platform-rules-and-the-mac)
 25. [Windows file icons and associations](#windows-file-icons-and-associations)
 26. [About card](#about-card)
-27. [Public source and release packaging](#public-source-and-release-packaging)
-28. [Rules learned in practice](#rules-learned-in-practice)
-29. [Before shipping a feature](#before-shipping-a-feature)
-30. [Maintaining this reference](#maintaining-this-reference)
+27. [Languages](#languages)
+28. [Public source and release packaging](#public-source-and-release-packaging)
+29. [Rules learned in practice](#rules-learned-in-practice)
+30. [Before shipping a feature](#before-shipping-a-feature)
+31. [Maintaining this reference](#maintaining-this-reference)
 
 ## What Falcon is for
 
@@ -469,6 +470,7 @@ Paths are relative to `falcon/native/src/` unless shown in full.
 | Menu blur (the frosted glass behind menus and panels); an opt-in capture hook for checking it, which is the only code that reads the GPU back | `backdrop.rs`, `glass_blur.rs`; `menu_probe.rs` |
 | Optional diagnostic logging and its permission gate (`LogGate`); log lines queue as `WriteMsg::Log` | `diagnostic_log.rs`; `support.rs` |
 | About card | `about.rs`, `ui/about.slint` |
+| Languages: choosing one, message lookup (`tr`, `tr_format!`, `tr_plural!`, `tr_noop!`), the Settings picker; plural rules; turning packs into bundled translations | `i18n.rs`, `i18n_rules.rs`; `build_translations.rs`; `translations/`; `scripts/check-translations.py` |
 | Windows file associations, the icon helper and per-format shell icons | `windows_assoc.rs`, `windows_icon_bridge.rs`, `file_icons.rs`; `falcon/native/shell-icons/` |
 | Mac default-app settings (LaunchServices) and Finder's open-document events | `mac_assoc.rs`, `macos_open.rs` |
 | Mac menu bar: what the menus contain and enable (pure, tested on Windows), and the native menu | `menubar_model.rs`, `mac_menu.rs` |
@@ -6879,6 +6881,110 @@ Clicking the version at the bottom of Settings opens the About card (`ui/about.s
 The version button is left-aligned with the Settings content; Show welcome stays on the right. Clicking the version still opens the About card. This supersedes the earlier centred-version layout.
 
 **The version string has one source.** `app.set_app_version(env!("CARGO_PKG_VERSION"))` reads the version from `falcon/native/Cargo.toml` on both platforms. A Mac title-bar test build shows `mac_experiment::build_label()` instead (the same version plus a test-build suffix). Nothing types the version by hand.
+
+## Languages
+
+English is the source language. Other languages are language packs, which are data only. The
+contributor guide is [docs/development/translations.md](docs/development/translations.md).
+
+- **Sources.**
+  - `falcon/native/translations/languages.json` is the language list: code, own name, matched
+    system tags, plural rule.
+  - `translations/<code>.json` holds one pack per listed language, keyed by the exact English text.
+  - Plural rules live in `src/i18n_rules.rs`, shared by the build script and the app.
+- **Build.**
+  - `build_translations.rs` (called from `build.rs`) validates every pack and writes
+    `OUT_DIR/translations/<code>/LC_MESSAGES/falcon-native.po` for Slint, with all entries under
+    context `falcon`.
+  - It also writes `OUT_DIR/packs.rs`, the `LANGUAGES` table with each pack embedded by
+    `include_str!`.
+  - It sets `SLINT_BUNDLE_TRANSLATIONS` only when there is at least one pack, because Slint fails on
+    an empty folder. It sets `FALCON_TRANSLATIONS_HASH` so a pack edit recompiles the `slint!`
+    units, which do not track `.po` files.
+  - `i-slint-compiler`'s `bundle-translations` feature is a build dependency.
+- **Choosing.**
+  - `i18n::init` runs once, right after `load_settings`, before any window exists.
+  - `Settings.language` decides: `""` follows the system, `"en"` is English, anything else is a pack
+    code, and an unknown code follows the system.
+  - The system's ordered preferences come from `sys-locale`. `system_language` walks them: exact tag,
+    then language plus script, then a region mapped to a script (zh CN/SG/MY → Hans, TW/HK/MO →
+    Hant), then the bare language only for a tag with no script information. English first wins.
+  - `i18n::select_for_slint` runs right after `MainWindow::new` and replaces Slint's own locale
+    guess.
+  - The choice holds for the whole run. The Settings picker saves a new choice and shows a restart
+    note when it differs from the running language.
+- **Rust lookups.**
+  - The active pack is parsed once into a `OnceLock` and its strings are leaked, so
+    `tr(&'static str) -> &'static str`.
+  - `tr_format!` expands to `format!` with the same literal for English, which keeps the compile-time
+    placeholder check and byte-identical English. For other languages it fills named placeholders by
+    name.
+  - `tr_plural!` keys a pack by the English singular and picks the form with the rule's
+    `plural_index`.
+  - Every lookup falls back to English.
+- **Settings and toggle.**
+  - LANGUAGE leads Settings, as a dropdown (owner ruling in the round-1 review): a Font-selector
+    style trigger opens a sort-menu style list hung under it at its width. It has the sctxbox
+    height cap, a Flickable and a bottom fade, so any number of packs stays reachable. Rust builds
+    the rows as "System (…)", "English", then the own names.
+  - The menu (`language-menu-open`) closes on any press, is the first arm of the Esc ladder (it
+    closes before Settings), and closes when Settings closes. Settings is a dialog, so the photo is
+    already blocked and the menu needs no place in `menu-open`.
+  - Opening it calls `keys.focus()` first, as the shortcut-capture rows do. The Esc ladder lives in
+    the `keys` FocusScope, a sibling of Settings, so a Settings text field left focused would
+    otherwise swallow Esc.
+  - Settings → Developer → "Widen controls to fit text" sets `Theme.fit-text`, saved as
+    `Settings.fit_text_widths`. Off is today's geometry. On, each width tuned to English becomes
+    `max(tuned, what its translated words need)`, one value expression per site (ledger L47):
+    - the welcome's Skip/Done buttons and the toast card's Yes/No row (measured against hidden
+      English copies, so English never moves);
+    - the compare bar's focus badge and its two `SegPill`s (`fit-width`);
+    - the photo and Review-tile context menus: their rows' need, never the filename header
+      (`preferred-width: 0px`, owner ruling), bounded only by the window;
+    - the export sheet's two label columns (`lbl-left-w`/`lbl-right-w`, so controls stay aligned);
+    - the info panel's ISO brief cell (the other floored cells show camera values);
+    - the copy dialog (kind 1), when a content choice outgrows its 116 px cell (`cfm0`–`cfm2`);
+    - the export progress card, from its title and counts (the done count held at the total's
+      width). The Review panel's category chips stay fixed (owner ruling: leave them).
+  - The toggle also skips two Rust cut-offs: `auto_detect_label`'s 24 characters and
+    `custom_gamut_label_is_long`'s 8 (`fit-text-toggled` re-decides them at once).
+  - Both new settings are saved only once set, so old settings files stay byte-identical.
+- **Tests and the pseudo-language.**
+  - Non-release builds also bundle `xx-TEST` from `translations/test/xx-TEST.json`, which wraps
+    every message in ⟦…⟧, and set `cfg(falcon_pseudo_language)`.
+  - Tests are English by default: `boot()` pins Slint to `"en"`, and `cfg(test)` lookups use a
+    per-thread override that defaults to English.
+  - Slint keeps the selected language per thread, so a test can select `xx-TEST` without affecting
+    others.
+- **Checks.** `scripts/check-translations.py` collects every marked message:
+  - Slint `@tr("falcon" => …)`, and Rust `tr`, `tr_format!`, `tr_plural!`, `tr_noop!`;
+  - comments, `#[cfg(test)]` modules and `*_tests.rs` are skipped.
+
+  For every pack, it checks entries, placeholder sets and plural shapes. Slint messages use
+  numbered placeholders and Rust messages named ones. `--write` regenerates `xx-TEST.json`.
+- **Never translated.**
+  - Log lines and saved values, including key tokens and the `Rejected` and `Picks` folder names.
+    Where a log line and the screen shared a sentence, the log keeps an English copy (`*_english`
+    helpers, `entry_custom_label_log`).
+  - Registry text.
+  - EXIF values.
+  - Text that drives behaviour. Compare ids and translate only what is drawn.
+- **Where behaviour used to read English text (marking round).**
+  - Key tokens stay English in settings and Slint comparisons; `support::key_token_name` and Slint
+    `key-name` translate only the drawn keycap.
+  - Tooltip clears compare `Tip.text` with the property each owner publishes (the same translated
+    text), never an English literal.
+  - The Undo menu rows compare `cull-undo-label`, an English id from `undo_pill_label`; the Events
+    button draws its translated words.
+  - EXIF rows are filtered and ordered on their English keys from `falcon-decode`, then published
+    through `exif_row_shown`.
+  - Mac top-level menus carry a `menubar_model::TopMenu` id; `TopMenu::role()` places Window before
+    Help, registers the help menu and sets explicit enablement for File and View. Only
+    `TopMenu::title()` is translated.
+  - `scripts/mac-bundle.sh` writes `CFBundleLocalizations` (English plus each listed pack) so macOS
+    draws its own panels in the app's languages.
+- **Selecting a language also sets Slint's decimal separator.** No Slint code formats decimals
+  today.
 
 ## Public source and release packaging
 

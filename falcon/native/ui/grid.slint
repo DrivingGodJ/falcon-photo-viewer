@@ -103,7 +103,7 @@ import { TileBadge } from "filmstrip.slint";
             // loading cell — the FilmThumb "···" affordance (badge != "" is the root visible gate,
             // so a mounted tile is always a REAL shot; quiet dots, never broken/black).
             if !root.item.valid && !root.item.unsupported && !root.item.failed : Text {
-                text: root.item.pending ? "Loading…" : "···"; color: Theme.text-mute;
+                text: root.item.pending ? @tr("falcon" => "Loading…") : "···"; color: Theme.text-mute;
                 font-size: root.item.pending ? Theme.font-sm : Theme.font-md; font-weight: root.item.pending ? 400 : 700;
                 x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
             }

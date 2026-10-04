@@ -106,10 +106,11 @@ use objc2::{class, msg_send, msg_send_id, sel, ClassType};
 use objc2_app_kit::NSApplication;
 use objc2_foundation::{MainThreadMarker, NSString};
 
+use crate::i18n;
 use crate::menubar_model::{
     app_menu_inserts, app_submenu_fingerprint_ok, build_menus, enabled_for, fingerprint,
-    graft_state, should_attempt_graft, GraftState, ItemDef, MenuSnapshot, TAG_QUIT,
-    TAG_RECENT_BASE, TAG_RECENT_EMPTY, TAG_RECENT_PARENT,
+    graft_state, should_attempt_graft, top_menus, GraftState, ItemDef, MenuSnapshot, TopMenu,
+    TAG_QUIT, TAG_RECENT_BASE, TAG_RECENT_EMPTY, TAG_RECENT_PARENT,
 };
 use crate::support::log_event;
 
@@ -514,7 +515,11 @@ unsafe fn rebuild_recents(refs: &MenuRefs, snap: &MenuSnapshot) {
     for i in (0..n).rev() {
         let () = msg_send![menu, removeItemAtIndex: i];
     }
-    let file = build_menus(snap).into_iter().next().map(|(_, items)| items).unwrap_or_default();
+    let file = top_menus(snap)
+        .into_iter()
+        .find(|(id, _)| *id == TopMenu::File)
+        .map(|(_, items)| items)
+        .unwrap_or_default();
     let Some(parent) = file.into_iter().find(|i| i.tag == TAG_RECENT_PARENT) else { return };
     for def in parent.submenu.unwrap_or_default() {
         let item = new_action_item(&def, refs.controller);
@@ -688,21 +693,26 @@ unsafe fn try_install() -> Option<MenuRefs> {
     }
 
     // ── our menus: File · Edit · Photo · View · (Window) · Help ──
-    let model = build_menus(snap);
-    for (title, items) in &model {
-        if *title == "Help" {
+    // Language packs (round 2, PLAN §4): each menu is placed and configured by its id's role (a
+    // Windows-tested decision in the model), and only the drawn title is translated.
+    let model = top_menus(snap);
+    for (id, items) in &model {
+        let role = id.role();
+        let title = id.title();
+        if role.window_before {
             // Window sits between View and Help (macOS convention). Standard nil-target selectors —
             // the responder chain enables them and `setWindowsMenu:` lets AppKit populate the list.
-            let wmenu = new_menu("Window");
+            let window_title = i18n::tr("Window");
+            let wmenu = new_menu(window_title);
             {
-                let t = NSString::from_str("Minimize");
+                let t = NSString::from_str(i18n::tr("Minimize"));
                 let k = NSString::from_str("m");
                 let alloc: Allocated<AnyObject> = msg_send_id![class!(NSMenuItem), alloc];
                 let mi: Retained<AnyObject> =
                     msg_send_id![alloc, initWithTitle: &*t, action: sel!(performMiniaturize:), keyEquivalent: &*k];
                 let () = msg_send![&*wmenu, addItem: &*mi];
                 refs.keep.push(mi);
-                let t = NSString::from_str("Zoom");
+                let t = NSString::from_str(i18n::tr("Zoom"));
                 let k = NSString::from_str("");
                 let alloc: Allocated<AnyObject> = msg_send_id![class!(NSMenuItem), alloc];
                 let zi: Retained<AnyObject> =
@@ -711,7 +721,7 @@ unsafe fn try_install() -> Option<MenuRefs> {
                 refs.keep.push(zi);
             }
             let holder = new_action_item(
-                &ItemDef { tag: 0, title: "Window".into(), key: "", ctrl: false, checked: false, separator: false, submenu: None },
+                &ItemDef { tag: 0, title: window_title.into(), key: "", ctrl: false, checked: false, separator: false, submenu: None },
                 ctrl_ptr,
             );
             // v0.9.61 (A2): the sweep tag — on THIS holder too. It is built in its own branch, above
@@ -725,7 +735,7 @@ unsafe fn try_install() -> Option<MenuRefs> {
         }
         let menu = new_menu(title);
         let () = msg_send![&*menu, setDelegate: ctrl_ptr];
-        if *title == "File" || *title == "View" {
+        if role.explicit_enables {
             // Explicit enablement here so a submenu PARENT honestly disables when its children are
             // all unavailable (AppKit auto-enables submenu parents regardless of validation):
             // File → Open Recent with no history, and — v0.8.119 (Y57) — View → Sort with no folder.
@@ -733,19 +743,19 @@ unsafe fn try_install() -> Option<MenuRefs> {
         }
         let before = refs.items.len();
         realize_into(&menu, items, ctrl_ptr, &mut refs.items, &mut refs.keep, &mut refs.recent_menu, false);
-        if *title == "File" || *title == "View" {
+        if role.explicit_enables {
             // EVERY realized tag in these menus (submenu children included — realize_into recurses
             // into `items`), because with autoenables off nothing else will ever set them.
             refs.explicit_tags.extend(refs.items[before..].iter().map(|(t, _)| *t));
         }
         let holder = new_action_item(
-            &ItemDef { tag: 0, title: (*title).into(), key: "", ctrl: false, checked: false, separator: false, submenu: None },
+            &ItemDef { tag: 0, title: title.into(), key: "", ctrl: false, checked: false, separator: false, submenu: None },
             ctrl_ptr,
         );
         let () = msg_send![&*holder, setTag: TAG_TOPLEVEL]; // v0.9.61 (A2): swept by the next graft
         let () = msg_send![&*holder, setSubmenu: &*menu];
         let () = msg_send![main_menu, addItem: &*holder];
-        if *title == "Help" {
+        if role.help_menu {
             let () = msg_send![&*app, setHelpMenu: &*menu];
         }
         refs.probe_item = Retained::as_ptr(&holder) as *mut AnyObject; // the read-back witness

@@ -149,7 +149,7 @@ export component MainToolbar inherits Rectangle {
                         // is the P5 mute so the state is VISIBLE rather than discovered by clicking.
                         enabled: !root.modal-blocking;
                         active: root.settings-open;
-                        tip: "Settings"; // G11 (v0.8.44): delayed tooltip — the asterisk glyph STAYS (user decision)
+                        tip: @tr("falcon" => "Settings"); // G11 (v0.8.44): delayed tooltip — the asterisk glyph STAYS (user decision)
                         // v0.8.68 (D-audit FIX 4): close the welcome FIRST so this panel doesn't mount
                         // behind the modal scrim (invisible until welcome closes). welcome-open=false is
                         // a no-op when it's already closed; when open, its changed-observer latches
@@ -201,7 +201,7 @@ export component MainToolbar inherits Rectangle {
                         // is the P5 mute so the state is VISIBLE rather than discovered by clicking.
                         enabled: !root.modal-blocking;
                         active: root.loading-open;
-                        tip: "Browse speed"; // G11 (v0.8.44): delayed tooltip
+                        tip: @tr("falcon" => "Browse speed"); // G11 (v0.8.44): delayed tooltip
                         clicked => { root.action("speed", 0, root.height / 1px); } // v0.8.14 (Item 2): one top-left panel at a time; panel-switch (M5) recorded BEFORE the flips; v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the panel isn't mounted behind the modal; v0.8.120 (Y75): + the shared bar-menu close
                         Path {
                             x: (parent.width - 14px) / 2; y: (parent.height - 14px) / 2;
@@ -222,7 +222,7 @@ export component MainToolbar inherits Rectangle {
                         // visible rather than discovered by clicking (the O8 pattern, verbatim).
                         width: root.bar-cell-w; radius: 0; hit: !root.immersive && !root.modal-blocking; bar: true; // 40x44 cell (44px bar) -> the 2/4px-inset wash is a TRUE 36px rounded square (uniform 4px gaps, v0.8.180 owner ruling)
                         enabled: !root.modal-blocking;
-                        tip: "Open…"; // G11 delayed tooltip; v0.8.65 (C3/M6): honest label — the button now offers Image | Folder
+                        tip: @tr("falcon" => "Open…"); // G11 delayed tooltip; v0.8.65 (C3/M6): honest label — the button now offers Image | Folder
                         // v0.8.65 (C3/M6): rfd has no combined file+folder dialog, so the button
                         // opens a small two-option menu (the sort-menu overlay grammar) instead of a
                         // file picker pretending to cover both. Anchored at this button's ax (the
@@ -264,7 +264,7 @@ export component MainToolbar inherits Rectangle {
                         // is the P5 mute so the state is VISIBLE rather than discovered by clicking.
                         enabled: !root.modal-blocking;
                         active: root.sel-open;
-                        tip: "Review"; // G11 (v0.8.44): delayed tooltip
+                        tip: @tr("falcon" => "Review"); // G11 (v0.8.44): delayed tooltip
                         clicked => { root.action("review", 0, root.height / 1px); } // v0.8.38 (G6): shared exclusivity toggle (keyboard 's' + this button); v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the panel isn't mounted behind the modal; v0.8.120 (Y75): + the shared bar-menu close
                         // ── v0.8.191 (W7-d): THE SHARED `FlagGlyph`, NOT A SEVENTH COPY OF IT. ────
                         // This was a hand-rolled polyline BYTE-IDENTICAL to glyphs.slint's `FlagGlyph`
@@ -323,9 +323,9 @@ export component MainToolbar inherits Rectangle {
                         // now speak. (Making the other five hoverable-while-disabled would swallow
                         // the drag press that O8 deliberately lets through — a ruled behaviour, not
                         // a gap to close here.)
-                        tip: (root.count-all < 2 && !root.compare) ? "Compare A/B — needs 2 photos"
-                           : (root.modal-blocking ? "Compare A/B — close the dialog first"
-                           : "Compare A/B"); // G11 (v0.8.44): delayed tooltip; v0.8.154 (A1): state-derived
+                        tip: (root.count-all < 2 && !root.compare) ? @tr("falcon" => "Compare A/B — needs 2 photos")
+                           : (root.modal-blocking ? @tr("falcon" => "Compare A/B — close the dialog first")
+                           : @tr("falcon" => "Compare A/B")); // G11 (v0.8.44): delayed tooltip; v0.8.154 (A1): state-derived
                         clicked => { root.action("compare", 0, root.height / 1px); } // v0.8.120 (Y75)
                         Path {
                             x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
@@ -416,7 +416,7 @@ export component MainToolbar inherits Rectangle {
                         // is the P5 mute so the state is VISIBLE rather than discovered by clicking.
                         enabled: !root.modal-blocking;
                         active: root.notif-open;
-                        tip: "Notifications"; // v0.8.45 (Fix 3): the bell was the one unlabeled title-bar glyph G11 missed (min/max/close = OS-standard, deliberately untipped)
+                        tip: @tr("falcon" => "Notifications"); // v0.8.45 (Fix 3): the bell was the one unlabeled title-bar glyph G11 missed (min/max/close = OS-standard, deliberately untipped)
                         clicked => { root.action("notifications", 0, root.height / 1px); } // v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the panel isn't mounted behind the modal; v0.8.120 (Y75): + the shared bar-menu close
                         // bell glyph — amber when there are unread events
                         // v0.8.191 (W7-c, owner report 08-16): the same class as the folder beside it,
@@ -803,9 +803,20 @@ export component MainToolbar inherits Rectangle {
                     // v0.8.192 (owner order): the action is "Copy path" again — the chip grammar names
                     // what the click DOES ("Hide filmstrip", "Picks — open Review"), and the click does
                     // this now.
+                    // Language packs (round 2): the count and section chips' tips live here beside `path-tip`,
+                    // for the same reason: each chip publishes its property and the L22 unmount clears
+                    // below compare against the same property, so both sides hold the same translated
+                    // text (an English literal would never equal a translated tip).
+                    property <string> pos-tip: @tr("falcon" => "Position in folder — sorting");
+                    property <string> picks-tip: @tr("falcon" => "Picks — open Review");
+                    property <string> rejects-tip: @tr("falcon" => "Rejects — open Review");
+                    property <string> film-hide-tip: @tr("falcon" => "Hide filmstrip");
+                    property <string> film-show-tip: @tr("falcon" => "Show filmstrip");
+                    property <string> grid-hide-tip: @tr("falcon" => "Hide photo grid");
+                    property <string> grid-show-tip: @tr("falcon" => "Show photo grid");
                     property <string> path-tip: root.path-text == ""
-                        ? "Copy path"
-                        : root.path-text + "\n" + "Copy path";
+                        ? @tr("falcon" => "Copy path")
+                        : @tr("falcon" => "{0}\nCopy path", root.path-text);
                     // M7 (v0.8.19): the chips' POP decisions stay BINARY + INSTANT — the mount
                     // conditions below and the path cap's 324px reservation (the `pill-show ?
                     // hudclip.width - 324px : hudclip.width` binding) follow the TARGET
@@ -863,10 +874,10 @@ export component MainToolbar inherits Rectangle {
                         // rejects — each write Tip.text = their `tip:` string on hover (HudChip's observer,
                         // hud.slint ~line 65). They unmount together on THIS seam; a mid-hover unmount
                         // strands whichever tip is live, same class as the pill above. Clear on the hide
-                        // edge if the channel still holds one of theirs (ownership-guarded; enumerated from
-                        // the three count-chip call-site tip props below — keep in sync). cx/cy untouched
+                        // edge if the channel still holds one of theirs (ownership-guarded; the chips publish
+                        // hudclip's `pos-tip` / `picks-tip` / `rejects-tip`, the properties compared here). cx/cy untouched
                         // (cx-only hosts).
-                        if (!self.chips-show && (Tip.text == "Position in folder — sorting" || Tip.text == "Picks — open Review" || Tip.text == "Rejects — open Review")) { Tip.text = ""; }
+                        if (!self.chips-show && (Tip.text == self.pos-tip || Tip.text == self.picks-tip || Tip.text == self.rejects-tip)) { Tip.text = ""; }
                         if (root.dbg-chrome) { root.dbg-chips-log(self.width / 1px, parent.width / 1px, root.width / 1px, self.pill-show, self.chips-show, self.chips-eff, root.count-all, root.hud-pos != "", root.cache-meter-show && self.ctrl-show); }
                     }
                     changed ctrl-show => {
@@ -880,11 +891,11 @@ export component MainToolbar inherits Rectangle {
                         // live, so clear on the hide edge too — enumerate BOTH states of each (the tip
                         // binding flips with film-visible / grid-open at the SectionChip call sites below,
                         // so a state change while hovered can leave a stale prior-state string; enumerating
-                        // all four catches it, unlike a dynamic-property compare). Ownership-guarded; cx/cy
-                        // untouched.
+                        // all four catches it, unlike a dynamic-property compare — each of the four is its own
+                        // hudclip property, the one its chip publishes). Ownership-guarded; cx/cy untouched.
                         if (!self.ctrl-show) {
                             root.meter-hover(false, 0, root.height / 1px);
-                            if (Tip.text == "Hide filmstrip" || Tip.text == "Show filmstrip" || Tip.text == "Hide photo grid" || Tip.text == "Show photo grid") { Tip.text = ""; }
+                            if (Tip.text == self.film-hide-tip || Tip.text == self.film-show-tip || Tip.text == self.grid-hide-tip || Tip.text == self.grid-show-tip) { Tip.text = ""; }
                         }
                         if (root.dbg-chrome) { root.dbg-chips-log(self.width / 1px, parent.width / 1px, root.width / 1px, self.pill-show, self.chips-show, self.chips-eff, root.count-all, root.hud-pos != "", root.cache-meter-show && self.ctrl-show); }
                     }
@@ -977,7 +988,7 @@ export component MainToolbar inherits Rectangle {
                         SectionChip {
                             hit: !root.immersive; opacity: hudclip.ctrl-eff;
                             icon: 1; on: root.film-visible;
-                            tip: root.film-visible ? "Hide filmstrip" : "Show filmstrip";
+                            tip: root.film-visible ? hudclip.film-hide-tip : hudclip.film-show-tip;
                             clicked => { root.action("filmstrip", 0, root.height / 1px); } // v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the toggle's effect isn't hidden behind the modal; v0.8.120 (Y75): + the shared bar-menu close
                         }
                     }
@@ -986,7 +997,7 @@ export component MainToolbar inherits Rectangle {
                         SectionChip {
                             hit: !root.immersive; opacity: hudclip.ctrl-eff;
                             icon: 2; on: root.grid-open;
-                            tip: root.grid-open ? "Hide photo grid" : "Show photo grid";
+                            tip: root.grid-open ? hudclip.grid-hide-tip : hudclip.grid-show-tip;
                             clicked => { root.action("grid", 0, root.height / 1px); } // v0.8.68 (D-audit FIX 4): close welcome first (no-op when closed) so the grid dock isn't mounted behind the modal; v0.8.120 (Y75): + the shared bar-menu close
                         }
                     }
@@ -1134,7 +1145,7 @@ export component MainToolbar inherits Rectangle {
                         HudChip {
                             hit: !root.immersive && !root.modal-blocking;
                             opacity: hudclip.chips-eff * (root.modal-blocking ? 0.35 : 1.0); // same gate/mute as adjacent chips
-                            tip: "Position in folder — sorting"; // G11 (v0.8.44): delayed tooltip; v0.8.49: the chip opens the sort menu now
+                            tip: hudclip.pos-tip; // G11 (v0.8.44): delayed tooltip; v0.8.49: the chip opens the sort menu now
                             label: root.hud-pos;
                             // v0.8.58 (owner): folder-derived frame — browsing never re-sizes it
                             widest-a: root.hud-pos-widest-a;
@@ -1159,7 +1170,7 @@ export component MainToolbar inherits Rectangle {
                             // "Copy path"). These two named the
                             // datum only, so the one affordance the tip exists to teach —
                             // click to open Selection — stayed undiscovered.
-                            tip: "Picks — open Review"; // G11 (v0.8.44): delayed tooltip
+                            tip: hudclip.picks-tip; // G11 (v0.8.44): delayed tooltip
                             // v0.8.121 (F10): P5 mute + the hit gate, so the dead state is VISIBLE
                             // rather than discovered by clicking (HudChip has no `enabled` of its
                             // own, and the call site already owns this chip's opacity).
@@ -1176,7 +1187,7 @@ export component MainToolbar inherits Rectangle {
                         HudChip {
                             hit: !root.immersive && !root.modal-blocking; // v0.8.121 (F10): the twin of the picks chip above
                             opacity: hudclip.chips-eff * (root.modal-blocking ? 0.35 : 1.0); // M6 gate + M7 fade-in + v0.8.121 (F10) P5 mute
-                            tip: "Rejects — open Review"; // G11 (v0.8.44): delayed tooltip (v0.8.119 Y53: names the click, as its twin above)
+                            tip: hudclip.rejects-tip; // G11 (v0.8.44): delayed tooltip (v0.8.119 Y53: names the click, as its twin above)
                             icon: 2; label: root.count-rejects;
                             // v0.8.58 (owner): digit-count-quantized frame (the picks chip's twin)
                             widest-a: root.count-rejects >= 1000 ? "8888" : (root.count-rejects >= 100 ? "888" : (root.count-rejects >= 10 ? "88" : "8"));

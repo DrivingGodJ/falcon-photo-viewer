@@ -6,9 +6,11 @@
 
 #[cfg(windows)]
 mod build_shell_icons;
+mod build_translations;
 
 fn main() {
     guard_slint_scale_factor();
+    build_translations::build();
     // v0.8.46: DEBUG builds emit Slint element debug info so the headless geometry rigs
     // (tipgeom_tests.rs) can query real elements via i-slint-backend-testing's ElementHandle
     // (find_by_element_type_name / absolute_position). The env var is read by the slint!

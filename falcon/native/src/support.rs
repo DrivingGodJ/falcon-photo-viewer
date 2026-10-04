@@ -1195,7 +1195,7 @@ impl Drop for OpGuard {
         // OpGuard exists to surface. Recovering the guard keeps the "operation failed" banner on screen.
         let mut s = self.slot.lock().unwrap_or_else(|e| e.into_inner());
         if s.is_none() {
-            *s = Some(("Operation failed — the worker crashed mid-run (see log)".to_string(), OpSeverity::Error, self.kind, self.origin.clone()));
+            *s = Some((i18n::tr("Operation failed — the worker crashed mid-run (see log)").to_string(), OpSeverity::Error, self.kind, self.origin.clone()));
         }
         drop(s);
         self.busy.store(false, Ordering::SeqCst);
@@ -2935,7 +2935,7 @@ pub(crate) fn ctx_populate_fields(shot: Option<&Shot>, prefs: &[(u8, bool)]) -> 
         return CtxPopulate {
             has_finished: false,
             has_raw: false,
-            copy_fmt_label: "Copy image".to_string(),
+            copy_fmt_label: i18n::tr("Copy image").to_string(),
             rank_mode: -1,
         };
     };
@@ -2949,8 +2949,8 @@ pub(crate) fn ctx_populate_fields(shot: Option<&Shot>, prefs: &[(u8, bool)]) -> 
         has_finished,
         has_raw,
         copy_fmt_label: match shot.finished_format() {
-            Some(f) => format!("Copy {f}"),
-            None => "Copy image".to_string(),
+            Some(f) => tr_format!("Copy {format}", format = f),
+            None => i18n::tr("Copy image").to_string(),
         },
         // v0.8.119 (design-sweep O17/O19/O23): which Copy row the Ctrl+C priority walk would really
         // perform for this shot, so the menu can put the keycap there instead of always on the
@@ -3050,7 +3050,9 @@ pub(crate) fn bulk_copy_row_label(base: &str, n: usize) -> String {
     if n <= 1 {
         base.to_string()
     } else {
-        format!("{base} ({n})")
+        // Language packs (round 2): `base` is already a whole translated row name ("Copy RAW");
+        // the count's place and brackets are this message's, so a pack can write them its own way.
+        tr_format!("{label} ({n})", label = base, n = n)
     }
 }
 
@@ -3058,19 +3060,27 @@ pub(crate) fn bulk_copy_row_label(base: &str, n: usize) -> String {
 /// and its type because there is one of each; over a set the two numbers ARE the news — how many
 /// photographs went to the clipboard, and how many files that came to — and the third number is the
 /// one a silent copy would hide: the photographs this kind could not serve.
+///
+/// Language packs (round 2): the sentence counts photographs, and its bracket counts files, so the
+/// photographs are the counted message and the files' word picks between two whole messages by
+/// English's rule (`n == 1`, the `one_other` rule). The skipped clause is its own counted message
+/// per kind (`skipped_what` is the kind's English id), joined to the sentence by one message.
 pub(crate) fn bulk_copy_result_text(photos: usize, files: usize, skipped: usize, skipped_what: &str) -> String {
-    let mut s = format!(
-        "{photos} photo{} copied to clipboard ({files} file{})",
-        if photos == 1 { "" } else { "s" },
-        if files == 1 { "" } else { "s" }
-    );
-    if skipped > 0 {
-        s.push_str(&format!(
-            " — {skipped} {} no {skipped_what}",
-            if skipped == 1 { "has" } else { "have" }
-        ));
+    let s = if files == 1 {
+        tr_plural!(photos, "{n} photo copied to clipboard ({files} file)", "{n} photos copied to clipboard ({files} file)", files = files)
+    } else {
+        tr_plural!(photos, "{n} photo copied to clipboard ({files} files)", "{n} photos copied to clipboard ({files} files)", files = files)
+    };
+    if skipped == 0 {
+        return s;
     }
-    s
+    let clause = match skipped_what {
+        "RAW" => tr_plural!(skipped, "{n} has no RAW", "{n} have no RAW"),
+        "files" => tr_plural!(skipped, "{n} has no files", "{n} have no files"),
+        "image" => tr_plural!(skipped, "{n} has no image", "{n} have no image"),
+        _ => format!("{skipped} {} no {skipped_what}", if skipped == 1 { "has" } else { "have" }),
+    };
+    tr_format!("{copied} — {skipped_clause}", copied = s, skipped_clause = clause)
 }
 
 /// The noun the skipped clause names, per kind — the ONE place the three kinds are worded for that
@@ -3088,9 +3098,9 @@ pub(crate) fn bulk_copy_skipped_what(kind: i32) -> &'static str {
 /// `ctx-tile-selected` precedent), and "these photos" over one photograph is the L20 class.
 pub(crate) fn bulk_copy_nothing_text(n: usize) -> String {
     if n == 1 {
-        "Nothing to copy for this photo".to_string()
+        i18n::tr("Nothing to copy for this photo").to_string()
     } else {
-        "Nothing to copy for these photos".to_string()
+        i18n::tr("Nothing to copy for these photos").to_string()
     }
 }
 
@@ -3128,11 +3138,11 @@ pub(crate) fn bulk_copy_rows(shots: &[&Shot]) -> BulkCopyRows {
     let both_on = fin.photos > 0 && raw.photos > 0;
     BulkCopyRows {
         fin_label: bulk_copy_row_label(&bulk_copy_fin_base(shots), fin.photos),
-        raw_label: bulk_copy_row_label("Copy RAW", raw.photos),
+        raw_label: bulk_copy_row_label(i18n::tr("Copy RAW"), raw.photos),
         // …and THAT is why this count needs the gate spelled beside it (ruling 1): kind 2's
         // `photos` counts photographs yielding ANY file, which over two JPG-only shots is 2 while
         // the gate is false. A dead row states a name, never a number it cannot act on.
-        both_label: bulk_copy_row_label("Copy both", if both_on { both.photos } else { 0 }),
+        both_label: bulk_copy_row_label(i18n::tr("Copy both"), if both_on { both.photos } else { 0 }),
         fin_on: fin.photos > 0,
         raw_on: raw.photos > 0,
         both_on,
@@ -3147,12 +3157,12 @@ pub(crate) fn bulk_copy_rows(shots: &[&Shot]) -> BulkCopyRows {
 fn bulk_copy_fin_base(shots: &[&Shot]) -> String {
     let mut fmts = shots.iter().filter_map(|s| s.finished_format());
     let Some(first) = fmts.next() else {
-        return "Copy image".to_string();
+        return i18n::tr("Copy image").to_string();
     };
     if fmts.all(|f| f == first) {
-        format!("Copy {first}")
+        tr_format!("Copy {format}", format = first)
     } else {
-        "Copy images".to_string()
+        i18n::tr("Copy images").to_string()
     }
 }
 
@@ -3533,9 +3543,9 @@ mod publish_tests {
 /// above it carries the meaning. That divergence is deliberate and is on the veto list.
 pub(crate) fn copy_pref_label(mode: u8) -> &'static str {
     match mode {
-        2 => "RAW + image",
-        1 => "RAW only",
-        _ => "Image only (non-RAW)",
+        2 => i18n::tr("RAW + image"),
+        1 => i18n::tr("RAW only"),
+        _ => i18n::tr("Image only (non-RAW)"),
     }
 }
 
@@ -5151,11 +5161,11 @@ pub(crate) fn gamut_chip_label(gamut: i32, custom_label: &str) -> String {
 /// were the FIRST thing truncated. The card renders the marker as its own non-eliding sibling now
 /// (the "· this screen" shape); only the name/setting portion can elide.
 pub(crate) fn display_section_head(name: &str, chip: &str, active: bool, expanded: bool) -> String {
-    let name = if name.trim().is_empty() { "Display" } else { name.trim() };
+    let name = if name.trim().is_empty() { i18n::tr("Display") } else { name.trim() };
     if active && expanded {
         return name.to_string();
     }
-    format!("{name} — {chip}")
+    tr_format!("{name} — {setting}", name = name, setting = chip)
 }
 
 /// v0.8.108 (audit A6 / owner ruling): the section title for one SOURCE that is driving more than
@@ -5298,16 +5308,20 @@ pub(crate) fn display_section_count(
 /// Counted in chars, not bytes, so a unicode monitor name cannot skew it.
 ///
 /// The ACTIVE/single case keeps the v0.8.106 string VERBATIM — it is the pinned copy.
-pub(crate) fn auto_detect_label(name: &str, active: bool) -> String {
+///
+/// Language packs: the budget is counted on the label as shown, and `fit_text` (Settings →
+/// Developer → Widen controls to fit text) skips it, so a translator sees the whole name. Off keeps
+/// the English-tuned cut-off exactly.
+pub(crate) fn auto_detect_label(name: &str, active: bool, fit_text: bool) -> String {
     if active {
-        return "Auto-detect this monitor".to_string();
+        return i18n::tr("Auto-detect this monitor").to_string();
     }
     let n = name.trim();
-    let full = format!("Auto-detect {n}");
-    if n.is_empty() || full.chars().count() > AUTO_DETECT_LABEL_MAX {
+    let full = tr_format!("Auto-detect {name}", name = n);
+    if n.is_empty() || (!fit_text && full.chars().count() > AUTO_DETECT_LABEL_MAX) {
         // Not "this monitor": that string is the ACTIVE section's, and a non-active section is
         // deliberately never allowed to claim it (v0.8.108's whole reason for naming the display).
-        return "Auto-detect this display".to_string();
+        return i18n::tr("Auto-detect this display").to_string();
     }
     full
 }
@@ -5359,9 +5373,14 @@ pub(crate) fn degraded_resolve_plan(
 /// look at. Two different facts deserve two different sentences.
 /// v0.8.109 (V9): …and it is said ONLY about a display that is genuinely absent from the
 /// enumeration. See [`display_not_readable_warn`] for the other half.
+///
+/// Language packs (round 2): a nameless display is its own whole sentence, here and in the four
+/// composers below, so no pack has to fit "That display" into a sentence built for a name.
 pub(crate) fn display_not_connected_warn(name: &str) -> String {
-    let name = if name.trim().is_empty() { "That display" } else { name.trim() };
-    format!("{name} isn't connected — plug it in to read its profile")
+    if name.trim().is_empty() {
+        return i18n::tr("That display isn't connected — plug it in to read its profile").to_string();
+    }
+    tr_format!("{name} isn't connected — plug it in to read its profile", name = name.trim())
 }
 
 /// v0.8.109 (V9): the THIRD honest sentence — the display IS in the enumeration, but its row carries
@@ -5374,8 +5393,10 @@ pub(crate) fn display_not_connected_warn(name: &str) -> String {
 /// `detect_monitor_icc` is never called, because an empty hint means "read the primary" and
 /// substituting another panel's profile is the harm v0.8.104/v0.8.105 closed.
 pub(crate) fn display_not_readable_warn(name: &str) -> String {
-    let name = if name.trim().is_empty() { "That display" } else { name.trim() };
-    format!("Falcon couldn't read {name}'s connection — try Load profile… instead")
+    if name.trim().is_empty() {
+        return i18n::tr("Falcon couldn't read That display's connection — try Load profile… instead").to_string();
+    }
+    tr_format!("Falcon couldn't read {name}'s connection — try Load profile… instead", name = name.trim())
 }
 
 /// v0.8.109 (V7): why FORGET refuses a display that is plugged in. The card mount-gates Remove to
@@ -5384,8 +5405,14 @@ pub(crate) fn display_not_readable_warn(name: &str) -> String {
 /// connected display's entry is a colour decision, not a bookkeeping one, and the card says which
 /// control makes it.
 pub(crate) fn display_forget_refusal_warn(name: &str) -> String {
-    let name = if name.trim().is_empty() { "That display" } else { name.trim() };
-    format!("{name} is connected again — set it back to sRGB to clear its saved colour setting")
+    if name.trim().is_empty() {
+        return i18n::tr("That display is connected again — set it back to sRGB to clear its saved colour setting")
+            .to_string();
+    }
+    tr_format!(
+        "{name} is connected again — set it back to sRGB to clear its saved colour setting",
+        name = name.trim()
+    )
 }
 
 /// Strip the v0.8.108 CONNECTION discriminator (`@x,y`) [`disambiguate_display_keys`] appends, and
@@ -5725,16 +5752,20 @@ pub(crate) fn display_unit_mismatch_log(key: &str, stored: &str, live: &str) -> 
 /// be read. One event, one toast: the failure sentence stands ALONE when the install fails, exactly
 /// as the sibling switch toast has since v0.8.107 (main.rs's `!(entry.gamut == 4 && !install_ok)`).
 pub(crate) fn display_adopt_toast(name: &str, chip: &str) -> String {
-    let name = if name.trim().is_empty() { "this display" } else { name.trim() };
-    format!("{chip} applied to {name} — adjust in Settings if needed.")
+    if name.trim().is_empty() {
+        return tr_format!("{chip} applied to this display — adjust in Settings if needed.", chip = chip);
+    }
+    tr_format!("{chip} applied to {name} — adjust in Settings if needed.", chip = chip, name = name.trim())
 }
 
 /// v0.8.109 (V2): the adoption toast for a display that is NOT the one the window is on. Falcon
 /// holds ONE installed transform and it belongs to the active display, so nothing was applied —
 /// the configuration was reattached, and the sentence says only that.
 pub(crate) fn display_adopt_set_toast(name: &str, chip: &str) -> String {
-    let name = if name.trim().is_empty() { "That display" } else { name.trim() };
-    format!("{name} is set to {chip} — adjust in Settings if needed.")
+    if name.trim().is_empty() {
+        return tr_format!("That display is set to {chip} — adjust in Settings if needed.", chip = chip);
+    }
+    tr_format!("{name} is set to {chip} — adjust in Settings if needed.", name = name.trim(), chip = chip)
 }
 
 /// v0.8.107 (owner ruling D4): the toast shown when moving the window between displays actually
@@ -5742,8 +5773,10 @@ pub(crate) fn display_adopt_set_toast(name: &str, chip: &str) -> String {
 /// point is that the photographer knows which screen he is now judging colour on. A move between
 /// identically-configured displays changes nothing and says nothing (the caller never gets here).
 pub(crate) fn display_switch_toast(name: &str, chip: &str) -> String {
-    let name = if name.trim().is_empty() { "This display" } else { name.trim() };
-    format!("Colour: {name} — {chip}")
+    if name.trim().is_empty() {
+        return tr_format!("Colour: This display — {chip}", chip = chip);
+    }
+    tr_format!("Colour: {name} — {chip}", name = name.trim(), chip = chip)
 }
 
 /// The Custom chip's label for a per-display entry, derived from its remembered path — "Custom…"
@@ -5754,6 +5787,19 @@ pub(crate) fn display_switch_toast(name: &str, chip: &str) -> String {
 /// installed there is nothing to read but the path, so this is the file stem. Deliberately not a
 /// file read: the card must render for a display whose profile lives on an unmounted volume.
 pub(crate) fn entry_custom_label(icc_path: &str) -> String {
+    match std::path::Path::new(icc_path).file_stem().and_then(|s| s.to_str()) {
+        Some(stem) if !stem.is_empty() => custom_chip_label(stem),
+        _ => i18n::tr("Custom…").to_string(),
+    }
+}
+
+/// The Custom chip's label for a loaded profile — "Custom: <profile>" — in this run's language.
+pub(crate) fn custom_chip_label(profile: &str) -> String {
+    tr_format!("Custom: {profile}", profile = profile)
+}
+
+/// [`entry_custom_label`] in English, for a log line that names the same setting (logs stay English).
+pub(crate) fn entry_custom_label_log(icc_path: &str) -> String {
     match std::path::Path::new(icc_path).file_stem().and_then(|s| s.to_str()) {
         Some(stem) if !stem.is_empty() => format!("Custom: {stem}"),
         _ => "Custom…".to_string(),
@@ -5872,6 +5918,15 @@ pub(crate) struct Settings {
     pub(crate) accel_migrated: bool,
     pub(crate) dev_hud: bool,
     pub(crate) diagnostic_logging: bool, // opt-in diagnostic files; never gates durable review data
+    /// The interface language: "" follows the system, "en" is English, otherwise a language pack's
+    /// code (`i18n.rs`). Applies at the next start. Saved only once chosen, so older settings files
+    /// stay byte-identical.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub(crate) language: String,
+    /// Settings → Developer "Widen controls to fit text": widths tuned to English grow to fit their
+    /// text, for checking a translation's layout. Saved only while On.
+    #[serde(default, skip_serializing_if = "bool_is_false")]
+    pub(crate) fit_text_widths: bool,
     // §43 (v0.4.0): the Speed/OFF adaptive modes are retired — the fast tier ALWAYS follows the
     // window, and the one lever is the DCT stop bracketing it (`quality_super`). An old
     // settings.json's adaptive_res / adaptive_mode / off_res / speed_fps / bench_fps_lo|mid|hi
@@ -6953,17 +7008,20 @@ pub(crate) fn panels_at_open(memory: Option<(bool, bool, i32)>, pref: PanelsSegC
 /// develop visible), reachable only from a pre-v0.8.97 settings.json, keeps the singular: there the
 /// command really does restore one panel. The two ON titles are UNCHANGED and deliberately ignore
 /// `raw_open` — they are the info panel's own controls, and per-panel independence is the ruling.
+///
+/// Language packs (round 2): translated here, with the same English as the Slint `@tr` entries, so
+/// the macOS row and the context menu stay one message per state in every language.
 pub(crate) fn info_menu_title(open: bool, min: bool, raw_open: bool) -> &'static str {
     if !open {
         if raw_open {
-            "Show info panel"
+            i18n::tr("Show info panel")
         } else {
-            "Show panels"
+            i18n::tr("Show panels")
         }
     } else if min {
-        "Expand info panel"
+        i18n::tr("Expand info panel")
     } else {
-        "Minimise info panel"
+        i18n::tr("Minimise info panel")
     }
 }
 
@@ -11386,12 +11444,12 @@ pub(crate) fn bench_clamp_note(full_res: u32, probe_res: u32) -> slint::SharedSt
     if probe_res == 0 || probe_res >= full_res {
         return slint::SharedString::new();
     }
-    slint::format!(
-        "Full {} px: the upload stage was measured at {} px — this machine's own detail-upload ceiling, \
-         and the largest frame Falcon ever stages here.",
-        full_res,
-        probe_res
+    tr_format!(
+        "Full {full} px: the upload stage was measured at {probe} px — this machine's own detail-upload ceiling, and the largest frame Falcon ever stages here.",
+        full = full_res,
+        probe = probe_res
     )
+    .into()
 }
 
 // ── §43 benchmark math (pure, unit-tested below) ────────────────────────────────────
@@ -11458,12 +11516,13 @@ pub(crate) struct BenchResult {
 /// every restore; the two surfaces mount it only while the seg disagrees.
 pub(crate) fn bench_provenance_note(synthetic: bool, mp: i32) -> slint::SharedString {
     if synthetic {
-        slint::format!(
-            "This result is from a generated {} MP target-size test, not the current folder.",
-            mp.max(1)
+        tr_format!(
+            "This result is from a generated {mp} MP target-size test, not the current folder.",
+            mp = mp.max(1)
         )
+        .into()
     } else {
-        "This result is from the current folder's photos, not a generated target-size test.".into()
+        i18n::tr("This result is from the current folder's photos, not a generated target-size test.").into()
     }
 }
 
@@ -11553,32 +11612,41 @@ pub(crate) fn bench_provenance_tail_for(
     synthetic: bool,
     synth_mp: i32,
 ) -> String {
-    if !is_mac || (src_fmt.is_empty() && pool_w == 0) {
+    if !is_mac {
         return String::new();
     }
-    let mut parts: Vec<String> = Vec::new();
-    if !src_fmt.is_empty() {
-        // v0.9.62 (B2.4 / D-Y2): a SYNTHETIC run's source label said "JPG source" — true about the
-        // bytes and false about everything the reader takes from it. The generator writes JPEGs, so
-        // `bench_format_label` honestly answers "JPG", and the row then read as though a folder of
-        // the user's JPEGs had been measured. Name what it actually was — and KEEP the format,
-        // because the JPEG fact is precisely WHY the run cannot speak for a HEIC lane.
-        if synthetic && synth_mp > 0 {
-            parts.push(format!("generated {synth_mp} MP {src_fmt} test images, warm cache"));
-        } else if synthetic {
-            parts.push(format!("generated {src_fmt} test images, warm cache"));
-        } else {
-            parts.push(format!("{src_fmt} source, warm cache"));
-        }
+    // Language packs (round 2): the `"; "`-joined parts are whole messages, one per combination of
+    // what is known (the source, then whether the pool width was recorded). The engine name, the
+    // format and the numbers are values. The saved format label stays English (it is persisted);
+    // only its "mixed (…)" wording is translated here, where it is shown.
+    let engine = if full_gpu { "Image I/O" } else { "CPU" };
+    let format = bench_src_fmt_shown(src_fmt);
+    let width = pool_w;
+    // v0.9.62 (B2.4 / D-Y2): a SYNTHETIC run's source label said "JPG source" — true about the
+    // bytes and false about everything the reader takes from it. The generator writes JPEGs, so
+    // `bench_format_label` honestly answers "JPG", and the row then read as though a folder of
+    // the user's JPEGs had been measured. Name what it actually was — and KEEP the format,
+    // because the JPEG fact is precisely WHY the run cannot speak for a HEIC lane.
+    match (src_fmt.is_empty(), synthetic, synth_mp > 0, pool_w > 0) {
+        (true, _, _, false) => String::new(), // nothing recorded (a pre-v0.9.60 record): say nothing
+        (true, _, _, true) => tr_format!(" · full-res on {engine}; measured at pool width {width}", engine = engine, width = width),
+        (false, true, true, false) => tr_format!(" · generated {mp} MP {format} test images, warm cache; full-res on {engine}", mp = synth_mp, format = format, engine = engine),
+        (false, true, true, true) => tr_format!(" · generated {mp} MP {format} test images, warm cache; full-res on {engine}; measured at pool width {width}", mp = synth_mp, format = format, engine = engine, width = width),
+        (false, true, false, false) => tr_format!(" · generated {format} test images, warm cache; full-res on {engine}", format = format, engine = engine),
+        (false, true, false, true) => tr_format!(" · generated {format} test images, warm cache; full-res on {engine}; measured at pool width {width}", format = format, engine = engine, width = width),
+        (false, false, _, false) => tr_format!(" · {format} source, warm cache; full-res on {engine}", format = format, engine = engine),
+        (false, false, _, true) => tr_format!(" · {format} source, warm cache; full-res on {engine}; measured at pool width {width}", format = format, engine = engine, width = width),
     }
-    parts.push(format!(
-        "full-res on {}",
-        if full_gpu { "Image I/O" } else { "CPU" }
-    ));
-    if pool_w > 0 {
-        parts.push(format!("measured at pool width {pool_w}"));
+}
+
+/// Language packs (round 2): the saved source-format label as SHOWN. `bench_format_label` writes
+/// "JPG", "RAW" or "mixed (JPG + HEIC)" into the settings file, so the saved value stays English;
+/// format names stay as they are, and only the "mixed (…)" wording is a message.
+pub(crate) fn bench_src_fmt_shown(src_fmt: &str) -> String {
+    match src_fmt.strip_prefix("mixed (").and_then(|s| s.strip_suffix(')')).and_then(|s| s.split_once(" + ")) {
+        Some((first, second)) => tr_format!("mixed ({first} + {second})", first = first, second = second),
+        None => src_fmt.to_string(),
     }
-    format!(" · {}", parts.join("; "))
 }
 
 /// May a benchmark result PARAMETERIZE this folder's promises? On macOS a SYNTHETIC run may not:
@@ -11629,13 +11697,15 @@ pub(crate) fn bench_rec_card(
 /// just refused to let him do — the forced-synthetic welcome run cannot measure a folder, because
 /// there isn't one (L15). Naming the actual next step turns a dead end into an instruction.
 pub(crate) fn bench_rec_hint(governs: bool, no_folder: bool) -> &'static str {
-    if governs {
+    // Language packs (round 2): the three constants are marked with `tr_noop!`; shown translated.
+    let hint = if governs {
         BENCH_REC_HINT_PRE
     } else if no_folder {
         BENCH_REC_HINT_OPEN_A_FOLDER
     } else {
         BENCH_REC_HINT_NOT_THIS_FOLDER
-    }
+    };
+    i18n::tr(hint)
 }
 
 /// Push the hint back onto the UI from the CURRENT state. Called wherever "is a folder open"
@@ -11656,11 +11726,11 @@ pub(crate) fn refresh_bench_rec_hint(app: &MainWindow) {
 
 /// The card's pre-run hint — the literal the .slint file carried before v0.9.60, so the Windows
 /// rendering is byte-identical in every state.
-pub(crate) const BENCH_REC_HINT_PRE: &str = "shown after the run";
+pub(crate) const BENCH_REC_HINT_PRE: &str = tr_noop!("shown after the run");
 /// …and the macOS-only refusal hint.
-pub(crate) const BENCH_REC_HINT_NOT_THIS_FOLDER: &str = "not yet measured for this folder";
+pub(crate) const BENCH_REC_HINT_NOT_THIS_FOLDER: &str = tr_noop!("not yet measured for this folder");
 /// v0.9.62 (B3): …in the state where "this folder" is not a thing that exists yet.
-pub(crate) const BENCH_REC_HINT_OPEN_A_FOLDER: &str = "open a folder and run it again";
+pub(crate) const BENCH_REC_HINT_OPEN_A_FOLDER: &str = tr_noop!("open a folder and run it again");
 
 /// v0.9.60 (W2-5b): hold a file's data OUT of the unified buffer cache for as long as this guard
 /// lives. `F_GLOBAL_NOCACHE` (fcntl 55) sets the flag on the VNODE, not on our descriptor, so the
@@ -11778,14 +11848,19 @@ pub(crate) fn restore_bench_ui(app: &MainWindow, settings: &Settings, screen: u3
     let mp = settings.bench_target_mp.clamp(crate::BENCH_MP_MIN, crate::BENCH_MP_MAX);
     let w = if settings.bench_w > 0 { settings.bench_w as u32 } else { mp_to_long_side(mp) };
     let (sub_res, super_res) = bench_tiers(w, screen);
+    // Language packs (round 2): the readout is one message; the provenance tail is its own ` · `
+    // clause, separator included, appended as the copy results append theirs.
     app.set_bench_text(slint::format!(
-        "Faster preview {}: {} · Sharper preview {}: {} · Full {}: {} fps (browse-sustained){}",
-        sub_res,
-        settings.bench_sub_fps,
-        super_res,
-        settings.bench_super_fps,
-        w,
-        settings.bench_fullres_fps,
+        "{}{}",
+        tr_format!(
+            "Faster preview {sub_res}: {sub_fps} · Sharper preview {super_res}: {super_fps} · Full {full_res}: {full_fps} fps (browse-sustained)",
+            sub_res = sub_res,
+            sub_fps = settings.bench_sub_fps,
+            super_res = super_res,
+            super_fps = settings.bench_super_fps,
+            full_res = w,
+            full_fps = settings.bench_fullres_fps
+        ),
         // v0.9.60 (W2-5c): the macOS provenance tail — "" on Windows by construction, and "" here
         // too for a record saved before this wave (it has no provenance to state).
         bench_provenance_tail(
@@ -11893,7 +11968,7 @@ pub(crate) fn zoom_sharp_slow_note_for(zoom_accelerated: bool) -> &'static str {
         // one without this line.
         ""
     } else {
-        "HEIC files step at their decode rate here — each zoomed step waits for the full frame."
+        i18n::tr("HEIC files step at their decode rate here — each zoomed step waits for the full frame.")
     }
 }
 
@@ -11920,18 +11995,19 @@ pub(crate) fn heic_zoom_accelerated() -> bool {
 /// v0.8.123 (I3): the slow-format caveat is NOT appended here — it is its own line, rendered under
 /// both this arm and the unbenchmarked one ([`zoom_sharp_slow_note`]).
 pub(crate) fn zoom_sharp_note(full_fps: i32, gpu: bool) -> slint::SharedString {
-    slint::format!(
-        "Zoomed browsing shows only sharp full-res frames — no blur. It paces to your card's real decode+upload rate (benched ≈ {} fps {} at this size), holding steady if a fast burst outruns it.",
-        full_fps.max(1),
+    tr_format!(
+        "Zoomed browsing shows only sharp full-res frames — no blur. It paces to your card's real decode+upload rate (benched ≈ {fps} fps on {engine} at this size), holding steady if a fast burst outruns it.",
+        fps = full_fps.max(1),
         // v0.9.10 (Mac fix 3): name the full-res engine per-OS — the same token the bench log carries.
         // Windows string byte-identical ("on nvJPEG"), pinned by windows_strings_unchanged; macOS = the
         // Image I/O accel slot that actually times the Full tier.
-        if gpu {
-            if cfg!(target_os = "macos") { "on Image I/O" } else { "on nvJPEG" }
+        engine = if gpu {
+            if cfg!(target_os = "macos") { "Image I/O" } else { "nvJPEG" }
         } else {
-            "on CPU"
+            "CPU"
         }
     )
+    .into()
 }
 
 /// v0.9.62 (B2.2 / D-R1): the THIRD always-sharp caption — a benchmark exists, and it may not speak
@@ -11950,9 +12026,9 @@ pub(crate) fn zoom_sharp_note(full_fps: i32, gpu: bool) -> slint::SharedString {
 /// Unreachable on Windows by construction (its mount is `benchmarked && !bench-governs`, and
 /// `bench-governs` is `benchmarked` there) — the Windows popup's bytes are untouched.
 pub(crate) fn zoom_sharp_unmeasured_note() -> &'static str {
-    "Zoomed browsing shows only sharp full-res frames — no blur. It paces to your card's real \
-     decode+upload rate, holding steady if a fast burst outruns it. The last benchmark used \
-     generated test images, so there is no measured figure for this folder yet."
+    i18n::tr(
+        "Zoomed browsing shows only sharp full-res frames — no blur. It paces to your card's real decode+upload rate, holding steady if a fast burst outruns it. The last benchmark used generated test images, so there is no measured figure for this folder yet.",
+    )
 }
 
 /// §43: image long side (px) for a target megapixel count, assuming a 3:2 frame —
@@ -12028,11 +12104,14 @@ pub(crate) fn bench_recommendation(sub_fps: i32, super_fps: i32, w: u32, screen:
 /// (not yet benchmarked) — the caller only calls this with a real result.
 pub(crate) fn bench_rec_text(sub_fps: i32, super_fps: i32, w: u32, screen: u32) -> slint::SharedString {
     let (fps, sup, res) = bench_recommendation(sub_fps, super_fps, w, screen);
-    if fps >= 120 {
-        slint::format!("Browse at maximum speed · {} {} px", if sup { "Sharper preview" } else { "Faster preview" }, res)
-    } else {
-        slint::format!("Browse at {} photos/s · {} {} px", fps, if sup { "Sharper preview" } else { "Faster preview" }, res)
-    }
+    // Language packs (round 2): one whole message per speed and preview tier.
+    let text = match (fps >= 120, sup) {
+        (true, true) => tr_format!("Browse at maximum speed · Sharper preview {res} px", res = res),
+        (true, false) => tr_format!("Browse at maximum speed · Faster preview {res} px", res = res),
+        (false, true) => tr_format!("Browse at {fps} photos/s · Sharper preview {res} px", fps = fps, res = res),
+        (false, false) => tr_format!("Browse at {fps} photos/s · Faster preview {res} px", fps = fps, res = res),
+    };
+    text.into()
 }
 
 /// v0.8.160 (B4/U11): publish the RECOMMENDATION — its sentence AND the two settings it names — in
@@ -12410,6 +12489,8 @@ impl Default for Settings {
             // saved value wins; only fresh installs change.
             dev_hud: false,
             diagnostic_logging: false,
+            language: String::new(),
+            fit_text_widths: false,
             quality_super: true,
             info_open: true,
             info_view: 1, // v0.8.154 (A6): STANDARD — byte-for-byte the birth state main_window.slint declares
@@ -12849,7 +12930,9 @@ pub(crate) fn init_writer() {
                 let m = writer_fail_message(p, &e.to_string(), is_xmp);
                 // The XMP message doesn't embed the io detail (kept clean for the toast) — append it to the
                 // LOG line only, so the failing cause is still greppable. The JSON `m` already carries `{e}`.
-                log_event(&format!("writer: {m}{}", if is_xmp { format!(" — {e}") } else { String::new() }));
+                // Language packs (round 2): the log names the failure in English; `m` is what is shown.
+                let m_log = writer_fail_log_text(p, &e.to_string(), is_xmp);
+                log_event(&format!("writer: {m_log}{}", if is_xmp { format!(" — {e}") } else { String::new() }));
                 fails_w.lock().unwrap_or_else(|x| x.into_inner()).push(m);
             };
             writer_loop(rx, sink, xmp_sink, on_fail, |dir| review_write_target(dir), log_append_inline);
@@ -13108,10 +13191,49 @@ pub(crate) fn await_file_op_boundary(busy: &AtomicBool, budget: std::time::Durat
 /// spent this round removing from the user's vocabulary — and a full path is not what the user
 /// recognises anyway. Everything else keeps the original text verbatim.
 pub(crate) fn writer_fail_message(p: &Path, err: &str, is_xmp: bool) -> String {
+    match writer_fail_subject(p, is_xmp) {
+        WriterFail::Xmp(photo) => tr_format!(
+            "Couldn't update the XMP sidecar for {photo} — it may be locked by another app. Ratings are safe in Falcon.",
+            photo = photo
+        ),
+        WriterFail::Review(folder) => tr_format!(
+            "Review data FAILED to save for {folder} ({err}) — your latest changes may not be on disk",
+            folder = folder,
+            err = err
+        ),
+        WriterFail::Other(path) => tr_format!(
+            "Save FAILED for {path} ({err}) — your latest changes may not be on disk",
+            path = path,
+            err = err
+        ),
+    }
+}
+
+/// Language packs (round 2): the same sentence in English for the writer's log line (logs stay
+/// English); the events centre shows [`writer_fail_message`], translated.
+pub(crate) fn writer_fail_log_text(p: &Path, err: &str, is_xmp: bool) -> String {
+    match writer_fail_subject(p, is_xmp) {
+        WriterFail::Xmp(photo) => format!(
+            "Couldn't update the XMP sidecar for {photo} — it may be locked by another app. Ratings are safe in Falcon."
+        ),
+        WriterFail::Review(folder) => {
+            format!("Review data FAILED to save for {folder} ({err}) — your latest changes may not be on disk")
+        }
+        WriterFail::Other(path) => format!("Save FAILED for {path} ({err}) — your latest changes may not be on disk"),
+    }
+}
+
+/// What a writer give-up names: the sidecar's photo, the review data's folder, or the file's path.
+enum WriterFail {
+    Xmp(String),
+    Review(String),
+    Other(String),
+}
+
+fn writer_fail_subject(p: &Path, is_xmp: bool) -> WriterFail {
     if is_xmp {
-        return format!(
-            "Couldn't update the XMP sidecar for {} — it may be locked by another app. Ratings are safe in Falcon.",
-            p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string())
+        return WriterFail::Xmp(
+            p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string()),
         );
     }
     let is_review = p
@@ -13124,9 +13246,9 @@ pub(crate) fn writer_fail_message(p: &Path, err: &str, is_xmp: bool) -> String {
             .and_then(|d| d.file_name())
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| p.parent().map(|d| d.display().to_string()).unwrap_or_default());
-        return format!("Review data FAILED to save for {folder} ({err}) — your latest changes may not be on disk");
+        return WriterFail::Review(folder);
     }
-    format!("Save FAILED for {} ({err}) — your latest changes may not be on disk", p.display())
+    WriterFail::Other(p.display().to_string())
 }
 
 /// Drain the writer's failure messages (the tick pushes each into the events centre). Empty if none or
@@ -13375,7 +13497,7 @@ fn register_open_folder_as(
     let warn = if check_collision
         && entries.iter().any(|e| e.pid != me && entry_is_live(e, now) && folders_eq(&e.folder, &folder))
     {
-        Some("This folder is open in another Falcon window — review edits (ratings, flags, rejects) are last-writer-wins between them".to_string())
+        Some(i18n::tr("This folder is open in another Falcon window — review edits (ratings, flags, rejects) are last-writer-wins between them").to_string())
     } else {
         None
     };
@@ -17950,9 +18072,9 @@ pub(crate) fn efficiency_transition_line(
 #[must_use]
 pub(crate) fn efficiency_auto_toast(snap: PowerSnapshot) -> String {
     if snap.source == PowerSource::Dc {
-        "On battery — reducing background work.".to_string()
+        i18n::tr("On battery — reducing background work.").to_string()
     } else {
-        "Battery saver is on — reducing background work.".to_string()
+        i18n::tr("Battery saver is on — reducing background work.").to_string()
     }
 }
 
@@ -18043,13 +18165,14 @@ pub(crate) fn efficiency_note(
     user_super: bool,
 ) -> String {
     if env_disabled {
-        return "Turned off for this session by FALCON_EFFICIENCY=0 — the control resumes on the \
-                next launch without it."
-            .to_string();
+        return i18n::tr(
+            "Turned off for this session by FALCON_EFFICIENCY=0 — the control resumes on the next launch without it.",
+        )
+        .to_string();
     }
     // A simulated run must not read as a measured one on the SHEET either (the B-O3 principle, one
     // surface over). Dev levers are visible where they act.
-    let sim_note = if sim.is_some() { " (simulated)" } else { "" };
+    let sim_note = if sim.is_some() { format!(" {}", i18n::tr("(simulated)")) } else { String::new() };
     // v0.8.196 fix tail: what "Active" is actually DOING right now — composed, never re-worded, and
     // SILENT about a rate the posture is not taking away (skeptic B, R5).
     let rate = efficiency_rate_sentence(limits, user_fps, mode, snap, sim);
@@ -18060,16 +18183,18 @@ pub(crate) fn efficiency_note(
         (false, true) => format!(" {rate}"),
         (false, false) => format!(" {rate} {sampling}"),
     };
+    // Each verdict is one whole sentence; the simulated mark and the live sentences follow it.
     match mode {
-        EFFICIENCY_ON => format!("Active — turned on.{sim_note}{live}"),
-        EFFICIENCY_OFF => format!("Not active — this setting is switched off.{sim_note}"),
+        EFFICIENCY_ON => format!("{}{sim_note}{live}", i18n::tr("Active — turned on.")),
+        EFFICIENCY_OFF => format!("{}{sim_note}", i18n::tr("Not active — this setting is switched off.")),
         _ => match (snap.source, snap.saver) {
-            (PowerSource::Dc, _) => format!("Active — on battery.{sim_note}{live}"),
-            (_, true) => format!("Active — Battery saver is on.{sim_note}{live}"),
+            (PowerSource::Dc, _) => format!("{}{sim_note}{live}", i18n::tr("Active — on battery.")),
+            (_, true) => format!("{}{sim_note}{live}", i18n::tr("Active — Battery saver is on.")),
             (PowerSource::Unknown, false) => format!(
-                "No battery detected — Auto never activates on this computer.{sim_note}"
+                "{}{sim_note}",
+                i18n::tr("No battery detected — Auto never activates on this computer.")
             ),
-            (PowerSource::Ac, false) => format!("Waiting for battery power.{sim_note}"),
+            (PowerSource::Ac, false) => format!("{}{sim_note}", i18n::tr("Waiting for battery power.")),
         },
     }
 }
@@ -18822,40 +18947,38 @@ fn efficiency_reason_sentence(
 ) -> String {
     // R3: at the floor the number is not a measurement of anything the machine can do.
     if limits.floored {
-        return format!(
-            "That is the slowest step Falcon will use — this machine is currently slower than {} fps.",
-            fps_text(EFFICIENCY_CEILING_FLOOR_FPS)
+        return tr_format!(
+            "That is the slowest step Falcon will use — this machine is currently slower than {fps} fps.",
+            fps = fps_text(EFFICIENCY_CEILING_FLOOR_FPS)
         );
     }
     if sim.is_some() || limits.source == LimitSource::Sim {
-        return "The rate comes from a SIMULATED latency (a dev lever), not from this machine."
+        return i18n::tr("The rate comes from a SIMULATED latency (a dev lever), not from this machine.")
             .to_string();
     }
     match limits.source {
         // Y3: the Default arm is the one state that can be improved by an action, and the sibling
         // note in this very popup already points at it.
-        LimitSource::Default => {
-            "That is the default until this machine has been measured — run a benchmark \
-             (Settings → Fast View) for a rate fitted to it."
-                .to_string()
-        }
+        LimitSource::Default => i18n::tr(
+            "That is the default until this machine has been measured — run a benchmark (Settings → Fast View) for a rate fitted to it.",
+        )
+        .to_string(),
         LimitSource::Seed => {
-            "That comes from this machine's benchmark, and follows the live rate as you browse."
+            i18n::tr("That comes from this machine's benchmark, and follows the live rate as you browse.")
                 .to_string()
         }
         // R2: a live measurement is the only arm entitled to say what the machine is doing, and WHY
-        // the posture is on is the mode's own question, never the ceiling's.
-        _ => {
-            let why = match mode {
-                EFFICIENCY_ON => String::new(),
-                _ => match (snap.source, snap.saver) {
-                    (PowerSource::Dc, _) => " on battery".to_string(),
-                    (_, true) => " with Battery saver on".to_string(),
-                    _ => String::new(),
-                },
-            };
-            format!("That is the rate this machine is keeping up with{why}.")
+        // the posture is on is the mode's own question, never the ceiling's. One whole sentence per
+        // reason.
+        _ => match mode {
+            EFFICIENCY_ON => i18n::tr("That is the rate this machine is keeping up with."),
+            _ => match (snap.source, snap.saver) {
+                (PowerSource::Dc, _) => i18n::tr("That is the rate this machine is keeping up with on battery."),
+                (_, true) => i18n::tr("That is the rate this machine is keeping up with while Battery saver is on."),
+                _ => i18n::tr("That is the rate this machine is keeping up with."),
+            },
         }
+        .to_string(),
     }
 }
 
@@ -18869,14 +18992,30 @@ pub(crate) fn efficiency_rate_sentence(
     snap: PowerSnapshot,
     sim: Option<PowerSim>,
 ) -> String {
-    if !efficiency_binding(limits, user_fps) {
-        return String::new();
+    match efficiency_rate_parts(limits, user_fps, mode, snap, sim) {
+        Some((fps, reason)) => tr_format!(
+            "Efficiency mode is limiting browsing to {fps} fps right now. {reason}",
+            fps = fps,
+            reason = reason
+        ),
+        None => String::new(),
     }
-    format!(
-        "Efficiency mode is limiting browsing to {} fps right now. {}",
-        fps_text(limits.ceiling_fps),
-        efficiency_reason_sentence(limits, mode, snap, sim)
-    )
+}
+
+/// The rate sentence's two values — the ceiling as printed and its reason sentence — or `None`
+/// while the posture is not taking rate away. The leaf's tip builds its own sentence from these
+/// rather than trimming the rate sentence, which a language pack translates.
+fn efficiency_rate_parts(
+    limits: EfficiencyLimits,
+    user_fps: f32,
+    mode: u8,
+    snap: PowerSnapshot,
+    sim: Option<PowerSim>,
+) -> Option<(String, String)> {
+    if !efficiency_binding(limits, user_fps) {
+        return None;
+    }
+    Some((fps_text(limits.ceiling_fps), efficiency_reason_sentence(limits, mode, snap, sim)))
 }
 
 /// The sampling half, in the FAST VIEW CARD'S OWN WORDS (skeptic B, R4 — CONFIRMED). The round said
@@ -18889,7 +19028,7 @@ pub(crate) fn efficiency_sampling_sentence(limits: EfficiencyLimits, user_super:
         // A user already on Subsample sees no change, so there is nothing to say to him.
         return String::new();
     }
-    "Efficiency mode is using Faster preview right now — your setting is kept.".to_string()
+    i18n::tr("Efficiency mode is using Faster preview right now — your setting is kept.").to_string()
 }
 
 /// §E — **THE CLAUSE EVERY `efficiency:` LOG LINE GROWS WHILE ENGAGED.** It states the three derived
@@ -18937,15 +19076,15 @@ pub(crate) fn efficiency_leaf_tip(
     if !limits.engaged {
         return String::new();
     }
-    let rate = efficiency_rate_sentence(limits, user_fps, mode, snap, sim);
-    if rate.is_empty() {
+    let Some((fps, reason)) = efficiency_rate_parts(limits, user_fps, mode, snap, sim) else {
         // ENGAGED BUT NOT BINDING (skeptic B, R5): the badge still has to explain itself, and what
         // it must NOT do is claim a throttle the user's own setting is already below. The posture is
         // doing its other four cuts; the browse rate is his.
-        return "Efficiency mode — background loading is reduced; your browsing speed is unchanged."
+        return i18n::tr("Efficiency mode — background loading is reduced; your browsing speed is unchanged.")
             .to_string();
-    }
-    format!("Efficiency mode — {}", rate.trim_start_matches("Efficiency mode is "))
+    };
+    // Built from the rate's parts, never by trimming the rate sentence's (translated) words.
+    tr_format!("Efficiency mode — limiting browsing to {fps} fps right now. {reason}", fps = fps, reason = reason)
 }
 
 /// §D — **WHAT THE TICK DOES ABOUT A PUBLISH-GATE EDGE**, after the field log showed the honest
@@ -21727,22 +21866,21 @@ pub(crate) fn set_heic_lane_cap(n: usize) -> usize {
 /// an arm it did not choose.
 pub(crate) fn lane_cap_note(env: Option<usize>, setting: usize) -> String {
     match env {
-        Some(n) => format!(
-            "FALCON_HEIC_LANE_CAP={n} is set in this process's environment and overrides this \
-             control for the whole run. The saved setting takes over on the next launch without it."
+        Some(n) => tr_format!(
+            "FALCON_HEIC_LANE_CAP={cap} is set in this process's environment and overrides this control for the whole run. The saved setting takes over on the next launch without it.",
+            cap = n
         ),
-        None if setting > 0 => format!(
-            "At most {setting} speculative HEIC decodes in flight on a folder the hardware lane has \
-             promoted to CHEAP. The displayed photo is exempt, so the ceiling is {}. Applies live.",
-            setting.saturating_add(1)
+        None if setting > 0 => tr_format!(
+            "At most {setting} speculative HEIC decodes in flight on a folder the hardware lane has promoted to CHEAP. The displayed photo is exempt, so the ceiling is {ceiling}. Applies live.",
+            setting = setting,
+            ceiling = setting.saturating_add(1)
         ),
         // v0.8.171: "the shipped default" moved to the OTHER arm, and this sentence has to move
         // with it or the card tells the owner the opposite of what the build does.
-        None => "Speculative concurrency on a promoted (CHEAP) folder is UNCAPPED. The shipped \
-                 default is 4 — on the 08-06 laptop pair, uncapped produced 30 five-second give-ups \
-                 to WIC against 4 at cap 4, because one video engine time-slices the extra asks \
-                 rather than serving them."
-            .to_string(),
+        None => i18n::tr(
+            "Speculative concurrency on a promoted (CHEAP) folder is UNCAPPED. The shipped default is 4 — on the 08-06 laptop pair, uncapped produced 30 five-second give-ups to WIC against 4 at cap 4, because one video engine time-slices the extra asks rather than serving them.",
+        )
+        .to_string(),
     }
 }
 
@@ -25356,6 +25494,27 @@ pub(crate) fn mark_verb(old: u8, new: u8) -> &'static str {
     }
 }
 
+/// Language packs (round 2): a single-photo edit stated against its subject, "Flagged — HWU_1234".
+/// `verb` is an English id — [`mark_verb`]'s four, "Rotated" or "Rating cleared" — never displayed
+/// text, so it only picks the whole message; any other verb keeps the composed English. The
+/// off-screen edit notice (`note_offscreen_edit`) and the pinned last-action row both speak it.
+pub(crate) fn edit_on_subject(verb: &str, subject: &str) -> String {
+    match verb {
+        "Flagged" => tr_format!("Flagged — {photo}", photo = subject),
+        "Rejected" => tr_format!("Rejected — {photo}", photo = subject),
+        "Unflagged" => tr_format!("Unflagged — {photo}", photo = subject),
+        "Un-rejected" => tr_format!("Un-rejected — {photo}", photo = subject),
+        "Rotated" => tr_format!("Rotated — {photo}", photo = subject),
+        "Rating cleared" => tr_format!("Rating cleared — {photo}", photo = subject),
+        _ => format!("{verb} — {subject}"),
+    }
+}
+
+/// The rating half of [`edit_on_subject`]: "Rated 3 — HWU_1234".
+pub(crate) fn rated_on_subject(stars: i32, subject: &str) -> String {
+    tr_format!("Rated {stars} — {photo}", stars = stars, photo = subject)
+}
+
 #[cfg(test)]
 mod mark_verb_tests {
     use super::{mark_verb, MARK_FLAG, MARK_REJECT};
@@ -25688,13 +25847,17 @@ pub(crate) fn selection_clear_offers_restore(n: usize, user_initiated: bool) -> 
 /// The recovery toast's sentence, and the one the [Restore] pill answers with. Composed here so
 /// the count never becomes an int->string concat in Slint (which the engine has no operator for).
 pub(crate) fn selection_cleared_toast(n: usize) -> String {
-    format!("Selection cleared ({n})")
+    tr_format!("Selection cleared ({n})", n = n)
 }
 pub(crate) fn selection_restored_toast(applied: usize, total: usize) -> String {
     if applied == total {
-        format!("Selection restored ({applied})")
+        tr_format!("Selection restored ({applied})", applied = applied)
     } else {
-        format!("Selection restored ({applied} of {total} - the rest are no longer in this folder)")
+        tr_format!(
+            "Selection restored ({applied} of {total} - the rest are no longer in this folder)",
+            applied = applied,
+            total = total
+        )
     }
 }
 
@@ -25702,7 +25865,8 @@ pub(crate) fn selection_restored_toast(applied: usize, total: usize) -> String {
 /// macOS, from the one platform string table. Used by the empty-state hint and any copy that names
 /// the gesture.
 pub(crate) fn sel_toggle_chord() -> String {
-    format!("{}click", crate::platform::PLATFORM.mod_ctrl)
+    // Language packs (round 2): the gesture's name is one message; the modifier is a key name.
+    tr_format!("{modifier}click", modifier = crate::platform::PLATFORM.mod_ctrl)
 }
 /// v0.8.169 (item 5, OWNER RULING): the context menus' "Select" keycap — **both** selection
 /// modifiers, slash-separated ("Ctrl / Shift"; "⌘ / ⇧" on the Mac arm).
@@ -25727,21 +25891,21 @@ pub(crate) fn sel_gesture_chord_display() -> String {
 /// The mode-5 empty state's hint. (Mode 5 unmounts its own chip at count 0 and the A-4 fallback
 /// leaves the category in the same event, so this is a belt: it must still say something true.)
 pub(crate) fn sel_hint_selected_text() -> String {
-    format!("{} photos on the filmstrip or grid to build a selection.", sel_toggle_chord())
+    tr_format!("{gesture} photos on the filmstrip or grid to build a selection.", gesture = sel_toggle_chord())
 }
 /// The context menus' counted "Clear selection" row (L20 -- a state-derived title, composed in Rust
 /// per the ctx-rank-mode precedent: a counted entry is never re-derived UI-side).
 pub(crate) fn clear_selection_label(n: usize) -> String {
     if n == 0 {
-        "Clear selection".to_string()
+        i18n::tr("Clear selection").to_string()
     } else {
-        format!("Clear selection ({n})")
+        tr_format!("Clear selection ({n})", n = n)
     }
 }
 /// The hidden category chip's whole label ("Selected · 12") -- one string, so the chip needs no
 /// concat and the rig can pin its WIDEST state by setting this property directly (ledger L5).
 pub(crate) fn selected_chip_label(n: usize) -> String {
-    format!("Selected · {n}")
+    tr_format!("Selected · {n}", n = n)
 }
 
 // ── v0.8.130 (W2-1, design section 6): THE OUTPUT ROW'S ADAPTING COLUMN ────────────────────
@@ -25766,11 +25930,11 @@ pub(crate) fn out_col1_targets(filt: i32) -> bool {
 /// are being fixed for, so the caption adapts with them.
 pub(crate) fn out_col1_title(filt: i32) -> &'static str {
     match filt {
-        1 => "Picks",
-        2 => "Rejects",
-        3 => "Rated",
-        5 => "Selected",
-        _ => "Displayed",
+        1 => i18n::tr("Picks"),
+        2 => i18n::tr("Rejects"),
+        3 => i18n::tr("Rated"),
+        5 => i18n::tr("Selected"),
+        _ => i18n::tr("Displayed"),
     }
 }
 /// The two button labels. SHORT by contract (ledger L5/H16): `ActionBtn` has no clip and no
@@ -25778,29 +25942,43 @@ pub(crate) fn out_col1_title(filt: i32) -> &'static str {
 /// The widest state is "Export displayed" / "Nothing to export".
 pub(crate) fn out_col1_label(filt: i32, web: bool) -> &'static str {
     match (filt, web) {
-        (5, false) => "Copy selected",
-        (5, true) => "Export selected",
-        (1, false) => "Copy picks",
-        (1, true) => "Export picks",
-        (3, false) => "Copy rated",
-        (3, true) => "Export rated",
+        (5, false) => i18n::tr("Copy selected"),
+        (5, true) => i18n::tr("Export selected"),
+        (1, false) => i18n::tr("Copy picks"),
+        (1, true) => i18n::tr("Export picks"),
+        (3, false) => i18n::tr("Copy rated"),
+        (3, true) => i18n::tr("Export rated"),
         // The disabled Rejects state SAYS what it is, in the label, where the user is looking --
         // the design's "nothing to copy here" caption without a new row to lay out.
-        (2, false) => "Nothing to copy",
-        (2, true) => "Nothing to export",
-        (_, false) => "Copy displayed",
-        (_, true) => "Export displayed",
+        (2, false) => i18n::tr("Nothing to copy"),
+        (2, true) => i18n::tr("Nothing to export"),
+        (_, false) => i18n::tr("Copy displayed"),
+        (_, true) => i18n::tr("Export displayed"),
     }
 }
-/// The set NOUN, count-agreed, shared by the confirm title and body so they cannot drift.
-pub(crate) fn out_set_noun(filt: i32, n: usize) -> &'static str {
-    let one = n == 1;
+/// The set the sentences below NAME, shared by the confirm title and body (and the web sheet's
+/// sentences) so they cannot drift.
+///
+/// Language packs (round 2): this used to return the English noun, count-agreed ("selected photo" /
+/// "selected photos"), which five composers spliced into their sentences. A spliced noun cannot be
+/// translated (another language inflects it, or orders the sentence differently), so each sentence
+/// is now one whole message per set, counted where it holds the number, and this answers only WHICH
+/// set. English output is unchanged.
+#[derive(Clone, Copy)]
+pub(crate) enum OutSet {
+    Selected,
+    Picks,
+    Rated,
+    Rejects,
+    Displayed,
+}
+pub(crate) fn out_set_noun(filt: i32) -> OutSet {
     match filt {
-        5 => if one { "selected photo" } else { "selected photos" },
-        1 => if one { "pick" } else { "picks" },
-        3 => if one { "rated photo" } else { "rated photos" },
-        2 => if one { "reject" } else { "rejects" },
-        _ => if one { "displayed photo" } else { "displayed photos" },
+        5 => OutSet::Selected,
+        1 => OutSet::Picks,
+        3 => OutSet::Rated,
+        2 => OutSet::Rejects,
+        _ => OutSet::Displayed,
     }
 }
 /// v0.8.131 (F-P7 / J20): the WEB sheet's noun-led sentence, beside its big count. NUMBERLESS by
@@ -25810,7 +25988,21 @@ pub(crate) fn out_set_noun(filt: i32, n: usize) -> &'static str {
 /// the DISPLAYED set, so a zero-flag folder with 12 selected photos opened a sheet showing 0 with a
 /// permanently disabled Export, and 40 picks + 3 selected said 40 and exported 3.
 pub(crate) fn out_web_sentence(filt: i32, n: usize) -> String {
-    format!("{} → export copies → export folder", out_set_noun(filt, n))
+    // Language packs (round 2): numberless, so the count chooses between two whole messages
+    // (`n == 1`, the precedent for a counted phrase that holds no number).
+    let s = match (out_set_noun(filt), n == 1) {
+        (OutSet::Selected, true) => i18n::tr("selected photo → export copies → export folder"),
+        (OutSet::Selected, false) => i18n::tr("selected photos → export copies → export folder"),
+        (OutSet::Picks, true) => i18n::tr("pick → export copies → export folder"),
+        (OutSet::Picks, false) => i18n::tr("picks → export copies → export folder"),
+        (OutSet::Rated, true) => i18n::tr("rated photo → export copies → export folder"),
+        (OutSet::Rated, false) => i18n::tr("rated photos → export copies → export folder"),
+        (OutSet::Rejects, true) => i18n::tr("reject → export copies → export folder"),
+        (OutSet::Rejects, false) => i18n::tr("rejects → export copies → export folder"),
+        (OutSet::Displayed, true) => i18n::tr("displayed photo → export copies → export folder"),
+        (OutSet::Displayed, false) => i18n::tr("displayed photos → export copies → export folder"),
+    };
+    s.to_string()
 }
 
 /// The web sheet's DESCRIPTION line — set-aware for the same reason. "every flagged pick" was true
@@ -25825,11 +26017,21 @@ pub(crate) fn out_web_sentence(filt: i32, n: usize) -> String {
 /// — was left in the editor. `fmt` is the SELECTED PRESET's format: clicking a row in the list runs
 /// `apply-preset`, which writes `out-format`, and the export dispatcher reads that same property.
 pub(crate) fn out_web_description(filt: i32, n: usize, fmt: falcon_decode::WebFormat) -> String {
-    format!(
-        "Pick a preset below — Export renders the {} with it into the shoot's ./export folder, converted to {} and sRGB for web & social.",
-        out_set_noun(filt, n),
-        fmt.noun()
-    )
+    // Language packs (round 2): numberless, one whole message per set and count form; the format
+    // name ("JPG" / "PNG") is a value.
+    let format = fmt.noun();
+    match (out_set_noun(filt), n == 1) {
+        (OutSet::Selected, true) => tr_format!("Pick a preset below — Export renders the selected photo with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Selected, false) => tr_format!("Pick a preset below — Export renders the selected photos with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Picks, true) => tr_format!("Pick a preset below — Export renders the pick with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Picks, false) => tr_format!("Pick a preset below — Export renders the picks with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Rated, true) => tr_format!("Pick a preset below — Export renders the rated photo with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Rated, false) => tr_format!("Pick a preset below — Export renders the rated photos with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Rejects, true) => tr_format!("Pick a preset below — Export renders the reject with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Rejects, false) => tr_format!("Pick a preset below — Export renders the rejects with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Displayed, true) => tr_format!("Pick a preset below — Export renders the displayed photo with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+        (OutSet::Displayed, false) => tr_format!("Pick a preset below — Export renders the displayed photos with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.", format = format),
+    }
 }
 
 /// The progress card's title and the op toast, which both named "picks" on every category.
@@ -25842,7 +26044,14 @@ pub(crate) fn out_web_description(filt: i32, n: usize, fmt: falcon_decode::WebFo
 /// DISPLAYED set. "picks" is now one of six nouns this composer can emit, and a future terminology
 /// sweep must not re-pin the old literal here. The spec's line carries the same note.
 pub(crate) fn out_web_progress_title(filt: i32, n: usize) -> String {
-    format!("Exporting {n} {}", out_set_noun(filt, n))
+    // Language packs (round 2): one counted message per set.
+    match out_set_noun(filt) {
+        OutSet::Selected => tr_plural!(n, "Exporting {n} selected photo", "Exporting {n} selected photos"),
+        OutSet::Picks => tr_plural!(n, "Exporting {n} pick", "Exporting {n} picks"),
+        OutSet::Rated => tr_plural!(n, "Exporting {n} rated photo", "Exporting {n} rated photos"),
+        OutSet::Rejects => tr_plural!(n, "Exporting {n} reject", "Exporting {n} rejects"),
+        OutSet::Displayed => tr_plural!(n, "Exporting {n} displayed photo", "Exporting {n} displayed photos"),
+    }
 }
 
 /// The COMPLETION sentence's head. Architect default [VD]: noun-aware, naming the set the run
@@ -25850,12 +26059,33 @@ pub(crate) fn out_web_progress_title(filt: i32, n: usize) -> String {
 /// RAW-only / unsupported / need attention / FAILED — "existed" became "already there", the copy
 /// path's own words for the same fact, and the stranded-placeholder clause is new.)
 pub(crate) fn out_web_done_head(filt: i32, ok: usize) -> String {
-    format!("Exported {ok} {} → ./export", out_set_noun(filt, ok))
+    // Language packs (round 2): one counted message per set.
+    match out_set_noun(filt) {
+        OutSet::Selected => tr_plural!(ok, "Exported {n} selected photo → ./export", "Exported {n} selected photos → ./export"),
+        OutSet::Picks => tr_plural!(ok, "Exported {n} pick → ./export", "Exported {n} picks → ./export"),
+        OutSet::Rated => tr_plural!(ok, "Exported {n} rated photo → ./export", "Exported {n} rated photos → ./export"),
+        OutSet::Rejects => tr_plural!(ok, "Exported {n} reject → ./export", "Exported {n} rejects → ./export"),
+        OutSet::Displayed => tr_plural!(ok, "Exported {n} displayed photo → ./export", "Exported {n} displayed photos → ./export"),
+    }
 }
 
 /// The kind-1 confirm's headline, beside the big count (the `empty_confirm_title` pattern).
 pub(crate) fn out_confirm_title(filt: i32, n: usize) -> String {
-    format!("{} → copy to ./{PICKS_SUBFOLDER}", out_set_noun(filt, n))
+    // Language packs (round 2): numberless (the count stands beside it), so the count chooses
+    // between two whole messages. "./Picks" is the folder's name and stays as it is.
+    let s = match (out_set_noun(filt), n == 1) {
+        (OutSet::Selected, true) => i18n::tr("selected photo → copy to ./Picks"),
+        (OutSet::Selected, false) => i18n::tr("selected photos → copy to ./Picks"),
+        (OutSet::Picks, true) => i18n::tr("pick → copy to ./Picks"),
+        (OutSet::Picks, false) => i18n::tr("picks → copy to ./Picks"),
+        (OutSet::Rated, true) => i18n::tr("rated photo → copy to ./Picks"),
+        (OutSet::Rated, false) => i18n::tr("rated photos → copy to ./Picks"),
+        (OutSet::Rejects, true) => i18n::tr("reject → copy to ./Picks"),
+        (OutSet::Rejects, false) => i18n::tr("rejects → copy to ./Picks"),
+        (OutSet::Displayed, true) => i18n::tr("displayed photo → copy to ./Picks"),
+        (OutSet::Displayed, false) => i18n::tr("displayed photos → copy to ./Picks"),
+    };
+    s.to_string()
 }
 /// The kind-1 confirm's BODY -- counted, and it names the destination. `content` is the live
 /// copy-content choice (0 both / 1 RAW only / 2 JPG only) the dialog's own Seg writes.
@@ -25867,16 +26097,27 @@ pub(crate) fn out_confirm_body(filt: i32, n: usize, content: i32) -> String {
     // unsupported standalone image". There is no extension test anywhere on that path, so this
     // choice has ALWAYS copied a PNG folder's PNGs; only the sentence said otherwise. Same defect
     // the owner reported in the §33 list, on the surface that commits the act.
-    let (what, miss) = match CopyContent::from_i32(content) {
-        CopyContent::RawOnly => ("just the RAW", " Shots with no RAW are skipped."),
-        CopyContent::JpgOnly => ("just the image", " Shots with no image file are skipped."),
-        CopyContent::Both => ("the RAW + image", ""),
-    };
-    let each = if n == 1 { "" } else { " of each" };
-    format!(
-        "Copy {n} {} to the {PICKS_SUBFOLDER} subfolder — {what}{each}. Existing files are skipped.{miss}",
-        out_set_noun(filt, n)
-    )
+    //
+    // Language packs (round 2): one whole counted message per set and copy-content choice — the
+    // noun, "of each" (plural only) and the closing skip sentence all move with them. "Picks" is the
+    // folder's name and stays as it is.
+    match (out_set_noun(filt), CopyContent::from_i32(content)) {
+        (OutSet::Selected, CopyContent::RawOnly) => tr_plural!(n, "Copy {n} selected photo to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.", "Copy {n} selected photos to the Picks subfolder — just the RAW of each. Existing files are skipped. Shots with no RAW are skipped."),
+        (OutSet::Selected, CopyContent::JpgOnly) => tr_plural!(n, "Copy {n} selected photo to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.", "Copy {n} selected photos to the Picks subfolder — just the image of each. Existing files are skipped. Shots with no image file are skipped."),
+        (OutSet::Selected, CopyContent::Both) => tr_plural!(n, "Copy {n} selected photo to the Picks subfolder — the RAW + image. Existing files are skipped.", "Copy {n} selected photos to the Picks subfolder — the RAW + image of each. Existing files are skipped."),
+        (OutSet::Picks, CopyContent::RawOnly) => tr_plural!(n, "Copy {n} pick to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.", "Copy {n} picks to the Picks subfolder — just the RAW of each. Existing files are skipped. Shots with no RAW are skipped."),
+        (OutSet::Picks, CopyContent::JpgOnly) => tr_plural!(n, "Copy {n} pick to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.", "Copy {n} picks to the Picks subfolder — just the image of each. Existing files are skipped. Shots with no image file are skipped."),
+        (OutSet::Picks, CopyContent::Both) => tr_plural!(n, "Copy {n} pick to the Picks subfolder — the RAW + image. Existing files are skipped.", "Copy {n} picks to the Picks subfolder — the RAW + image of each. Existing files are skipped."),
+        (OutSet::Rated, CopyContent::RawOnly) => tr_plural!(n, "Copy {n} rated photo to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.", "Copy {n} rated photos to the Picks subfolder — just the RAW of each. Existing files are skipped. Shots with no RAW are skipped."),
+        (OutSet::Rated, CopyContent::JpgOnly) => tr_plural!(n, "Copy {n} rated photo to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.", "Copy {n} rated photos to the Picks subfolder — just the image of each. Existing files are skipped. Shots with no image file are skipped."),
+        (OutSet::Rated, CopyContent::Both) => tr_plural!(n, "Copy {n} rated photo to the Picks subfolder — the RAW + image. Existing files are skipped.", "Copy {n} rated photos to the Picks subfolder — the RAW + image of each. Existing files are skipped."),
+        (OutSet::Rejects, CopyContent::RawOnly) => tr_plural!(n, "Copy {n} reject to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.", "Copy {n} rejects to the Picks subfolder — just the RAW of each. Existing files are skipped. Shots with no RAW are skipped."),
+        (OutSet::Rejects, CopyContent::JpgOnly) => tr_plural!(n, "Copy {n} reject to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.", "Copy {n} rejects to the Picks subfolder — just the image of each. Existing files are skipped. Shots with no image file are skipped."),
+        (OutSet::Rejects, CopyContent::Both) => tr_plural!(n, "Copy {n} reject to the Picks subfolder — the RAW + image. Existing files are skipped.", "Copy {n} rejects to the Picks subfolder — the RAW + image of each. Existing files are skipped."),
+        (OutSet::Displayed, CopyContent::RawOnly) => tr_plural!(n, "Copy {n} displayed photo to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.", "Copy {n} displayed photos to the Picks subfolder — just the RAW of each. Existing files are skipped. Shots with no RAW are skipped."),
+        (OutSet::Displayed, CopyContent::JpgOnly) => tr_plural!(n, "Copy {n} displayed photo to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.", "Copy {n} displayed photos to the Picks subfolder — just the image of each. Existing files are skipped. Shots with no image file are skipped."),
+        (OutSet::Displayed, CopyContent::Both) => tr_plural!(n, "Copy {n} displayed photo to the Picks subfolder — the RAW + image. Existing files are skipped.", "Copy {n} displayed photos to the Picks subfolder — the RAW + image of each. Existing files are skipped."),
+    }
 }
 
 // ── v0.8.132 (OQ1, owner-ruled 08-03): THE REJECTED-PHOTOGRAPHS TOGGLE ─────────────────
@@ -25944,7 +26185,7 @@ pub(crate) fn include_rejects_effective(open: bool, toggle: bool, filt: i32) -> 
 /// int+string concatenation, and a counted label re-derived UI-side is the divergence class this
 /// file keeps closing.
 pub(crate) fn include_rejects_label(n: usize) -> String {
-    format!("Include {n} rejected photo{}?", if n == 1 { "" } else { "s" })
+    tr_plural!(n, "Include {n} rejected photo?", "Include {n} rejected photos?")
 }
 
 /// ── queue 36 (sheet 2.2d, OWNER-RULED 2026-09-06): THE RAW-ONLY PICK — **THE ONE PREDICATE** ────
@@ -25984,7 +26225,7 @@ pub(crate) fn web_exports_a_picture(s: &Shot, policy: RawExportPolicy) -> bool {
 /// question in a different noun — the owner's ruling was "similar to the export with rejected image
 /// case", and that similarity is meant to be visible in the sheet, not just in the code.
 pub(crate) fn include_raw_only_label(n: usize) -> String {
-    format!("Include {n} RAW-only photo{}?", if n == 1 { "" } else { "s" })
+    tr_plural!(n, "Include {n} RAW-only photo?", "Include {n} RAW-only photos?")
 }
 
 /// The caption UNDER that row — the limitation, stated where the decision is made.
@@ -25998,7 +26239,8 @@ pub(crate) fn include_raw_only_label(n: usize) -> String {
 ///
 /// A `const` rather than a composer because it takes no arguments: it is published from the tick
 /// beside the counted label so that every worded string on this sheet comes from one place.
-pub(crate) const RAW_ONLY_CAPTION: &str = "Uses each camera's built-in preview, not a developed RAW. Some cameras embed a small one, and it is never upscaled.";
+/// Language packs (round 2): marked here, translated where the tick publishes it.
+pub(crate) const RAW_ONLY_CAPTION: &str = tr_noop!("Uses each camera's built-in preview, not a developed RAW. Some cameras embed a small one, and it is never upscaled.");
 
 // ── v0.8.130 (W2-2, spec R-B): BULK ACTIONS OVER THE SELECTION ─────────────────────────────
 
@@ -26139,14 +26381,13 @@ pub(crate) fn bulk_mark_sets(indices: &[usize], marks: &[u8], bit: u8) -> bool {
 /// the in-app menus are sentence case ("photo"), the mac menu bar is title case by AppKit
 /// convention ("Photo"). That casing is the only thing separating the three composers below, and
 /// having it be the only thing is the point — a fourth surface adds a noun, never a plural rule.
+///
+/// Language packs (round 2): every shown sentence that used this phrase is now one whole counted
+/// message (the menu bar's rows in `menubar_model`, `bulk_menubar_mark_title`), so the old
+/// `menubar_photo_count` is gone. What is left is the English fallback for a verb outside the ids
+/// `bulk_counted`'s callers pass.
 fn counted_noun(n: usize, noun: &str) -> String {
     format!("{n} {noun}{}", if n == 1 { "" } else { "s" })
-}
-
-/// The mac menu bar's counted noun phrase — "12 Photos" / "1 Photo". Title case, because that is
-/// what every other row in an NSMenu is.
-pub(crate) fn menubar_photo_count(n: usize) -> String {
-    counted_noun(n, "Photo")
 }
 
 /// The DIRECTED, counted sentence every bulk mark surface says, in that surface's own shape. An
@@ -26179,7 +26420,17 @@ fn bulk_counted(set_verb: &str, clear_verb: &str, n: usize, sets: bool, noun: &s
 /// half exists to prevent, and a menu bar is the surface with no tile rims beside it to read the
 /// group's state from.
 pub(crate) fn bulk_menubar_mark_title(set_verb: &str, clear_verb: &str, n: usize, sets: bool) -> String {
-    bulk_counted(set_verb, clear_verb, n, sets, "Photo")
+    // Language packs (round 2): each verb with its counted noun is one whole message. As in
+    // `bulk_btn_label`, the verbs are the callers' fixed English ids and only pick the message; a
+    // verb outside that set keeps the composed English.
+    let verb = if sets { set_verb } else { clear_verb };
+    match verb {
+        "Flag" => tr_plural!(n, "Flag {n} Photo", "Flag {n} Photos"),
+        "Unflag" => tr_plural!(n, "Unflag {n} Photo", "Unflag {n} Photos"),
+        "Reject" => tr_plural!(n, "Reject {n} Photo", "Reject {n} Photos"),
+        "Un-reject" => tr_plural!(n, "Un-reject {n} Photo", "Un-reject {n} Photos"),
+        _ => bulk_counted(set_verb, clear_verb, n, sets, "Photo"),
+    }
 }
 
 /// v0.8.133 (the visual wave, C.4 i): the same title on a BUTTON rather than a menu row — counted
@@ -26191,7 +26442,17 @@ pub(crate) fn bulk_menubar_mark_title(set_verb: &str, clear_verb: &str, n: usize
 /// takes the same `sets` bit `bulk_mark_sets` gives the menu rows, so the button, the menu entry and
 /// the write are one predicate seen three times.
 pub(crate) fn bulk_btn_label(set_verb: &str, clear_verb: &str, n: usize, sets: bool) -> String {
-    bulk_counted(set_verb, clear_verb, n, sets, "")
+    // Language packs (round 2): each verb with its count is one whole message. The verbs are the
+    // callers' fixed English ids ("Flag"/"Unflag", "Reject"/"Un-reject"), never displayed text, so
+    // they only pick the message; a verb outside that set keeps the composed English.
+    let verb = if sets { set_verb } else { clear_verb };
+    match verb {
+        "Flag" => tr_format!("Flag {n}", n = n),
+        "Unflag" => tr_format!("Unflag {n}", n = n),
+        "Reject" => tr_format!("Reject {n}", n = n),
+        "Un-reject" => tr_format!("Un-reject {n}", n = n),
+        _ => bulk_counted(set_verb, clear_verb, n, sets, ""),
+    }
 }
 
 /// v0.8.163 (§7 item 3 [VD]): the plural UNMARK row's label. Its two siblings are direction-derived
@@ -26199,7 +26460,7 @@ pub(crate) fn bulk_btn_label(set_verb: &str, clear_verb: &str, n: usize, sets: b
 /// `BulkOp::Clear` always clears — so the verb is constant and only the count moves. Same bare-count
 /// shape as the rest of the plural menu, composed here because Slint cannot concatenate an int.
 pub(crate) fn bulk_unmark_label(n: usize) -> String {
-    format!("Unmark {n}")
+    tr_format!("Unmark {n}", n = n)
 }
 
 /// v0.8.163 (§7 item 3, OWNER RULING): the rating row's label, both context menus. "the rating text
@@ -26210,32 +26471,64 @@ pub(crate) fn bulk_unmark_label(n: usize) -> String {
 /// (`ctx_menu_header` — same call site, same two inputs).
 pub(crate) fn ctx_rate_label(plural: bool, n: usize) -> String {
     if plural {
-        format!("Rate {n}")
+        tr_format!("Rate {n}", n = n)
     } else {
-        "Rating".to_string()
+        i18n::tr("Rating").to_string()
     }
 }
 /// What a bulk operation SAYS it did, forward direction. Deliberately NOT `bulk_edit_sentence`:
 /// that one's "of N" clause means "the rest are no longer in this folder", and here a shorter
 /// applied count means "the rest already carried it" — a true number with a false explanation is
 /// worse than no explanation.
+///
+/// Language packs (round 2): `word` is the caller's fixed English id ("Flagged", "Unmarked", …),
+/// never displayed text, so it only picks the whole counted message; an unknown word keeps the
+/// composed English. [`bulk_done_sentence_english`] is the same sentence for the log line.
 pub(crate) fn bulk_done_sentence(word: &str, n: usize) -> String {
+    match word {
+        "Flagged" => tr_plural!(n, "Flagged {n} photo", "Flagged {n} photos"),
+        "Unflagged" => tr_plural!(n, "Unflagged {n} photo", "Unflagged {n} photos"),
+        "Rejected" => tr_plural!(n, "Rejected {n} photo", "Rejected {n} photos"),
+        "Un-rejected" => tr_plural!(n, "Un-rejected {n} photo", "Un-rejected {n} photos"),
+        "Unmarked" => tr_plural!(n, "Unmarked {n} photo", "Unmarked {n} photos"),
+        "Rotated" => tr_plural!(n, "Rotated {n} photo", "Rotated {n} photos"),
+        _ => bulk_done_sentence_english(word, n),
+    }
+}
+/// The English sentence of [`bulk_done_sentence`], for logs (logs stay English).
+pub(crate) fn bulk_done_sentence_english(word: &str, n: usize) -> String {
     format!("{word} {n} photo{}", if n == 1 { "" } else { "s" })
 }
 /// v0.8.131 (F-P1 rule 5): what a bulk op says when it changed NOTHING. Silence taught the user
 /// that the key might not have worked; a count and a state say it did exactly what it could.
+///
+/// Language packs (round 2): one whole counted message per `word` id, as above.
 pub(crate) fn bulk_no_change(word: &str, n: usize) -> String {
     if n == 0 {
-        return "Nothing to change — none of those photos are still in this folder".to_string();
+        return i18n::tr("Nothing to change — none of those photos are still in this folder").to_string();
     }
-    let noun = if n == 1 { "photo" } else { "photos" };
-    if word.is_empty() {
-        format!("No change — {n} {noun} already had that rating")
-    } else {
-        format!("No change — {n} {noun} already {}", word.to_lowercase())
+    match word {
+        "" => tr_plural!(n, "No change — {n} photo already had that rating", "No change — {n} photos already had that rating"),
+        "Flagged" => tr_plural!(n, "No change — {n} photo already flagged", "No change — {n} photos already flagged"),
+        "Unflagged" => tr_plural!(n, "No change — {n} photo already unflagged", "No change — {n} photos already unflagged"),
+        "Rejected" => tr_plural!(n, "No change — {n} photo already rejected", "No change — {n} photos already rejected"),
+        "Un-rejected" => tr_plural!(n, "No change — {n} photo already un-rejected", "No change — {n} photos already un-rejected"),
+        "Unmarked" => tr_plural!(n, "No change — {n} photo already unmarked", "No change — {n} photos already unmarked"),
+        _ => {
+            let noun = if n == 1 { "photo" } else { "photos" };
+            format!("No change — {n} {noun} already {}", word.to_lowercase())
+        }
     }
 }
 pub(crate) fn bulk_rate_done(n: usize, stars: i32) -> String {
+    if stars <= 0 {
+        tr_plural!(n, "Cleared the rating on {n} photo", "Cleared the rating on {n} photos")
+    } else {
+        tr_plural!(n, "Rated {n} photo {stars}★", "Rated {n} photos {stars}★", stars = stars)
+    }
+}
+/// The English sentence of [`bulk_rate_done`], for logs (logs stay English).
+pub(crate) fn bulk_rate_done_english(n: usize, stars: i32) -> String {
     let noun = if n == 1 { "photo" } else { "photos" };
     if stars <= 0 {
         format!("Cleared the rating on {n} {noun}")
@@ -26407,18 +26700,17 @@ pub(crate) fn bulk_rate_inert(n: usize, target: i32, uniform: Option<i32>) -> Op
     if uniform != Some(target) {
         return None;
     }
-    let noun = if n == 1 { "photo" } else { "photos" };
     Some(if target <= 0 {
-        format!("Nothing to clear on {}{n} {noun}", if n == 1 { "this " } else { "these " })
+        tr_plural!(n, "Nothing to clear on this {n} photo", "Nothing to clear on these {n} photos")
     } else {
-        format!("All {n} {noun} are already {target}★")
+        tr_plural!(n, "All {n} photo are already {target}★", "All {n} photos are already {target}★", target = target)
     })
 }
 
 /// [Yes] arriving after the selection moved on. It states the outcome and claims NO cause: the app
 /// cannot know whether the user re-selected, a rescan landed, or the folder changed underneath.
 pub(crate) fn bulk_ask_stale() -> String {
-    "Not applied — the selection moved on".to_string()
+    i18n::tr("Not applied — the selection moved on").to_string()
 }
 
 // v0.8.133 (the visual wave, C-2): `bulk_rate_label` is GONE, and with it the `ctx-bulk-rate-label`
@@ -26429,7 +26721,7 @@ pub(crate) fn bulk_ask_stale() -> String {
 // shown by which stars are filled, and the press goes through the same ask the keyboard raises.
 /// "Delete 12 photos…" — the ellipsis is the confirm dialog.
 pub(crate) fn bulk_delete_label(n: usize) -> String {
-    format!("Delete {n} photo{}…", if n == 1 { "" } else { "s" })
+    tr_plural!(n, "Delete {n} photo…", "Delete {n} photos…")
 }
 /// v1.0.0-rc (queue item 27, sheet 2.1 B2 b): the plural ROTATE rows' label — "Rotate 12 right".
 ///
@@ -26438,7 +26730,11 @@ pub(crate) fn bulk_delete_label(n: usize) -> String {
 /// [`bulk_mark_sets`] because a mark is a toggle and the set's state decides which way a press goes;
 /// a quarter-turn right is a quarter-turn right whatever the set already carries.
 pub(crate) fn bulk_rotate_label(n: usize, cw: bool) -> String {
-    format!("Rotate {n} {}", if cw { "right" } else { "left" })
+    if cw {
+        tr_format!("Rotate {n} right", n = n)
+    } else {
+        tr_format!("Rotate {n} left", n = n)
+    }
 }
 
 /// v1.0.0-rc (queue item 27, sheet 2.1 B2 b, OWNER RULING): what a rotated batch SAYS, including
@@ -26452,7 +26748,31 @@ pub(crate) fn bulk_rotate_label(n: usize, cw: bool) -> String {
 ///
 /// `turned == 0` says "Nothing rotated" rather than "Rotated 0 photos": a count of zero is not a
 /// report of work, and the clause after it is the whole of the news.
+///
+/// Language packs (round 2): the head and each clause are whole counted messages; the clauses are
+/// joined to the head (and to each other) by messages of their own, so a pack can punctuate them.
 pub(crate) fn bulk_rotate_sentence(turned: usize, cw: bool, animated: usize, unreadable: usize) -> String {
+    let head = if turned == 0 {
+        i18n::tr("Nothing rotated").to_string()
+    } else if cw {
+        tr_plural!(turned, "Rotated {n} photo right", "Rotated {n} photos right")
+    } else {
+        tr_plural!(turned, "Rotated {n} photo left", "Rotated {n} photos left")
+    };
+    let animated_clause = (animated > 0).then(|| tr_plural!(animated, "{n} animated GIF skipped", "{n} animated GIFs skipped"));
+    let unreadable_clause =
+        (unreadable > 0).then(|| tr_plural!(unreadable, "{n} GIF couldn't be checked", "{n} GIFs couldn't be checked"));
+    let clauses = match (animated_clause, unreadable_clause) {
+        (None, None) => return head,
+        (Some(a), None) => a,
+        (None, Some(u)) => u,
+        (Some(a), Some(u)) => tr_format!("{skipped}, {unchecked}", skipped = a, unchecked = u),
+    };
+    tr_format!("{rotated} — {gifs}", rotated = head, gifs = clauses)
+}
+
+/// The English sentence of [`bulk_rotate_sentence`], for the bulk-rotate log line (logs stay English).
+pub(crate) fn bulk_rotate_sentence_english(turned: usize, cw: bool, animated: usize, unreadable: usize) -> String {
     let head = if turned == 0 {
         "Nothing rotated".to_string()
     } else {
@@ -26486,7 +26806,11 @@ pub(crate) fn bulk_rotate_sentence(turned: usize, cw: bool, animated: usize, unr
 /// single row's `reveal_verb` is the same application named a different way and the two must not be
 /// able to drift (a row asserts `reveal_verb == format!("Reveal in {file_manager}")`).
 pub(crate) fn reveal_label(n: usize) -> String {
-    format!("Reveal {n} in {}", crate::platform::PLATFORM.file_manager)
+    tr_format!(
+        "Reveal {n} in {file_manager}",
+        n = n,
+        file_manager = i18n::tr(crate::platform::PLATFORM.file_manager)
+    )
 }
 
 /// v1.0.0-rc (queue item 27, sheet 2.1 B3 b): WHICH files a counted reveal highlights — ONE per
@@ -26503,11 +26827,10 @@ pub(crate) fn reveal_paths(shots: &[&Shot]) -> Vec<PathBuf> {
 /// The ask-first toast's question. Digit 0 is a CLEAR, and says so rather than claiming to
 /// "rate 0 stars".
 pub(crate) fn bulk_rate_ask(n: usize, stars: i32) -> String {
-    let noun = if n == 1 { "photo" } else { "photos" };
     if stars <= 0 {
-        format!("Clear rating on {n} {noun}?")
+        tr_plural!(n, "Clear rating on {n} photo?", "Clear rating on {n} photos?")
     } else {
-        format!("Rate all {n} {noun} {stars}★?")
+        tr_plural!(n, "Rate all {n} photo {stars}★?", "Rate all {n} photos {stars}★?", stars = stars)
     }
 }
 
@@ -26525,13 +26848,12 @@ pub(crate) fn bulk_rate_ask(n: usize, stars: i32) -> String {
 /// One composer for all three states (L28), because "Clear-rating" and the singular are exactly the
 /// two places a second copy would drift.
 pub(crate) fn ask_cancelled_line(n: usize, stars: i32) -> String {
-    let subject = if n == 1 {
-        "the photo is unchanged".to_string()
+    // Language packs (round 2): one whole counted message per question kind.
+    if stars <= 0 {
+        tr_plural!(n, "Clear-rating question cancelled — the photo is unchanged", "Clear-rating question cancelled — the {n} photos are unchanged")
     } else {
-        format!("the {n} photos are unchanged")
-    };
-    let asked = if stars <= 0 { "Clear-rating question" } else { "Rating question" };
-    format!("{asked} cancelled — {subject}")
+        tr_plural!(n, "Rating question cancelled — the photo is unchanged", "Rating question cancelled — the {n} photos are unchanged")
+    }
 }
 
 /// The displacing card's whole text: the raiser's own sentence, and — only when this raise KILLED a
@@ -26542,6 +26864,9 @@ pub(crate) fn ask_cancelled_line(n: usize, stars: i32) -> String {
 /// A function rather than a `format!` at each of the two displacement sites: they are the whole
 /// population, and one of them is in `main.rs` while the other is in `tick.rs`, which is precisely
 /// the distance a second copy drifts across.
+///
+/// Language packs (round 2): two whole messages on two lines; the newline stays the layout's, not a
+/// pack's (a translated sentence joined by a pack could drop it and merge the lines).
 pub(crate) fn toast_with_ask_notice(text: &str, killed: Option<&BulkAsk>) -> String {
     match killed {
         Some(k) => format!("{text}\n{}", ask_cancelled_line(k.targets.len(), k.stars)),
@@ -26575,19 +26900,27 @@ pub(crate) fn detail_pending(
 /// The plural delete confirm's headline (kind 6's title slot) and body. The body names the file
 /// magnitude, which is the number that actually leaves the folder: a RAW+JPG pick is two files.
 pub(crate) fn bulk_delete_title(n: usize) -> String {
-    format!("Delete {n} photo{}?", if n == 1 { "" } else { "s" })
+    tr_plural!(n, "Delete {n} photo?", "Delete {n} photos?")
 }
+/// Language packs (round 2): the first sentence counts photographs (the counted message) and files
+/// (two whole messages, picked by English's rule `n == 1` — the `one_other` rule); the sidecar note
+/// is its own counted message; and the closing sentence joins them in one message, so a pack can
+/// place the note. English is unchanged, the "1 file go" included.
 pub(crate) fn bulk_delete_body(shots: usize, files: usize, sidecars: usize) -> String {
-    let tail = match sidecars {
-        0 => String::new(),
-        1 => " (one XMP sidecar goes too)".to_string(),
-        k => format!(" ({k} XMP sidecars go too)"),
+    let bin = crate::platform::bin_noun();
+    let head = if files == 1 {
+        tr_plural!(shots, "{n} selected photo — {files} file go to the {bin}.", "{n} selected photos — {files} file go to the {bin}.", files = files, bin = bin)
+    } else {
+        tr_plural!(shots, "{n} selected photo — {files} files go to the {bin}.", "{n} selected photos — {files} files go to the {bin}.", files = files, bin = bin)
     };
-    format!(
-        "{shots} selected photo{} — {files} file{} go to the {}.{tail} Recoverable from there, and Recover restores the whole batch.",
-        if shots == 1 { "" } else { "s" },
-        if files == 1 { "" } else { "s" },
-        crate::platform::PLATFORM.trash_noun
+    let note = match sidecars {
+        0 => String::new(),
+        k => tr_plural!(k, " (one XMP sidecar goes too)", " ({n} XMP sidecars go too)"),
+    };
+    tr_format!(
+        "{photos_and_files}{sidecar_note} Recoverable from there, and Recover restores the whole batch.",
+        photos_and_files = head,
+        sidecar_note = note
     )
 }
 
@@ -26654,7 +26987,7 @@ pub(crate) const REFUSAL_TOAST_GAP_MS: u64 = 1_500;
 /// cull key's, with the GESTURE'S verb: that one says "press again" because a key was pressed, and
 /// a notch is scrolled. Said only where a load really is pending — the C7 wait bar refused because
 /// the next photo has nothing to show yet (L30).
-pub(crate) const WHEEL_WAIT_TOAST: &str = "Still loading — scroll again when the next photo appears";
+pub(crate) const WHEEL_WAIT_TOAST: &str = tr_noop!("Still loading — scroll again when the next photo appears");
 
 // ── v1.0.0-rc (queue item 31, REVIEW PANEL: HOVER TO PREVIEW) ───────────────────────────────────
 //
@@ -26921,8 +27254,8 @@ impl HoverAppears {
     /// The rendered cell label — the ONE source for the Settings seg's `opts` wording.
     pub(crate) fn label(self) -> &'static str {
         match self {
-            HoverAppears::Rest => "After a short rest",
-            HoverAppears::Instant => "At once",
+            HoverAppears::Rest => tr_noop!("After a short rest"),
+            HoverAppears::Instant => tr_noop!("At once"),
         }
     }
 }
@@ -26939,7 +27272,8 @@ impl HoverAppears {
 pub(crate) fn hover_appears_opts() -> Vec<slint::SharedString> {
     let mut out: Vec<slint::SharedString> = vec![slint::SharedString::default(); 2];
     for a in [HoverAppears::Rest, HoverAppears::Instant] {
-        out[a.index() as usize] = a.label().into();
+        let label = a.label();
+        out[a.index() as usize] = i18n::tr(label).into();
     }
     out
 }
@@ -27301,12 +27635,20 @@ pub(crate) fn wm_position_label(x: f32, y: f32) -> String {
     } else {
         ""
     };
-    match (v, h) {
-        ("", "") => "center".to_string(),
-        ("", h) => h.to_string(),
-        (v, "") => v.to_string(),
-        (v, h) => format!("{v}-{h}"),
-    }
+    // Language packs (round 2): each of the nine placements is one whole word or phrase (never
+    // "{v}-{h}" assembled), so a language can name the corners its own way.
+    let label = match (v, h) {
+        ("", "") => i18n::tr("center"),
+        ("", "left") => i18n::tr("left"),
+        ("", _) => i18n::tr("right"),
+        ("top", "") => i18n::tr("top"),
+        (_, "") => i18n::tr("bottom"),
+        ("top", "left") => i18n::tr("top-left"),
+        ("top", _) => i18n::tr("top-right"),
+        (_, "left") => i18n::tr("bottom-left"),
+        _ => i18n::tr("bottom-right"),
+    };
+    label.to_string()
 }
 
 /// v1.0.0-rc EXPORT FORMAT tail (§R-B B-R1/B-R2) — **THE OUTPUT SECTION'S THREE COMPOSED
@@ -27340,15 +27682,17 @@ pub(crate) fn wm_position_label(x: f32, y: f32) -> String {
 /// fails SILENTLY. `the_output_captions_fit_their_column_at_every_stop` (tipgeom_tests) measures
 /// each of these strings in the app's own renderer and pins it under its real slot; the architect's
 /// ruled wording was two clauses longer and did not fit, which is recorded in §C.TAIL.
+/// Language packs (round 2): these three are marked here and translated where they are published
+/// (`out_format_caption`, `out_quality_caption`).
 pub(crate) const OUT_FORMAT_CAPTIONS: [&str; 2] = [
-    "any image in, JPG out — smallest files",
-    "any image in, PNG out — no compression loss",
+    tr_noop!("any image in, JPG out — smallest files"),
+    tr_noop!("any image in, PNG out — no compression loss"),
 ];
 
 /// The Quality row's caption when the deliverable is a PNG. Its own constant because it is the
 /// sentence the owner vetoes, and because two rows read it.
 pub(crate) const PNG_QUALITY_CAPTION: &str =
-    "not used for PNG — larger files, no loss";
+    tr_noop!("not used for PNG — larger files, no loss");
 
 /// v1.0.0-rc EXPORT FORMAT tail (§R-B): the Format row's caption, composed in Rust like the
 /// Quality row's beneath it. It was a Slint array literal, which put the round's headline sentence
@@ -27356,7 +27700,8 @@ pub(crate) const PNG_QUALITY_CAPTION: &str =
 /// is published from the same gated tick pass as the Quality caption and seeded at boot and on
 /// every preset apply, so no first-open frame renders it empty.
 pub(crate) fn out_format_caption(fmt: falcon_decode::WebFormat) -> &'static str {
-    OUT_FORMAT_CAPTIONS[fmt.index().clamp(0, 1) as usize]
+    let caption = OUT_FORMAT_CAPTIONS[fmt.index().clamp(0, 1) as usize];
+    i18n::tr(caption)
 }
 
 /// v1.0.0-rc EXPORT FORMAT (F4) — **THE QUALITY ROW'S CAPTION, AS A PURE FUNCTION.**
@@ -27382,19 +27727,20 @@ pub(crate) fn out_format_caption(fmt: falcon_decode::WebFormat) -> &'static str 
 /// number IS the description, and it is shown in the Seg's Custom cell), so the caption is empty.
 pub(crate) fn out_quality_caption(fmt: falcon_decode::WebFormat, tier: i32, custom: i32) -> String {
     if fmt == falcon_decode::WebFormat::Png {
-        return PNG_QUALITY_CAPTION.to_string();
+        return i18n::tr(PNG_QUALITY_CAPTION).to_string();
     }
     if custom > 0 {
         return String::new();
     }
     // The four JPEG tiers, moved here VERBATIM from the sheet's own array literal.
     const TIERS: [&str; 4] = [
-        "smallest files for web pages",
-        "crisp for Instagram & social",
-        "high detail for prints",
-        "near-lossless, largest files",
+        tr_noop!("smallest files for web pages"),
+        tr_noop!("crisp for Instagram & social"),
+        tr_noop!("high detail for prints"),
+        tr_noop!("near-lossless, largest files"),
     ];
-    TIERS[tier.clamp(0, 3) as usize].to_string()
+    let caption = TIERS[tier.clamp(0, 3) as usize];
+    i18n::tr(caption).to_string()
 }
 
 /// queue 34 (§1.D) — **THE SIZE TERM.** `100_000` is the Full-size SENTINEL, not a pixel count a
@@ -27403,9 +27749,9 @@ pub(crate) fn out_quality_caption(fmt: falcon_decode::WebFormat, tier: i32, cust
 /// through, so the two can never spell the same preset two ways (L28).
 pub(crate) fn out_size_term(p: &WmPreset) -> String {
     if p.out_long >= 100_000 {
-        "Full size".to_string()
+        i18n::tr("Full size").to_string()
     } else {
-        format!("{} px", p.out_long)
+        tr_format!("{size} px", size = p.out_long)
     }
 }
 
@@ -27419,7 +27765,8 @@ pub(crate) fn out_quality_term(p: &WmPreset) -> String {
     match p.format {
         falcon_decode::WebFormat::Png => String::new(),
         falcon_decode::WebFormat::Jpeg => {
-            format!("q{}", eff_pct(p.quality_custom, &OUT_QUALITY_TIERS, p.quality_tier).clamp(1, 100))
+            let quality = eff_pct(p.quality_custom, &OUT_QUALITY_TIERS, p.quality_tier).clamp(1, 100);
+            tr_format!("q{quality}", quality = quality)
         }
     }
 }
@@ -27430,8 +27777,8 @@ pub(crate) fn out_quality_term(p: &WmPreset) -> String {
 /// because a chip saying "no mark" is a chip about an absence in a row of four positive facts.
 pub(crate) fn wm_mark_term(p: &WmPreset) -> &'static str {
     match p.kind {
-        1 => "image mark",
-        2 => "text mark",
+        1 => i18n::tr("image mark"),
+        2 => i18n::tr("text mark"),
         _ => "",
     }
 }
@@ -27483,12 +27830,19 @@ pub(crate) fn wm_preset_recipe(p: &WmPreset) -> String {
     // omit an absent mark instead (`wm_mark_term` returns the empty string for `kind == 0`).
     let mark = {
         let m = wm_mark_term(p);
-        if m.is_empty() { "no mark" } else { m }
+        if m.is_empty() { i18n::tr("no mark") } else { m }
     };
+    // Language packs (round 2): the ` · ` list is one message, so a language can order its terms.
     if p.kind == 0 {
-        format!("{size} · {q} · {mark}")
+        tr_format!("{size} · {quality} · {mark}", size = size, quality = q, mark = mark)
     } else {
-        format!("{size} · {q} · {mark} · {}", wm_position_label(p.pos_x, p.pos_y))
+        tr_format!(
+            "{size} · {quality} · {mark} · {placement}",
+            size = size,
+            quality = q,
+            mark = mark,
+            placement = wm_position_label(p.pos_x, p.pos_y)
+        )
     }
 }
 
@@ -27900,17 +28254,18 @@ pub(crate) fn raster_text_watermark(
         Some((b, idx)) => match falcon_decode::text_watermark_rgba(&text, color, b, *idx) {
             Ok((rgba, w, h)) => {
                 *wm_cache.borrow_mut() = Some((rgba, w, h));
-                a.set_wm_image_name(slint::format!("“{}”", text));
+                // Language packs (round 2): the quotation marks are the language's own.
+                a.set_wm_image_name(tr_format!("“{text}”", text = text).into());
             }
             Err(e) => {
                 *wm_cache.borrow_mut() = None;
-                a.set_wm_image_name("text render failed".into());
+                a.set_wm_image_name(i18n::tr("text render failed").into());
                 log_event(&format!("text watermark render failed: {e}"));
             }
         },
         None => {
             *wm_cache.borrow_mut() = None;
-            a.set_wm_image_name("no system font found".into());
+            a.set_wm_image_name(i18n::tr("no system font found").into());
             log_event("text watermark: no system font available");
         }
     }
@@ -28743,7 +29098,7 @@ pub(crate) fn load_selection(
         // the drain mapped it `err ? error : SUCCESS`, so this line — "nothing was lost, and
         // nothing was converted either" — reached the events centre in success green.
         *warn_slot.lock().unwrap_or_else(|p| p.into_inner()) = Some((
-            "This folder's review data is locked by another program — Falcon is reading it in place and will rename it when the folder is free."
+            i18n::tr("This folder's review data is locked by another program — Falcon is reading it in place and will rename it when the folder is free.")
                 .to_string(),
             OpSeverity::Warn,
             -1,
@@ -28781,14 +29136,21 @@ pub(crate) fn load_selection(
                     return (legacy_seed(), BTreeMap::new(), FolderAttrs::default());
                 }
                 let preserved = preserve_corrupt_file(&path);
-                let msg = match &preserved {
-                    Some(bak) => format!(
-                        "Review data was unreadable — kept as {} and starting fresh",
-                        bak.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+                let kept = preserved
+                    .as_ref()
+                    .map(|bak| bak.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+                // Language packs (round 2): the events centre gets the marked sentence, the log the English.
+                let (msg, msg_en) = match &kept {
+                    Some(name) => (
+                        tr_format!("Review data was unreadable — kept as {name} and starting fresh", name = name),
+                        format!("Review data was unreadable — kept as {name} and starting fresh"),
                     ),
-                    None => "Review data was unreadable — couldn't preserve it; starting fresh".to_string(),
+                    None => (
+                        i18n::tr("Review data was unreadable — couldn't preserve it; starting fresh").to_string(),
+                        "Review data was unreadable — couldn't preserve it; starting fresh".to_string(),
+                    ),
                 };
-                log_event(&format!("review-data: PARSE FAILED for {} ({e}) — {msg}", path.display()));
+                log_event(&format!("review-data: PARSE FAILED for {} ({e}) — {msg_en}", path.display()));
                 // The parse-failure arm stays RED (v0.8.134 / F-2): a file was moved aside.
                 *warn_slot.lock().unwrap_or_else(|p| p.into_inner()) = Some((msg, OpSeverity::Error, -1, None));
                 (legacy_seed(), BTreeMap::new(), FolderAttrs::default())
@@ -29322,10 +29684,10 @@ pub(crate) fn shot_dest_names(s: &Shot) -> Vec<(String, Option<ManifestRec>)> {
 /// The counted sentence the "Select new / edited" row reports with.
 pub(crate) fn select_new_edited_toast(new: usize, edited: usize) -> String {
     match (new, edited) {
-        (0, 0) => "Nothing new or edited in this folder".to_string(),
-        (n, 0) => format!("Selected {n} new"),
-        (0, e) => format!("Selected {e} edited (by size/date)"),
-        (n, e) => format!("Selected {n} new + {e} edited (by size/date)"),
+        (0, 0) => i18n::tr("Nothing new or edited in this folder").to_string(),
+        (n, 0) => tr_format!("Selected {new} new", new = n),
+        (0, e) => tr_format!("Selected {edited} edited (by size/date)", edited = e),
+        (n, e) => tr_format!("Selected {new} new + {edited} edited (by size/date)", new = n, edited = e),
     }
 }
 
@@ -29354,9 +29716,9 @@ pub(crate) enum ManifestState {
 /// and any reason-only form (a row that does not name its command).
 pub(crate) fn select_new_edited_label(state: ManifestState) -> String {
     match state {
-        ManifestState::Ok => "Select new / edited".to_string(),
-        ManifestState::Absent => "Select new / edited (no record)".to_string(),
-        ManifestState::Unreadable => "Select new / edited (unreadable)".to_string(),
+        ManifestState::Ok => i18n::tr("Select new / edited").to_string(),
+        ManifestState::Absent => i18n::tr("Select new / edited (no record)").to_string(),
+        ManifestState::Unreadable => i18n::tr("Select new / edited (unreadable)").to_string(),
     }
 }
 
@@ -29376,9 +29738,65 @@ pub(crate) fn select_new_edited_label(state: ManifestState) -> String {
 /// header uses on a folder swap.
 pub(crate) fn ctx_menu_header(n_selected: usize, bulk_scoped: bool, name: &str) -> String {
     if bulk_scoped && n_selected > 1 {
-        format!("{n_selected} images")
+        tr_plural!(n_selected, "{n} image", "{n} images")
     } else {
         name.to_string()
+    }
+}
+
+// ── Language packs (round 2, batch 5): THE INFO PANEL'S EXIF LABELS AND THE COLOUR CHIP'S NAMES ──
+
+/// How an EXIF row's label reads where it is drawn: the docked panel's FULL view and every floating
+/// panel. `falcon-decode` names each row with a fixed English label, and that label stays the row's
+/// KEY (PLAN §4): the folded grid's picks, the `"Model"` filter, the White balance / `"Auto"` test
+/// and the "Color temp" insertion all read the key, never the drawn text. Only the label handed to
+/// Slint goes through the language pack, here. A label the table does not know is drawn as it is.
+/// ("Model" is not listed: that row is folded-grid-only and never drawn as a label.)
+pub(crate) fn exif_label_shown(key: &str) -> &str {
+    const LABELS: &[&str] = &[
+        tr_noop!("Camera"),
+        tr_noop!("Lens"),
+        tr_noop!("Focal length"),
+        tr_noop!("Aperture"),
+        tr_noop!("Shutter"),
+        tr_noop!("ISO"),
+        tr_noop!("Exposure bias"),
+        tr_noop!("Exposure program"),
+        tr_noop!("Metering"),
+        tr_noop!("White balance"),
+        tr_noop!("Color temp"),
+        tr_noop!("Flash"),
+        tr_noop!("Focal (35mm)"),
+        tr_noop!("Color space"),
+        tr_noop!("Dimensions"),
+        tr_noop!("GPS"),
+        tr_noop!("Altitude"),
+        tr_noop!("Date"),
+        tr_noop!("Software"),
+        tr_noop!("Artist"),
+        tr_noop!("Files"),
+    ];
+    match LABELS.iter().copied().find(|l| *l == key) {
+        Some(label) => i18n::tr(label),
+        None => key,
+    }
+}
+
+/// One EXIF row as Slint draws it: [`exif_label_shown`]'s label beside the value, which is the
+/// camera's and is never translated. Both panel builders (tick.rs's docked panel, main.rs's floating
+/// panels) publish their rows through this, after every lookup on the English key is done.
+pub(crate) fn exif_row_shown(key: &str, value: &str) -> ExifRow {
+    ExifRow { k: exif_label_shown(key).into(), v: value.into() }
+}
+
+/// A gamut's name where the colour chip and its hover note draw it. Colour-space names (sRGB,
+/// Display P3, Adobe RGB, Rec. 2020, DCI-P3, a source profile's own description) are names and stay
+/// as they are; the custom output profile's generic word "Custom" is translated. In English this is
+/// `display_name()` exactly, which is `label()` for every gamut an output can be.
+pub(crate) fn gamut_name_shown(g: Gamut) -> String {
+    match g {
+        Gamut::Custom => i18n::tr("Custom").to_string(),
+        g => g.display_name(),
     }
 }
 
@@ -29406,14 +29824,14 @@ pub(crate) const FLOAT_EXIF_MARGIN: f32 = 8.0;
 /// user state (a PINNED panel is a photograph the user chose to keep beside them); silently doing
 /// nothing is the L15 no-op. So the fifth request is refused OUT LOUD, and the sentence says what
 /// to do next. (Owner may prefer close-oldest.)
-pub(crate) const FLOAT_EXIF_FULL_MSG: &str = "Four EXIF panels are open — close one first.";
+pub(crate) const FLOAT_EXIF_FULL_MSG: &str = tr_noop!("Four EXIF panels are open — close one first.");
 /// v0.8.181 (pre-merge review) — [VD] THE OTHER REFUSAL ON THIS DOOR, which used to be a bare
 /// `return`. A menu carries the index it was opened on; a rescan (a delete, a folder change, an
 /// external edit) can retire that index before the click lands, and the handler then found nothing
 /// at `snap[t]` and gave up in silence. The user right-clicked, chose "View EXIF", and NOTHING
 /// happened — H1/H9, the house enemy, on a door whose sibling refusal two lines up already speaks.
 /// Same grammar as that one: a transient toast plus a log line.
-pub(crate) const FLOAT_EXIF_GONE_MSG: &str = "That photo is no longer in this folder.";
+pub(crate) const FLOAT_EXIF_GONE_MSG: &str = tr_noop!("That photo is no longer in this folder.");
 
 /// ONE floating EXIF panel, Rust-side. The Slint row (`FloatExifPanel`) is DERIVED from this; this
 /// is where the identity lives.
@@ -29795,12 +30213,56 @@ mod ctx_header_tests {
 /// copy site's own comment already worried about the pair drifting; here they cannot.
 ///
 /// Neither clause says "edited": intent is unobservable, and a size that differs is all we know.
+///
+/// Language packs (round 2): each ` · ` clause of the op-result sentences is one counted message
+/// that carries its own separator, so a pack can punctuate the list its own way. English keeps one
+/// form for every count (the two forms are equal).
 pub(crate) fn divergence_clauses(dv_dest: usize, dv_src: usize) -> String {
     format!(
         "{}{}",
-        if dv_dest > 0 { format!(" · {dv_dest} differ from the originals — left untouched (see log)") } else { String::new() },
-        if dv_src > 0 { format!(" · {dv_src} already there (the original has changed since)") } else { String::new() }
+        if dv_dest > 0 {
+            tr_plural!(
+                dv_dest,
+                " · {n} differ from the originals — left untouched (see log)",
+                " · {n} differ from the originals — left untouched (see log)"
+            )
+        } else {
+            String::new()
+        },
+        if dv_src > 0 {
+            tr_plural!(
+                dv_src,
+                " · {n} already there (the original has changed since)",
+                " · {n} already there (the original has changed since)"
+            )
+        } else {
+            String::new()
+        }
     )
+}
+
+/// Language packs (round 2): the op results' other shared ` · ` clauses — one counted message
+/// each, separator included, empty for a zero count (the callers' old `if n > 0` arms).
+pub(crate) fn clause_already_there(n: usize) -> String {
+    if n == 0 { String::new() } else { tr_plural!(n, " · {n} already there", " · {n} already there") }
+}
+pub(crate) fn clause_skipped(n: usize) -> String {
+    if n == 0 { String::new() } else { tr_plural!(n, " · {n} skipped", " · {n} skipped") }
+}
+pub(crate) fn clause_need_attention(n: usize) -> String {
+    if n == 0 {
+        String::new()
+    } else {
+        tr_plural!(n, " · {n} need attention (see log)", " · {n} need attention (see log)")
+    }
+}
+pub(crate) fn clause_failed(n: usize) -> String {
+    if n == 0 { String::new() } else { tr_plural!(n, " · {n} FAILED (see log)", " · {n} FAILED (see log)") }
+}
+/// The move result's head, which the pinned last-action row also speaks: "Moved 12 file(s) →
+/// ./Rejected" (English keeps "file(s)" for every count).
+pub(crate) fn moved_to_rejected_text(n: usize) -> String {
+    tr_plural!(n, "Moved {n} file(s) → ./Rejected", "Moved {n} file(s) → ./Rejected")
 }
 
 /// v1.0.0-rc (queue item 27, sheet 2.2b, OWNER RULING) — **the copy sentence's clause for a delivered
@@ -29821,17 +30283,21 @@ pub(crate) fn unopenable_clause(n: usize, fmts: &std::collections::BTreeSet<Stri
     if n == 0 {
         return String::new();
     }
-    let plural = if n == 1 { "" } else { "s" };
+    // Language packs (round 2): whole counted clauses (separator included), the format a value.
     if fmts.len() == 1 {
         let f = fmts.iter().next().expect("len() == 1");
-        let tail = if f == "HEIC" { " — a Mac or phone can" } else { "" };
-        return format!(" · {n} {f} file{plural} this PC can't open{tail}");
+        return if f == "HEIC" {
+            tr_plural!(
+                n,
+                " · {n} {format} file this PC can't open — a Mac or phone can",
+                " · {n} {format} files this PC can't open — a Mac or phone can",
+                format = f
+            )
+        } else {
+            tr_plural!(n, " · {n} {format} file this PC can't open", " · {n} {format} files this PC can't open", format = f)
+        };
     }
-    if n == 1 {
-        " · 1 file in a format this PC can't open".to_string()
-    } else {
-        format!(" · {n} files in formats this PC can't open")
-    }
+    tr_plural!(n, " · {n} file in a format this PC can't open", " · {n} files in formats this PC can't open")
 }
 
 /// v1.0.0-rc (queue item 27, sheet 2.2b): [`export_marked`]'s return, as the `type` definition clippy
@@ -30182,7 +30648,7 @@ pub(crate) fn rejected_file_count(dir: &Path) -> usize {
 pub(crate) fn empty_rejected_to_bin(dir: &Path) -> (usize, usize, String) {
     let rejected = dir.join("Rejected");
     if !is_safe_dir(&rejected) {
-        return (0, 0, "Nothing to empty — no ./Rejected folder.".to_string());
+        return (0, 0, i18n::tr("Nothing to empty — no ./Rejected folder.").to_string());
     }
     let mut paths: Vec<PathBuf> = Vec::new();
     match std::fs::read_dir(&rejected) {
@@ -30196,11 +30662,11 @@ pub(crate) fn empty_rejected_to_bin(dir: &Path) -> (usize, usize, String) {
         }
         Err(e) => {
             log_event(&format!("empty-rejected: cannot read {} ({e})", rejected.display()));
-            return (0, 1, format!("Couldn't read ./Rejected ({e})"));
+            return (0, 1, tr_format!("Couldn't read ./Rejected ({error})", error = e));
         }
     }
     if paths.is_empty() {
-        return (0, 0, "./Rejected is already empty.".to_string());
+        return (0, 0, i18n::tr("./Rejected is already empty.").to_string());
     }
     log_event(&format!("empty-rejected: sending {} file(s) from {} to the Recycle Bin", paths.len(), rejected.display()));
     let err = match trash::delete_all(&paths) {
@@ -30226,7 +30692,11 @@ pub(crate) fn empty_rejected_to_bin(dir: &Path) -> (usize, usize, String) {
     let msg = if fail == 0 && err.is_none() {
         crate::platform::empty_rejected_toast_text(ok)
     } else if ok == 0 {
-        format!("Couldn't empty ./Rejected — {}", err.unwrap_or_else(|| "the files are still there".to_string()))
+        // Language packs (round 2): the `trash` crate's error text is a value, never a message.
+        match err {
+            Some(e) => tr_format!("Couldn't empty ./Rejected — {error}", error = e),
+            None => i18n::tr("Couldn't empty ./Rejected — the files are still there").to_string(),
+        }
     } else {
         crate::platform::partial_recycle_toast_text(ok, paths.len(), fail)
     };
@@ -30251,7 +30721,7 @@ pub(crate) fn recycle_shot_files(paths: &[PathBuf]) -> (usize, usize, Vec<PathBu
     if files.is_empty() {
         // Nothing on disk to recycle (the shot's files vanished between popup-open and confirm) — treat as
         // a benign no-op rather than an error; the caller still rescans so the (now absent) shot drops out.
-        return (0, 0, Vec::new(), "Nothing to delete — files already gone.".to_string());
+        return (0, 0, Vec::new(), i18n::tr("Nothing to delete — files already gone.").to_string());
     }
     log_event(&format!("delete-recycle: sending {} file(s) to the Recycle Bin", files.len()));
     let err = match trash::delete_all(&files) {
@@ -30285,7 +30755,11 @@ pub(crate) fn recycle_shot_files(paths: &[PathBuf]) -> (usize, usize, Vec<PathBu
     let msg = if fail == 0 && err.is_none() {
         crate::platform::recycle_toast_text(ok)
     } else if ok == 0 {
-        format!("Delete did not complete — {}", err.unwrap_or_else(|| "the files are still in the folder".to_string()))
+        // Language packs (round 2): the `trash` crate's error text is a value, never a message.
+        match err {
+            Some(e) => tr_format!("Delete did not complete — {error}", error = e),
+            None => i18n::tr("Delete did not complete — the files are still in the folder").to_string(),
+        }
     } else {
         crate::platform::partial_recycle_toast_text(ok, files.len(), fail)
     };
@@ -30370,7 +30844,7 @@ pub(crate) fn recycle_shot_files(
     let files: Vec<PathBuf> = paths.iter().filter(|p| p.is_file()).cloned().collect();
     if files.is_empty() {
         // Same benign no-op as the Windows arm — the caller still rescans, so the absent shot drops out.
-        return (0, 0, Vec::new(), "Nothing to delete — files already gone.".to_string(), Vec::new());
+        return (0, 0, Vec::new(), i18n::tr("Nothing to delete — files already gone.").to_string(), Vec::new());
     }
     log_event(&format!("delete-recycle: sending {} file(s) to the Trash", files.len()));
     let fm = unsafe { NSFileManager::defaultManager() };
@@ -30435,7 +30909,13 @@ pub(crate) fn recycle_shot_files(
     let msg = if fail == 0 {
         crate::platform::recycle_toast_text(ok)
     } else if ok == 0 {
-        format!("Delete did not complete — {fail} of {} file(s) couldn't be moved to the Trash", files.len())
+        tr_plural!(
+            files.len(),
+            "Delete did not complete — {failed} of {n} file(s) couldn't be moved to the {bin}",
+            "Delete did not complete — {failed} of {n} file(s) couldn't be moved to the {bin}",
+            failed = fail,
+            bin = crate::platform::bin_noun()
+        )
     } else {
         crate::platform::partial_recycle_toast_text(ok, files.len(), fail)
     };
@@ -30484,6 +30964,10 @@ pub(crate) struct DeleteRecord {
     pub(crate) gen: u64,
     pub(crate) idx: usize,
     pub(crate) name: String,
+    /// Language packs (round 2): how many photographs a PLURAL delete recorded, 0 for one
+    /// photograph. `name` stays English (the log lines read it, and for a plural delete it is
+    /// "N photos"); [`DeleteRecord::shown_name`] is the same subject as the screen says it.
+    pub(crate) photos: usize,
     pub(crate) files: Vec<PathBuf>,
     /// UNIX-seconds captured just before the recycle — the WINDOWS bin-item time-filter lower bound
     /// (`match_recycled_items`). macOS restores from the captured Trash URL directly (no bin scan, no
@@ -30498,6 +30982,18 @@ pub(crate) struct DeleteRecord {
     /// the Windows record shape is unchanged.
     #[cfg(target_os = "macos")]
     pub(crate) trash_paths: Vec<(PathBuf, PathBuf)>,
+}
+
+impl DeleteRecord {
+    /// The record's subject as the screen says it: the photograph's name, or for a plural delete
+    /// "N photos" (English keeps "photos" for every count).
+    pub(crate) fn shown_name(&self) -> String {
+        if self.photos == 0 {
+            self.name.clone()
+        } else {
+            tr_plural!(self.photos, "{n} photos", "{n} photos")
+        }
+    }
 }
 
 /// v0.8.37 (FIX B) — the same-key rating-clear decision, isolated so the KEYBOARD number-key dispatch
@@ -30611,25 +31107,28 @@ pub(crate) fn confirm_recycled_in_bin(recycled: &[PathBuf], op_time: i64) -> Vec
 /// whatever the outcome (an emptied bin, a collision, a partial). `name` is the shot's display name,
 /// woven into the honest message.
 ///
+/// Language packs (round 2): `name` is the record's own (English) name for the log lines and
+/// `shown` is the same subject as the screen says it ([`DeleteRecord::shown_name`]).
+///
 /// v0.9.7 (Phase 6): gated OFF macOS — the `trash` crate has no `os_limited` there; the graceful Mac
 /// arm is the sibling `#[cfg(target_os = "macos")]` definition below.
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn recover_recycled_files(name: &str, originals: &[PathBuf], op_time: i64) -> (usize, usize, String) {
+pub(crate) fn recover_recycled_files(name: &str, shown: &str, originals: &[PathBuf], op_time: i64) -> (usize, usize, String) {
     let want = originals.len();
     if want == 0 {
-        return (0, 0, format!("Nothing to recover for {name}"));
+        return (0, 0, tr_format!("Nothing to recover for {name}", name = shown));
     }
     let bin = match trash::os_limited::list() {
         Ok(b) => b,
         Err(e) => {
             log_event(&format!("recover: could not read the Recycle Bin ({e})"));
-            return (0, want, crate::platform::recover_unavailable_text(name));
+            return (0, want, crate::platform::recover_unavailable_text(shown));
         }
     };
     let matched = match_recycled_items(&bin, originals, op_time);
     if matched.is_empty() {
         log_event(&format!("recover: no matching items in the Recycle Bin for {name} (emptied or purged?)"));
-        return (0, want, crate::platform::recover_missing_text(name));
+        return (0, want, crate::platform::recover_missing_text(shown));
     }
     // Pre-partition collisions: restore_all aborts the WHOLE batch if ANY original path already
     // exists, so never hand it a colliding item. A collided original is a real file the user must not
@@ -30667,13 +31166,34 @@ pub(crate) fn recover_recycled_files(name: &str, originals: &[PathBuf], op_time:
     }
     let failed = want - recovered;
     let msg = if failed == 0 {
-        format!("Recovered {name}")
-    } else if !collided.is_empty() {
-        format!("Recovered {recovered}/{want} file(s) for {name} — a file named {} already exists", collided.join(", "))
+        tr_format!("Recovered {name}", name = shown)
     } else {
-        format!("Recovered {recovered}/{want} file(s) for {name} — see log")
+        recover_partial_text(shown, want, recovered, &collided)
     };
     (recovered, failed, msg)
+}
+
+/// Language packs (round 2): a partial recover, both platforms — one counted message per case
+/// (English keeps "file(s)" for every count). The colliding names are values, listed as today.
+fn recover_partial_text(name: &str, want: usize, recovered: usize, collided: &[String]) -> String {
+    if collided.is_empty() {
+        tr_plural!(
+            want,
+            "Recovered {recovered}/{n} file(s) for {name} — see log",
+            "Recovered {recovered}/{n} file(s) for {name} — see log",
+            recovered = recovered,
+            name = name
+        )
+    } else {
+        tr_plural!(
+            want,
+            "Recovered {recovered}/{n} file(s) for {name} — a file named {names} already exists",
+            "Recovered {recovered}/{n} file(s) for {name} — a file named {names} already exists",
+            recovered = recovered,
+            name = name,
+            names = collided.join(", ")
+        )
+    }
 }
 
 /// v0.9.18 (macOS delete-recovery) — the per-file restore DECISION, pure so it unit-tests on any host
@@ -30752,14 +31272,12 @@ pub(crate) fn map_renamex_errno(errno: i32) -> RenamexFailure {
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn mac_recover_message(name: &str, want: usize, recovered: usize, gone: usize, collided: &[String]) -> String {
     if want > 0 && recovered == want {
-        format!("Recovered {name}")
+        tr_format!("Recovered {name}", name = name)
     } else if want > 0 && recovered == 0 && gone == want {
         // Every file's Trash entry is gone — the user emptied the Trash.
         crate::platform::recover_missing_text(name)
-    } else if !collided.is_empty() {
-        format!("Recovered {recovered}/{want} file(s) for {name} — a file named {} already exists", collided.join(", "))
     } else {
-        format!("Recovered {recovered}/{want} file(s) for {name} — see log")
+        recover_partial_text(name, want, recovered, collided)
     }
 }
 
@@ -30782,7 +31300,7 @@ pub(crate) fn mac_recover_message(name: &str, want: usize, recovered: usize, gon
 pub(crate) fn recover_recycled_files(name: &str, originals: &[PathBuf], pairs: &[(PathBuf, PathBuf)]) -> (usize, usize, String) {
     let want = originals.len();
     if want == 0 {
-        return (0, 0, format!("Nothing to recover for {name}"));
+        return (0, 0, tr_format!("Nothing to recover for {name}", name = name));
     }
     let mut recovered = 0usize;
     let mut gone = 0usize;
@@ -31195,11 +31713,22 @@ impl WebCollisionNames {
 /// the COUNT, not the total — "1 of 30 already exists", "12 of 30 already exist" — which is the one
 /// thing a hand-written Slint ternary over two ints could not have got right.
 pub(crate) fn web_collide_title(n: usize, total: usize) -> String {
-    format!(
-        "of {total} file{} this export would write already exist{} in ./export",
-        if total == 1 { "" } else { "s" },
-        if n == 1 { "s" } else { "" }
-    )
+    // Language packs (round 2): two counts in one phrase. The total is the counted message's own
+    // number; the collision count (shown beside it, not in it) chooses between two whole messages
+    // (`n == 1`, as batch 3's two-count sentences do).
+    if n == 1 {
+        tr_plural!(
+            total,
+            "of {n} file this export would write already exists in ./export",
+            "of {n} files this export would write already exists in ./export"
+        )
+    } else {
+        tr_plural!(
+            total,
+            "of {n} file this export would write already exist in ./export",
+            "of {n} files this export would write already exist in ./export"
+        )
+    }
 }
 
 /// v1.0.0-rc queue 36 (§1.D): the PER-FILE log line's camera-preview suffix.
@@ -31252,12 +31781,16 @@ pub(crate) fn web_done_collision_clause(choice: WebCollide, skipped: usize, over
         // a SECOND, disjoint tally beside it -- "Exported 30 · 12 overwritten" invites the
         // arithmetic 30 + 12. "including" says what is true: the replacements are part of the
         // number in front of it.
-        WebCollide::Overwrite if overwritten > 0 => {
-            format!(" · including {overwritten} replaced (your choice)")
+        // Language packs (round 2): each clause one counted message, separator included.
+        WebCollide::Overwrite if overwritten > 0 => tr_plural!(
+            overwritten,
+            " · including {n} replaced (your choice)",
+            " · including {n} replaced (your choice)"
+        ),
+        WebCollide::Skip if skipped > 0 => {
+            tr_plural!(skipped, " · {n} skipped (your choice)", " · {n} skipped (your choice)")
         }
-        WebCollide::Skip if skipped > 0 => format!(" · {skipped} skipped (your choice)"),
-        _ if skipped > 0 => format!(" · {skipped} already there"),
-        _ => String::new(),
+        _ => clause_already_there(skipped),
     }
 }
 
@@ -31375,11 +31908,11 @@ pub(crate) fn export_web_run_with_decoder(
     let outdir = dir.join(EXPORT_SUBFOLDER);
     if let Err(e) = std::fs::create_dir_all(&outdir) {
         log_event(&format!("web-export: cannot create {} ({e})", outdir.display()));
-        return (format!("Export failed: can't create ./export ({e})"), true);
+        return (tr_format!("Export failed: can't create ./export ({error})", error = e), true);
     }
     if !is_safe_dir(&outdir) {
         log_event(&format!("web-export: refusing — {} is not a real directory (symlink/junction?)", outdir.display()));
-        return ("Export failed: ./export is not a real folder".into(), true);
+        return (i18n::tr("Export failed: ./export is not a real folder").into(), true);
     }
     log_event(&format!(
         // v1.0.0-rc EXPORT FORMAT (F2/F6): the FORMAT leads, because it decides what the next term
@@ -31495,7 +32028,8 @@ pub(crate) fn export_web_run_with_decoder(
         let filename = if pixel_source == WebPixelSource::Finished { s.jpg.as_deref() } else { s.raw.as_deref() }
             .and_then(|path| path.file_name()).map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| s.name.clone());
-        progress.set_status(&filename, if developed_raw { "Developing RAW…" } else { "Encoding…" });
+        // Language packs (round 2): the phase stays an English id here; the tick translates it.
+        progress.set_status(&filename, if developed_raw { tr_noop!("Developing RAW…") } else { tr_noop!("Encoding…") });
         // v0.8.130 (W2-4): the manifest key. v0.8.187 (W1 i): ...and it now carries the suffix, so
         // a re-opened ./export folder's records still name the files that are actually in it. ONE
         // producer, shared with `web_collision_scan` (see `web_deliverable_name`).
@@ -31591,7 +32125,7 @@ pub(crate) fn export_web_run_with_decoder(
         }
         let res = decode(s, keep, pixel_source, progress).and_then(|(px, w, h)| {
             if progress.cancel.load(Ordering::Relaxed) { return Err(WebPixelError::Cancelled); }
-            progress.set_status(&filename, "Encoding…");
+            progress.set_status(&filename, tr_noop!("Encoding…"));
             // v0.8.0: rotate the decoded pixels upright before the resize+watermark+encode, so the
             // deliverable matches the screen (auto-off skips the EXIF read entirely).
             let base = if auto_orient {
@@ -31768,11 +32302,18 @@ pub(crate) fn export_web_run_with_decoder(
     // v0.8.130 (W2-4): ./export is a manifest destination like ./Picks (and unlike ./Rejected). A
     // CANCELLED run still writes: the merge then names exactly the files that landed.
     progress.finish_manifest(&mrecs);
+    // Language packs (round 2): the completion sentence is a counted head plus counted ` · `
+    // clauses, each one whole message with its separator (the copy result's shape). The log line
+    // above keeps its own English.
     let summary = if cancelled {
         format!(
-            "Export cancelled — {} written before stopping{}",
-            ok + overwritten,
-            if failed > 0 { format!(" · {failed} failed") } else { String::new() }
+            "{}{}",
+            tr_plural!(
+                ok + overwritten,
+                "Export cancelled — {n} written before stopping",
+                "Export cancelled — {n} written before stopping"
+            ),
+            if failed > 0 { tr_plural!(failed, " · {n} failed", " · {n} failed") } else { String::new() }
         )
     } else {
         format!(
@@ -31791,22 +32332,34 @@ pub(crate) fn export_web_run_with_decoder(
             // HAPPENED — "from camera previews" — never "exported" alone, which would leave the
             // limitation the user opted into visible nowhere after the run).
             if from_preview > 0 {
-                format!(" · {from_preview} from camera previews")
+                tr_plural!(from_preview, " · {n} from camera previews", " · {n} from camera previews")
             } else {
                 String::new()
             },
-            if from_raw > 0 { format!(" · {from_raw} developed from RAW") } else { String::new() },
+            if from_raw > 0 {
+                tr_plural!(from_raw, " · {n} developed from RAW", " · {n} developed from RAW")
+            } else {
+                String::new()
+            },
             if raw_only > 0 {
-                format!(" · {raw_only} RAW-only skipped (edit from ./Picks first)")
+                tr_plural!(
+                    raw_only,
+                    " · {n} RAW-only skipped (edit from ./Picks first)",
+                    " · {n} RAW-only skipped (edit from ./Picks first)"
+                )
             } else {
                 String::new()
             },
-            if unsupported > 0 { format!(" · {unsupported} unsupported skipped") } else { String::new() },
+            if unsupported > 0 {
+                tr_plural!(unsupported, " · {n} unsupported skipped", " · {n} unsupported skipped")
+            } else {
+                String::new()
+            },
             // v0.8.143 (D2): the stranded-placeholder clause, word for word the copy path's
             // (main.rs's `att` clause) — it is not a failure, nothing was touched, and it sends the
             // reader to the log where the file is named.
-            if attention > 0 { format!(" · {attention} need attention (see log)") } else { String::new() },
-            if failed > 0 { format!(" · {failed} FAILED (see log)") } else { String::new() }
+            clause_need_attention(attention),
+            clause_failed(failed)
         )
     };
     (summary, failed > 0)
@@ -31990,7 +32543,48 @@ pub(crate) fn act_turns_name(a: &Act, name: &str) -> bool {
 /// count. An index that is out of range when the entry pops (it cannot happen while `apply_scan`
 /// clears the stack, but the walk is written not to depend on that) is skipped and SAID, rather
 /// than counted as done. Pure -> table-tested.
+///
+/// Language packs (round 2): `verb` (the bulk family — "Rating", "Clear", "Flag", "Reject",
+/// "Rotation") and `action` ("reverted" / "re-applied") are English ids, so together they pick one
+/// whole counted message; an unknown pair keeps the composed English. The partial form counts the
+/// TOTAL ("of 9 photos"), which is the noun's count. [`bulk_edit_sentence_english`] is the log's.
 pub(crate) fn bulk_edit_sentence(verb: &str, action: &str, applied: usize, total: usize) -> String {
+    let missing = total.saturating_sub(applied);
+    if applied == total {
+        match (verb, action) {
+            ("Rating", "reverted") => tr_plural!(applied, "Rating reverted on {n} photo", "Rating reverted on {n} photos"),
+            ("Clear", "reverted") => tr_plural!(applied, "Clear reverted on {n} photo", "Clear reverted on {n} photos"),
+            ("Flag", "reverted") => tr_plural!(applied, "Flag reverted on {n} photo", "Flag reverted on {n} photos"),
+            ("Reject", "reverted") => tr_plural!(applied, "Reject reverted on {n} photo", "Reject reverted on {n} photos"),
+            ("Rotation", "reverted") => tr_plural!(applied, "Rotation reverted on {n} photo", "Rotation reverted on {n} photos"),
+            ("Rating", "re-applied") => tr_plural!(applied, "Rating re-applied on {n} photo", "Rating re-applied on {n} photos"),
+            ("Clear", "re-applied") => tr_plural!(applied, "Clear re-applied on {n} photo", "Clear re-applied on {n} photos"),
+            ("Flag", "re-applied") => tr_plural!(applied, "Flag re-applied on {n} photo", "Flag re-applied on {n} photos"),
+            ("Reject", "re-applied") => tr_plural!(applied, "Reject re-applied on {n} photo", "Reject re-applied on {n} photos"),
+            ("Rotation", "re-applied") => {
+                tr_plural!(applied, "Rotation re-applied on {n} photo", "Rotation re-applied on {n} photos")
+            }
+            _ => bulk_edit_sentence_english(verb, action, applied, total),
+        }
+    } else {
+        match (verb, action) {
+            ("Rating", "reverted") => tr_plural!(total, "Rating reverted on {applied} of {n} photos ({missing} no longer in this folder)", "Rating reverted on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Clear", "reverted") => tr_plural!(total, "Clear reverted on {applied} of {n} photos ({missing} no longer in this folder)", "Clear reverted on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Flag", "reverted") => tr_plural!(total, "Flag reverted on {applied} of {n} photos ({missing} no longer in this folder)", "Flag reverted on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Reject", "reverted") => tr_plural!(total, "Reject reverted on {applied} of {n} photos ({missing} no longer in this folder)", "Reject reverted on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Rotation", "reverted") => tr_plural!(total, "Rotation reverted on {applied} of {n} photos ({missing} no longer in this folder)", "Rotation reverted on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Rating", "re-applied") => tr_plural!(total, "Rating re-applied on {applied} of {n} photos ({missing} no longer in this folder)", "Rating re-applied on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Clear", "re-applied") => tr_plural!(total, "Clear re-applied on {applied} of {n} photos ({missing} no longer in this folder)", "Clear re-applied on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Flag", "re-applied") => tr_plural!(total, "Flag re-applied on {applied} of {n} photos ({missing} no longer in this folder)", "Flag re-applied on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Reject", "re-applied") => tr_plural!(total, "Reject re-applied on {applied} of {n} photos ({missing} no longer in this folder)", "Reject re-applied on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            ("Rotation", "re-applied") => tr_plural!(total, "Rotation re-applied on {applied} of {n} photos ({missing} no longer in this folder)", "Rotation re-applied on {applied} of {n} photos ({missing} no longer in this folder)", applied = applied, missing = missing),
+            _ => bulk_edit_sentence_english(verb, action, applied, total),
+        }
+    }
+}
+
+/// The English sentence of [`bulk_edit_sentence`], for the bulk-undo / bulk-redo log lines.
+pub(crate) fn bulk_edit_sentence_english(verb: &str, action: &str, applied: usize, total: usize) -> String {
     let noun = if applied == 1 { "photo" } else { "photos" };
     if applied == total {
         format!("{verb} {action} on {applied} {noun}")
@@ -31999,6 +32593,31 @@ pub(crate) fn bulk_edit_sentence(verb: &str, action: &str, applied: usize, total
             "{verb} {action} on {applied} of {total} photos ({} no longer in this folder)",
             total - applied
         )
+    }
+}
+
+/// Language packs (round 2): the compare-Held sentence of `show_or_say` — "Rating restored on
+/// HWU_1234 — not shown while both halves are pinned". `what` is the caller's English id (the log
+/// line names it in English), so it only picks the whole message; an unknown `what` keeps the
+/// composed English.
+pub(crate) fn not_shown_while_pinned(what: &str, name: &str) -> String {
+    match what {
+        "Rating restored" => {
+            tr_format!("Rating restored on {photo} — not shown while both halves are pinned", photo = name)
+        }
+        "Rotation restored" => {
+            tr_format!("Rotation restored on {photo} — not shown while both halves are pinned", photo = name)
+        }
+        "Rating re-applied" => {
+            tr_format!("Rating re-applied on {photo} — not shown while both halves are pinned", photo = name)
+        }
+        "Rotation re-applied" => {
+            tr_format!("Rotation re-applied on {photo} — not shown while both halves are pinned", photo = name)
+        }
+        "Next unrated found" => {
+            tr_format!("Next unrated found on {photo} — not shown while both halves are pinned", photo = name)
+        }
+        _ => format!("{what} on {name} — not shown while both halves are pinned"),
     }
 }
 
@@ -32105,9 +32724,19 @@ pub(crate) fn save_selection(
 }
 /// v0.8.36 (ITEM 2): a corrupt-settings warning stashed at load (before the events centre exists) and
 /// drained once by the tick into the events centre. Global so `load_settings` needn't grow a slot param.
-static SETTINGS_WARN: Mutex<Option<String>> = Mutex::new(None);
+/// It holds the preserved copy's file name (`None` inside: it could not be preserved). The sentence
+/// is composed when drained, because the load runs before this run's language is chosen; the log
+/// line at the load keeps its own English copy.
+static SETTINGS_WARN: Mutex<Option<Option<String>>> = Mutex::new(None);
 pub(crate) fn take_settings_warn() -> Option<String> {
-    SETTINGS_WARN.lock().unwrap_or_else(|e| e.into_inner()).take()
+    let kept = SETTINGS_WARN.lock().unwrap_or_else(|e| e.into_inner()).take()?;
+    Some(match kept {
+        Some(name) => tr_format!(
+            "Settings file was unreadable — kept as {name} and reset to defaults (keybinds/presets)",
+            name = name
+        ),
+        None => i18n::tr("Settings file was unreadable — couldn't preserve it; reset to defaults").to_string(),
+    })
 }
 pub(crate) fn load_settings() -> Settings {
     // v0.8.36 (ITEM 2): distinguish an ABSENT file (first run — silently default) from a PRESENT-but-
@@ -32124,15 +32753,18 @@ pub(crate) fn load_settings() -> Settings {
                 Ok(parsed) => parsed,
                 Err(e) => {
                     let preserved = preserve_corrupt_file(&p);
-                    let msg = match &preserved {
-                        Some(bak) => format!(
-                            "Settings file was unreadable — kept as {} and reset to defaults (keybinds/presets)",
-                            bak.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+                    let kept = preserved
+                        .as_ref()
+                        .map(|bak| bak.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+                    // The log's English; the events centre composes its own from `kept` (take_settings_warn).
+                    let msg = match &kept {
+                        Some(name) => format!(
+                            "Settings file was unreadable — kept as {name} and reset to defaults (keybinds/presets)"
                         ),
                         None => "Settings file was unreadable — couldn't preserve it; reset to defaults".to_string(),
                     };
                     log_event(&format!("settings: PARSE FAILED for {} ({e}) — {msg}", p.display()));
-                    *SETTINGS_WARN.lock().unwrap_or_else(|x| x.into_inner()) = Some(msg);
+                    *SETTINGS_WARN.lock().unwrap_or_else(|x| x.into_inner()) = Some(kept);
                     Settings::default()
                 }
             },
@@ -32147,15 +32779,21 @@ pub(crate) fn load_settings() -> Settings {
     s
 }
 
+/// The browsing-speed popup's title for a rate: the top stop reads "Max (up to 120 fps)", every
+/// other rate "<n> fps".
+pub(crate) fn fps_title(f: f32) -> slint::SharedString {
+    if f >= 120.0 {
+        i18n::tr("Max (up to 120 fps)").into()
+    } else {
+        tr_format!("{fps} fps", fps = f.round() as i32).into()
+    }
+}
+
 /// Apply saved input choices before the first event; do not replace an explicit Off with defaults.
 pub(crate) fn apply_input_settings(app: &MainWindow, settings: &Settings) {
     let f = settings.scrub_fps.clamp(1.0, 120.0);
     app.set_scrub_fps(f);
-    app.set_fps_text(if f >= 120.0 {
-        "Max (up to 120 fps)".into()
-    } else {
-        slint::format!("{} fps", f.round() as i32)
-    });
+    app.set_fps_text(fps_title(f));
     app.set_wheel_nav(settings.wheel_nav);
     app.set_same_key_clear(settings.same_key_clear); // v0.8.37 (FIX B): mirror the persisted same-key-clear flag into the live toggle (read at keyboard-rate dispatch time)
     app.set_scrub_wait_cache(settings.scrub_wait_cache);
@@ -32289,8 +32927,8 @@ pub(crate) fn is_bindable_char(c: char) -> bool {
 /// letter still shows uppercased ("r" → "R"); digits and everything else are left unchanged.
 pub(crate) fn pretty_key(k: &str) -> String {
     // v0.8.65 (C3/H4): the BASIC-shortcut tokens ("Left"/"Right"/…) display as keycap glyphs/words.
-    // Only the arrows need a glyph; the word tokens (Home/End/Tab/Space/Del) already read as keycaps
-    // and fall through the multi-char passthrough below unchanged.
+    // Only the arrows need a glyph; the word tokens (Home/End/Tab/Space/Del) read as keycaps through
+    // `key_token_name` below, which is where a language pack names them.
     match k {
         "Left" => return "←".into(),
         "Right" => return "→".into(),
@@ -32303,28 +32941,47 @@ pub(crate) fn pretty_key(k: &str) -> String {
         // Windows = "Shift+" → byte-identical to the pre-refactor literal (windows_strings_unchanged).
         (Some(c), None) if c.is_ascii_uppercase() => format!("{}{c}", crate::platform::PLATFORM.mod_shift),
         (Some(c), None) if c.is_ascii_lowercase() => c.to_ascii_uppercase().to_string(),
-        _ => k.to_string(),
+        _ => key_token_name(k).to_string(),
+    }
+}
+
+/// How a `BASIC_TOKENS` token reads where it is drawn. The token itself stays English in settings
+/// and in every Slint comparison; only this display goes through the language pack (the Slint twin
+/// is main_window.slint's `key-name`). Anything else passes through unchanged.
+pub(crate) fn key_token_name(token: &str) -> &str {
+    const NAMES: &[&str] = &[
+        tr_noop!("Left"),
+        tr_noop!("Right"),
+        tr_noop!("Home"),
+        tr_noop!("End"),
+        tr_noop!("Tab"),
+        tr_noop!("Space"),
+        tr_noop!("Del"),
+    ];
+    match NAMES.iter().copied().find(|n| *n == token) {
+        Some(name) => i18n::tr(name),
+        None => token,
     }
 }
 /// Build the Settings key rows for one action table. `conflict` (v0.8.65 C3, the J5-3 fix) is the
 /// one live capture-collision — (action id, message) — rendered as an inline warning under that row.
 fn bind_rows(
-    table: &[(&str, &str, &str)],
+    table: &[(&'static str, &'static str, &'static str)],
     map: &HashMap<String, String>,
     capturing: &Option<String>,
     conflict: &Option<(String, String)>,
 ) -> Vec<KeybindRow> {
     table
         .iter()
-        .map(|(id, label, def)| {
-            let key = map.get(*id).cloned().unwrap_or_else(|| def.to_string());
+        .map(|&(id, label, def)| {
+            let key = map.get(id).cloned().unwrap_or_else(|| def.to_string());
             KeybindRow {
-                action: (*id).into(),
-                label: (*label).into(),
+                action: id.into(),
+                label: i18n::tr(label).into(),
                 key: pretty_key(&key).into(),
-                capturing: capturing.as_deref() == Some(*id),
+                capturing: capturing.as_deref() == Some(id),
                 warn: match conflict {
-                    Some((a, msg)) if a == *id => msg.as_str().into(),
+                    Some((a, msg)) if a == id => msg.as_str().into(),
                     _ => "".into(),
                 },
             }
@@ -32381,9 +33038,10 @@ pub(crate) fn reset_cull_binds(map: &mut HashMap<String, String>) -> Option<(Str
         capture_conflict(map, id, d).map(|holder| {
             (
                 (*id).to_string(),
-                format!(
-                    "{} is also “{holder}” — rebind that under BASIC SHORTCUTS",
-                    pretty_key(d)
+                tr_format!(
+                    "{key} is also “{holder}” — rebind that under BASIC SHORTCUTS",
+                    key = pretty_key(d),
+                    holder = holder
                 ),
             )
         })
@@ -32396,7 +33054,7 @@ pub(crate) fn action_label(id: &str) -> String {
         .iter()
         .chain(BASIC_ACTIONS)
         .find(|(a, _, _)| *a == id)
-        .map(|(_, l, _)| (*l).to_string())
+        .map(|&(_, label, _)| i18n::tr(label).to_string())
         .unwrap_or_else(|| id.to_string())
 }
 /// v0.8.65 (C3, the J5-3 fix): would binding `key` to `action` collide with ANOTHER action's current
@@ -32568,7 +33226,7 @@ pub(crate) const NAME_ILLEGAL: &str = "<>:\"/\\|?*";
 /// `say_edit_result`, so it lands as a visible EVENTS ROW whenever the panel is open — the v0.8.184
 /// occlusion discipline) and any future menu tooltip. The MENU rows do not speak it: they grey,
 /// which is the other half of the L21 "grey or speak, never a silent no-op" rule.
-pub(crate) const ANIMATED_ROTATE_REFUSAL: &str = "Rotating an animated GIF isn't supported yet";
+pub(crate) const ANIMATED_ROTATE_REFUSAL: &str = tr_noop!("Rotating an animated GIF isn't supported yet");
 
 /// -- v0.8.187 (X9): WHY THE SAVE BUTTON IS GREY ------------------------------------------------
 ///
@@ -32587,18 +33245,21 @@ pub(crate) fn preset_name_problem(name: &str) -> String {
         return String::new(); // an untouched field is not an error yet
     }
     if t.chars().any(|c| NAME_ILLEGAL.contains(c) || (c as u32) < 0x20) {
-        return format!("A preset name can't contain {NAME_ILLEGAL} -- it becomes part of the filename");
+        return tr_format!(
+            "A preset name can't contain {characters} -- it becomes part of the filename",
+            characters = NAME_ILLEGAL
+        );
     }
     if t.ends_with('.') {
         // v1.0 MERGE TAIL [B-O3, ruled]: the RESTRICTION stays cross-platform — portable filenames
         // are a feature, because exports travel and a preset names the file it writes. The SENTENCE
         // stops naming an operating system the reader may not be on. (Both refusals here are trunk
         // work later than the branch point, so this merge is the first time a Mac user meets them.)
-        return "A preset name can't end in a dot -- it isn't allowed in portable file names"
+        return i18n::tr("A preset name can't end in a dot -- it isn't allowed in portable file names")
             .to_string();
     }
     if is_reserved_device_name(t) {
-        return "That is a reserved device name on some systems (CON, PRN, AUX, NUL, COM1-9, LPT1-9)"
+        return i18n::tr("That is a reserved device name on some systems (CON, PRN, AUX, NUL, COM1-9, LPT1-9)")
             .to_string();
     }
     String::new()
@@ -32615,7 +33276,7 @@ pub(crate) fn preset_name_problem(name: &str) -> String {
 /// says `.jpg` while the sheet's Format row says PNG is the L42 class in one character, and this
 /// line sits four rows under the row that decides it.
 pub(crate) fn web_name_example(preset: Option<&str>, fmt: falcon_decode::WebFormat) -> String {
-    format!("Files will be named {}", web_deliverable_name("HWU_1234", preset, fmt))
+    tr_format!("Files will be named {name}", name = web_deliverable_name("HWU_1234", preset, fmt))
 }
 
 /// v0.8.187 (X1): the OTHER refusal — the app could not READ the file well enough to know. A
@@ -32623,7 +33284,7 @@ pub(crate) fn web_name_example(preset: Option<&str>, fmt: falcon_decode::WebForm
 /// "animated" (that would be a claim about the photograph the app has not earned) and it must not
 /// silently rotate (the whole defect). It says which case it is, in the same plain grammar.
 pub(crate) const ANIMATED_ROTATE_UNREADABLE: &str =
-    "Couldn't check this GIF, so it wasn't rotated — an animated GIF can't be turned yet";
+    tr_noop!("Couldn't check this GIF, so it wasn't rotated — an animated GIF can't be turned yet");
 
 /// v0.8.187 (X5): a refusal NAMES ITS SUBJECT when the subject is not on screen.
 ///
@@ -32636,10 +33297,21 @@ pub(crate) const ANIMATED_ROTATE_UNREADABLE: &str =
 ///
 /// `name` is `None` for the on-screen target (the subject is obvious -- it fills the stage) and for
 /// a target whose name cannot be resolved.
-pub(crate) fn refusal_with_subject(base: &str, name: Option<&str>) -> String {
+///
+/// Language packs (round 2): `base` is one of the two refusal constants (English ids); each, with
+/// and without its subject, is one whole message, shown translated. Any other base keeps the
+/// composed English.
+pub(crate) fn refusal_with_subject(base: &'static str, name: Option<&str>) -> String {
     match name.map(str::trim).filter(|n| !n.is_empty()) {
-        Some(n) => format!("{base} \u{2014} {n}"),
-        None => base.to_string(),
+        Some(n) => match base {
+            ANIMATED_ROTATE_REFUSAL => tr_format!("Rotating an animated GIF isn't supported yet — {name}", name = n),
+            ANIMATED_ROTATE_UNREADABLE => tr_format!(
+                "Couldn't check this GIF, so it wasn't rotated — an animated GIF can't be turned yet — {name}",
+                name = n
+            ),
+            _ => format!("{base} \u{2014} {n}"),
+        },
+        None => i18n::tr(base).to_string(),
     }
 }
 
@@ -32672,7 +33344,7 @@ pub(crate) const REFUSAL_REPEAT_MS: u64 = 1000;
 /// the truth arriving has to end it. It is a STATE CHANGE the user did not initiate, which is
 /// precisely the class that must be announced rather than performed quietly.
 pub(crate) const ANIMATED_ROTATE_RESET: &str =
-    "This animated GIF's rotation was reset — the viewer can't turn one";
+    tr_noop!("This animated GIF's rotation was reset — the viewer can't turn one");
 
 /// The DOS device names, reserved with or without an extension and case-insensitively.
 /// `stem_of("nul.jpg") == "nul"`, which IS the device — this is why the check runs on the stem.
@@ -33041,13 +33713,23 @@ pub(crate) fn reserved_token_refusal(tokens: &[&str]) -> String {
             items.push((*t).to_string());
         }
     }
-    let list = match items.len() {
-        0 => return "That key is reserved for BASIC SHORTCUTS — use a letter or a digit here.".to_string(),
-        1 => items[0].clone(),
-        n => format!("{} and {}", items[..n - 1].join(", "), items[n - 1]),
-    };
-    let verb = if items.len() == 1 { "is" } else { "are" };
-    format!("{list} {verb} reserved for BASIC SHORTCUTS — use a letter or a digit here.")
+    // The keys as drawn (a language pack names them); the list joins and the sentence are each one
+    // message, so a pack orders them its own way.
+    let names: Vec<&str> = items.iter().map(|t| key_token_name(t)).collect();
+    match names.as_slice() {
+        [] => i18n::tr("That key is reserved for BASIC SHORTCUTS — use a letter or a digit here.").to_string(),
+        [key] => tr_format!("{key} is reserved for BASIC SHORTCUTS — use a letter or a digit here.", key = key),
+        [first, middle @ .., last] => {
+            let mut list = (*first).to_string();
+            for key in middle {
+                list = tr_format!("{list}, {key}", list = list, key = key);
+            }
+            tr_format!(
+                "{keys} are reserved for BASIC SHORTCUTS — use a letter or a digit here.",
+                keys = tr_format!("{list} and {key}", list = list, key = last)
+            )
+        }
+    }
 }
 
 /// v0.8.122 (M6 = the v0.8.121 verify's S3 finding): **is the delete-recovery offer live?** — ONE
@@ -33263,14 +33945,13 @@ pub(crate) fn last_act_sentence(act: &UndoEntry, subject: &str, cur_r: i32, cur_
                 return String::new();
             }
             if *prev_m != cur_m {
-                format!("{} — {subject}", mark_verb(*prev_m, cur_m))
+                edit_on_subject(mark_verb(*prev_m, cur_m), subject)
             } else if *prev_r != cur_r {
-                let verb = if cur_r >= 1 {
-                    format!("Rated {cur_r}")
+                if cur_r >= 1 {
+                    rated_on_subject(cur_r, subject)
                 } else {
-                    "Rating cleared".to_string()
-                };
-                format!("{verb} — {subject}")
+                    edit_on_subject("Rating cleared", subject)
+                }
             } else {
                 String::new()
             }
@@ -33279,7 +33960,7 @@ pub(crate) fn last_act_sentence(act: &UndoEntry, subject: &str, cur_r: i32, cur_
             if subject.is_empty() {
                 String::new()
             } else {
-                format!("Rotated — {subject}")
+                edit_on_subject("Rotated", subject)
             }
         }
         // The grouped acts already speak in counts, so they carry no subject name. The DIRECTION
@@ -33372,7 +34053,7 @@ pub(crate) fn cull_undo_armed(
 /// the path that exports. Present tense, so it reads correctly before and after the write. The
 /// leading warn glyph belongs to the surface, not the sentence. Pure — unit-tested.
 pub(crate) fn wm_font_missing_text(family: &str) -> String {
-    format!("\u{201c}{family}\u{201d} isn't installed on this machine — the watermark exports in a substitute typeface.")
+    tr_format!("\u{201c}{family}\u{201d} isn't installed on this machine — the watermark exports in a substitute typeface.", family = family)
 }
 
 /// v0.8.181 (pre-merge review) — **THE ONE-SLOT WORKER MAILBOX, WITH THE SUPERSESSION RULE IN IT.**
@@ -34009,42 +34690,51 @@ pub(crate) fn selection_empty_hints(map: &HashMap<String, String>) -> SelectionH
     let reject = menu_shortcut(map, "reject");
     let rot = menu_shortcut(map, "rotcw");
     let rates = rating_keys_phrase(map);
+    // Language packs (round 2): each hint is one whole message; the key names are values.
     let picks = if flag.is_empty() {
-        "Flag a keeper while browsing (bind a key in Settings → Controls).".to_string()
+        i18n::tr("Flag a keeper while browsing (bind a key in Settings → Controls).").to_string()
     } else {
-        format!("Press {flag} on a photo to flag a keeper.")
+        tr_format!("Press {key} on a photo to flag a keeper.", key = flag)
     };
     let rejects = if reject.is_empty() {
-        "Reject a photo while browsing (bind a key in Settings → Controls).".to_string()
+        i18n::tr("Reject a photo while browsing (bind a key in Settings → Controls).").to_string()
     } else {
-        format!("Press {reject} to reject a photo.")
+        tr_format!("Press {key} to reject a photo.", key = reject)
     };
     let rated = match &rates {
-        Some(r) => format!("Press {r} while browsing to rate."),
-        None => "Rate a photo while browsing (bind the rating keys in Settings → Controls)."
+        Some(r) => tr_format!("Press {keys} while browsing to rate.", keys = r),
+        None => i18n::tr("Rate a photo while browsing (bind the rating keys in Settings → Controls).")
             .to_string(),
     };
     let rotated = if rot.is_empty() {
-        "Rotate a photo while browsing (bind a key in Settings → Controls).".to_string()
+        i18n::tr("Rotate a photo while browsing (bind a key in Settings → Controls).").to_string()
     } else {
-        format!("Press {rot} on a photo to rotate it.")
+        tr_format!("Press {key} on a photo to rotate it.", key = rot)
     };
-    // The catch-all line lists whatever IS bound, in the panel's own "key = action" shorthand.
-    let mut parts: Vec<String> = Vec::new();
-    if !flag.is_empty() {
-        parts.push(format!("{flag} = flag"));
-    }
-    if !reject.is_empty() {
-        parts.push(format!("{reject} = reject"));
-    }
-    if let Some(r) = &rates {
-        parts.push(format!("{r} = rate"));
-    }
-    let any = if parts.is_empty() {
-        "Flag, reject or rate a photo while browsing — bind the keys in Settings → Controls."
-            .to_string()
-    } else {
-        format!("While browsing: {}.", parts.join(" · "))
+    // The catch-all line lists whatever IS bound, in the panel's own "key = action" shorthand —
+    // one whole message for each combination of bound actions (language packs, round 2: the
+    // ` · ` list is never assembled from pieces).
+    let any = match (!flag.is_empty(), !reject.is_empty(), &rates) {
+        (true, true, Some(r)) => tr_format!(
+            "While browsing: {flag} = flag · {reject} = reject · {rate} = rate.",
+            flag = flag,
+            reject = reject,
+            rate = r
+        ),
+        (true, true, None) => {
+            tr_format!("While browsing: {flag} = flag · {reject} = reject.", flag = flag, reject = reject)
+        }
+        (true, false, Some(r)) => tr_format!("While browsing: {flag} = flag · {rate} = rate.", flag = flag, rate = r),
+        (false, true, Some(r)) => {
+            tr_format!("While browsing: {reject} = reject · {rate} = rate.", reject = reject, rate = r)
+        }
+        (true, false, None) => tr_format!("While browsing: {flag} = flag.", flag = flag),
+        (false, true, None) => tr_format!("While browsing: {reject} = reject.", reject = reject),
+        (false, false, Some(r)) => tr_format!("While browsing: {rate} = rate.", rate = r),
+        (false, false, None) => {
+            i18n::tr("Flag, reject or rate a photo while browsing — bind the keys in Settings → Controls.")
+                .to_string()
+        }
     };
     SelectionHints { picks, rejects, rated, rotated, any }
 }
@@ -34532,6 +35222,8 @@ pub(crate) fn build_settings(
         accel_migrated: app.get_accel_migrated(),
         dev_hud: app.get_dev_hud(),
         diagnostic_logging: app.get_diagnostic_logging(),
+        language: crate::i18n::app_picker_pref(app.get_language_sel()).to_string(),
+        fit_text_widths: slint::ComponentHandle::global::<Theme>(app).get_fit_text(),
         quality_super: app.get_quality_super() != 0,
         info_open: app.get_info_open(),
         // v1.0.0-rc (queue item 33, OWNER RULING 2.4a, "the Settings value is a FLOOR"): THE
@@ -34739,8 +35431,12 @@ pub(crate) fn onboarding_boot(shown_in_settings: bool) -> (bool, bool) {
 /// takes the full row (predictable — no profile-name-length cliff where a short name shares the
 /// row and a longer one doesn't), the bare form never does. Counted in chars (not bytes) so the
 /// ellipsis can't skew it.
-pub(crate) fn custom_gamut_label_is_long(label: &str) -> bool {
-    label.chars().count() > 8
+///
+/// Language packs: with `fit_text` on (Settings → Developer → Widen controls to fit text) the
+/// English-tuned count is skipped and the chip always gets the full row, so any translated label
+/// shows whole. Off keeps the count exactly.
+pub(crate) fn custom_gamut_label_is_long(label: &str, fit_text: bool) -> bool {
+    fit_text || label.chars().count() > 8
 }
 
 /// v0.9.20: the Mac assoc popup's boot decision — `(arm_now, open_at_boot, latch_now)`. Mirrors
@@ -34807,16 +35503,36 @@ mod onboarding_tests {
     /// "Custom: <name>" label (even a 1-char name) takes the full-width row.
     #[test]
     fn custom_gamut_row_threshold_separates_bare_from_loaded() {
-        assert!(!custom_gamut_label_is_long("Custom…"), "bare form (7 chars) stays shared");
-        assert!(custom_gamut_label_is_long("Custom: x"), "shortest real label (9 chars) goes full-row");
-        assert!(custom_gamut_label_is_long("Custom: Dell_S2725QS_Native_v2"), "the owner's profile");
+        assert!(!custom_gamut_label_is_long("Custom…", false), "bare form (7 chars) stays shared");
+        assert!(custom_gamut_label_is_long("Custom: x", false), "shortest real label (9 chars) goes full-row");
+        assert!(custom_gamut_label_is_long("Custom: Dell_S2725QS_Native_v2", false), "the owner's profile");
         // degenerate guard: an empty profile name ("Custom: " = 8 chars) stays shared — exactly ON
         // the threshold, proving the char of slack on each side.
-        assert!(!custom_gamut_label_is_long("Custom: "));
+        assert!(!custom_gamut_label_is_long("Custom: ", false));
     }
 }
 
 // ───────────────────────────── title-bar culling HUD (H6, v0.7.2) ─────────────────────────────
+
+thread_local! {
+    /// The English message the empty stage card is showing, recorded where it is published. Logs
+    /// stay English, and two messages may share one translation, so the log never works it out
+    /// from the drawn text (round-2 review R1). Starts as the Slint default's message.
+    static EMPTY_STAGE_ENGLISH: std::cell::Cell<&'static str> = const { std::cell::Cell::new("No folder open") };
+}
+
+/// Language packs (round 2): publish the empty stage card's message — drawn translated, and kept in
+/// English for the immersive-toggle log. Callers pass the message through `tr_noop!`.
+pub(crate) fn set_empty_stage_text(app: &MainWindow, english: &'static str) {
+    EMPTY_STAGE_ENGLISH.with(|e| e.set(english));
+    app.set_empty_text(i18n::tr(english).into());
+}
+
+/// The English message behind the empty card, for the log (that log line is macOS-only).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(crate) fn empty_stage_text_english() -> &'static str {
+    EMPTY_STAGE_ENGLISH.with(std::cell::Cell::get)
+}
 
 /// Shorten a folder path for the title-bar HUD: the drive + the NEAREST TWO layers, e.g.
 /// `D:\…\1-1-2026Photos\101CANON` (user spec). A path that is already ≤ drive+2 layers shows in full.
@@ -36465,11 +37181,14 @@ impl DisplayColorMode {
 
     /// The sentence SUBJECT when the sentence starts with it ("… is ON for <display>").
     /// ONE table for every user-visible mention of the mode (L27).
+    ///
+    /// Language packs (round 2): English names (the log's), marked; the screen shows them through
+    /// `i18n::tr` as a sentence's `{mode}` value.
     pub(crate) fn subject_full(self) -> &'static str {
         match self {
-            DisplayColorMode::Wcg => "Windows Auto Colour Management",
-            DisplayColorMode::Hdr => "HDR",
-            _ => "HDR or Auto Colour Management",
+            DisplayColorMode::Wcg => tr_noop!("Windows Auto Colour Management"),
+            DisplayColorMode::Hdr => tr_noop!("HDR"),
+            _ => tr_noop!("HDR or Auto Colour Management"),
         }
     }
 
@@ -36477,22 +37196,17 @@ impl DisplayColorMode {
     /// changed: … is now ON"), so it does not say it twice.
     pub(crate) fn subject_short(self) -> &'static str {
         match self {
-            DisplayColorMode::Wcg => "Auto Colour Management",
-            DisplayColorMode::Hdr => "HDR",
-            _ => "HDR or Auto Colour Management",
+            DisplayColorMode::Wcg => tr_noop!("Auto Colour Management"),
+            DisplayColorMode::Hdr => tr_noop!("HDR"),
+            _ => tr_noop!("HDR or Auto Colour Management"),
         }
     }
 
-    /// How to turn it off — the recovery half of the auto-detect note. HDR and Auto Colour
-    /// Management live behind DIFFERENT Windows controls, which is exactly why the owner ruled they
-    /// must never share a sentence; the ambiguous arm names the page both are on and stops.
-    pub(crate) fn turn_off_clause(self) -> &'static str {
-        match self {
-            DisplayColorMode::Wcg => "Turn it off (Settings → System → Display → Colour management)",
-            DisplayColorMode::Hdr => "Turn HDR off",
-            _ => "Turn it off (Settings → System → Display)",
-        }
-    }
+    // How to turn it off — the recovery half of the auto-detect note — is part of that note's
+    // second sentence now, one whole message per mode (language packs, round 2; see
+    // `advanced_colour_autodetect_msg`). HDR and Auto Colour Management live behind DIFFERENT
+    // Windows controls, which is exactly why the owner ruled they must never share a sentence; the
+    // ambiguous arm names the page both are on and stops.
 
     /// The LOG spelling (never user-visible).
     pub(crate) fn label(self) -> &'static str {
@@ -36666,11 +37380,13 @@ pub(crate) enum NotifLevel {
 /// occasions differ only in their LEAD-IN, because at boot nothing has "changed" and saying so
 /// would be false on the one line whose whole job is to be trusted.
 const COLOUR_DOUBLE_CONVERT_CLAUSE: &str =
-    "Windows is managing colour, so Falcon's current output profile double-converts — switch to \
-     sRGB or run Auto-detect.";
+    tr_noop!("Windows is managing colour, so Falcon's current output profile double-converts — switch to sRGB or run Auto-detect.");
 
 /// How a display is named mid-sentence when its friendly name is unknown. (The existing composers'
 /// "That display" is a sentence SUBJECT and reads wrong after a preposition.)
+///
+/// Language packs (round 2): this English spelling is the LOG's ([`colour_settings_changed_log`]);
+/// the screen's sentences give the nameless display its own whole message instead.
 fn colour_display_name(display: &str) -> &str {
     let t = display.trim();
     if t.is_empty() {
@@ -36678,6 +37394,12 @@ fn colour_display_name(display: &str) -> &str {
     } else {
         t
     }
+}
+
+/// Language packs (round 2): two whole sentences said one after the other. English joins them with
+/// a space; a pack decides its own join (some languages put no space after a full stop).
+pub(crate) fn two_sentences(first: &str, second: &str) -> String {
+    tr_format!("{first} {second}", first = first, second = second)
 }
 
 /// v0.8.193 (A5/B1): what Auto-detect says when it arms sRGB because Windows is managing colour.
@@ -36693,23 +37415,58 @@ fn colour_display_name(display: &str) -> &str {
 /// what actually just became true: the setting is written, and it takes effect when the window
 /// moves there. (Raised as an out-of-scope observation in the v0.8.193 close; folded on the
 /// architect's review.)
+///
+/// Language packs (round 2): two whole sentences — what happened (per `active`, with the mode's
+/// name as a value and a nameless display as its own message) and how to undo it (per mode and
+/// per `would_use`) — joined by [`two_sentences`].
 pub(crate) fn advanced_colour_autodetect_msg(
     mode: DisplayColorMode,
     display: &str,
     would_use: Option<&str>,
     active: bool,
 ) -> String {
-    let tail = match would_use {
-        Some(p) => format!("to use the display's own profile: {p}."),
-        None => "to use a display profile.".to_string(),
+    let mode_name = mode.subject_full(); // marked with tr_noop!; shown translated
+    let m = i18n::tr(mode_name);
+    let d = display.trim();
+    let happened = match (active, d.is_empty()) {
+        (true, false) => tr_format!(
+            "{mode} is ON for {display} — Windows manages colour itself, so Falcon now outputs sRGB.",
+            mode = m,
+            display = d
+        ),
+        (true, true) => tr_format!(
+            "{mode} is ON for this display — Windows manages colour itself, so Falcon now outputs sRGB.",
+            mode = m
+        ),
+        (false, false) => tr_format!(
+            "{mode} is ON for {display} — Windows manages colour itself, so Falcon will output sRGB on it.",
+            mode = m,
+            display = d
+        ),
+        (false, true) => tr_format!(
+            "{mode} is ON for this display — Windows manages colour itself, so Falcon will output sRGB on it.",
+            mode = m
+        ),
     };
-    let outputs = if active { "Falcon now outputs sRGB" } else { "Falcon will output sRGB on it" };
-    format!(
-        "{} is ON for {} — Windows manages colour itself, so {outputs}. {} {tail}",
-        mode.subject_full(),
-        colour_display_name(display),
-        mode.turn_off_clause(),
-    )
+    let undo = match (mode, would_use) {
+        (DisplayColorMode::Wcg, Some(p)) => tr_format!(
+            "Turn it off (Settings → System → Display → Colour management) to use the display's own profile: {profile}.",
+            profile = p
+        ),
+        (DisplayColorMode::Wcg, None) => {
+            i18n::tr("Turn it off (Settings → System → Display → Colour management) to use a display profile.").to_string()
+        }
+        (DisplayColorMode::Hdr, Some(p)) => {
+            tr_format!("Turn HDR off to use the display's own profile: {profile}.", profile = p)
+        }
+        (DisplayColorMode::Hdr, None) => i18n::tr("Turn HDR off to use a display profile.").to_string(),
+        (_, Some(p)) => tr_format!(
+            "Turn it off (Settings → System → Display) to use the display's own profile: {profile}.",
+            profile = p
+        ),
+        (_, None) => i18n::tr("Turn it off (Settings → System → Display) to use a display profile.").to_string(),
+    };
+    two_sentences(&happened, &undo)
 }
 
 /// v0.8.193 (C3): the BOOT warning — Windows was already managing colour when Falcon started, and
@@ -36724,12 +37481,44 @@ pub(crate) fn advanced_colour_boot_warn(
     falcon_output_is_srgb: bool,
 ) -> Option<String> {
     (mode.windows_manages_colour() && !falcon_output_is_srgb).then(|| {
+        let mode_name = mode.subject_full(); // marked with tr_noop!; shown translated
+        let m = i18n::tr(mode_name);
+        let d = display.trim();
+        let head = if d.is_empty() {
+            tr_format!("{mode} is ON for this display.", mode = m)
+        } else {
+            tr_format!("{mode} is ON for {display}.", mode = m, display = d)
+        };
+        two_sentences(&head, i18n::tr(COLOUR_DOUBLE_CONVERT_CLAUSE))
+    })
+}
+
+/// Language packs (round 2): [`advanced_colour_boot_warn`] in English, for its log line.
+pub(crate) fn advanced_colour_boot_warn_english(
+    mode: DisplayColorMode,
+    display: &str,
+    falcon_output_is_srgb: bool,
+) -> Option<String> {
+    (mode.windows_manages_colour() && !falcon_output_is_srgb).then(|| {
         format!(
             "{} is ON for {}. {COLOUR_DOUBLE_CONVERT_CLAUSE}",
             mode.subject_full(),
             colour_display_name(display),
         )
     })
+}
+
+/// Language packs (round 2): WHICH colour-settings notice applies — decided once in
+/// [`colour_notice`], then said twice: translated for the screen, English for the log.
+enum ColourNotice<'a> {
+    /// Windows started managing colour; `srgb` = Falcon already outputs sRGB.
+    NowOn { mode: DisplayColorMode, srgb: bool },
+    /// …and stopped; `profile` = the SDR profile Auto-detect can use again.
+    NowOff { mode: DisplayColorMode, profile: Option<&'a str> },
+    /// Same mode, a newly ASSIGNED SDR profile.
+    Assigns(&'a str),
+    /// Same mode, the assigned SDR profile was removed.
+    NoLongerAssigns,
 }
 
 /// v0.8.193 (C2): Windows' colour settings for this display changed under the app — the owner's own
@@ -36747,7 +37536,97 @@ pub(crate) fn colour_settings_changed_msg(
     display: &str,
     falcon_output_is_srgb: bool,
 ) -> Option<(NotifLevel, String)> {
+    let (level, notice) = colour_notice(prev, now, falcon_output_is_srgb)?;
+    let m = |mode: DisplayColorMode| {
+        let mode_name = mode.subject_short(); // marked with tr_noop!; shown translated
+        i18n::tr(mode_name)
+    };
+    let d = display.trim();
+    let text = match (notice, d.is_empty()) {
+        (ColourNotice::NowOn { mode, srgb }, unnamed) => {
+            let head = if unnamed {
+                tr_format!("Windows colour settings changed: {mode} is now ON for this display.", mode = m(mode))
+            } else {
+                tr_format!("Windows colour settings changed: {mode} is now ON for {display}.", mode = m(mode), display = d)
+            };
+            let tail = if srgb {
+                i18n::tr("Falcon already outputs sRGB — nothing to change.")
+            } else {
+                i18n::tr(COLOUR_DOUBLE_CONVERT_CLAUSE)
+            };
+            two_sentences(&head, tail)
+        }
+        (ColourNotice::NowOff { mode, profile }, unnamed) => {
+            let head = if unnamed {
+                tr_format!("Windows colour settings changed: {mode} is now OFF for this display.", mode = m(mode))
+            } else {
+                tr_format!("Windows colour settings changed: {mode} is now OFF for {display}.", mode = m(mode), display = d)
+            };
+            let tail = match profile {
+                Some(p) => tr_format!("Auto-detect can use the display's profile again: {profile}.", profile = p),
+                None => i18n::tr("Auto-detect can use the display's profile again.").to_string(),
+            };
+            two_sentences(&head, &tail)
+        }
+        (ColourNotice::Assigns(b), true) => {
+            tr_format!("Windows now assigns {profile} to this display. Run Auto-detect to pick it up.", profile = b)
+        }
+        (ColourNotice::Assigns(b), false) => tr_format!(
+            "Windows now assigns {profile} to {display}. Run Auto-detect to pick it up.",
+            profile = b,
+            display = d
+        ),
+        (ColourNotice::NoLongerAssigns, true) => {
+            i18n::tr("Windows no longer assigns a colour profile to this display — Falcon keeps its current output profile.")
+                .to_string()
+        }
+        (ColourNotice::NoLongerAssigns, false) => tr_format!(
+            "Windows no longer assigns a colour profile to {display} — Falcon keeps its current output profile.",
+            display = d
+        ),
+    };
+    Some((level, text))
+}
+
+/// Language packs (round 2): [`colour_settings_changed_msg`]'s sentence in English, for its log line.
+pub(crate) fn colour_settings_changed_log(
+    prev: &DisplayColourSnapshot,
+    now: &DisplayColourSnapshot,
+    display: &str,
+    falcon_output_is_srgb: bool,
+) -> Option<String> {
+    let (_, notice) = colour_notice(prev, now, falcon_output_is_srgb)?;
     let d = colour_display_name(display);
+    Some(match notice {
+        ColourNotice::NowOn { mode, srgb } => {
+            let head = format!("Windows colour settings changed: {} is now ON for {d}.", mode.subject_short());
+            if srgb {
+                format!("{head} Falcon already outputs sRGB — nothing to change.")
+            } else {
+                format!("{head} {COLOUR_DOUBLE_CONVERT_CLAUSE}")
+            }
+        }
+        ColourNotice::NowOff { mode, profile } => {
+            let tail = match profile {
+                Some(p) => format!(" Auto-detect can use the display's profile again: {p}."),
+                None => " Auto-detect can use the display's profile again.".to_string(),
+            };
+            format!("Windows colour settings changed: {} is now OFF for {d}.{tail}", mode.subject_short())
+        }
+        ColourNotice::Assigns(b) => format!("Windows now assigns {b} to {d}. Run Auto-detect to pick it up."),
+        ColourNotice::NoLongerAssigns => {
+            format!("Windows no longer assigns a colour profile to {d} — Falcon keeps its current output profile.")
+        }
+    })
+}
+
+/// The decision behind [`colour_settings_changed_msg`] — unchanged from v0.8.193, moved here so the
+/// screen and the log cannot disagree about which notice applies.
+fn colour_notice<'a>(
+    prev: &'a DisplayColourSnapshot,
+    now: &'a DisplayColourSnapshot,
+    falcon_output_is_srgb: bool,
+) -> Option<(NotifLevel, ColourNotice<'a>)> {
     // A probe that stopped answering is not a change. Say nothing about a fact nothing measured.
     if now.mode == DisplayColorMode::Unknown {
         return None;
@@ -36755,30 +37634,13 @@ pub(crate) fn colour_settings_changed_msg(
     // 1) Windows started managing colour (from ANY other mode — Wcg→Hdr is a real transition and
     //    gets the Hdr wording, which is the whole point of keeping the two cases separate).
     if now.mode.windows_manages_colour() && prev.mode != now.mode {
-        let head = format!(
-            "Windows colour settings changed: {} is now ON for {d}.",
-            now.mode.subject_short()
-        );
-        return Some(if falcon_output_is_srgb {
-            (NotifLevel::Info, format!("{head} Falcon already outputs sRGB — nothing to change."))
-        } else {
-            (NotifLevel::Warn, format!("{head} {COLOUR_DOUBLE_CONVERT_CLAUSE}"))
-        });
+        let level = if falcon_output_is_srgb { NotifLevel::Info } else { NotifLevel::Warn };
+        return Some((level, ColourNotice::NowOn { mode: now.mode, srgb: falcon_output_is_srgb }));
     }
     // 2) …and stopped. Only from a mode Falcon actually OBSERVED as on: an `Unknown`→`Sdr` step
     //    would otherwise announce that something was switched off that was never seen switched on.
     if now.mode == DisplayColorMode::Sdr && prev.mode.windows_manages_colour() {
-        let tail = match now.sdr_stem.as_deref() {
-            Some(p) => format!(" Auto-detect can use the display's profile again: {p}."),
-            None => " Auto-detect can use the display's profile again.".to_string(),
-        };
-        return Some((
-            NotifLevel::Info,
-            format!(
-                "Windows colour settings changed: {} is now OFF for {d}.{tail}",
-                prev.mode.subject_short()
-            ),
-        ));
+        return Some((NotifLevel::Info, ColourNotice::NowOff { mode: prev.mode, profile: now.sdr_stem.as_deref() }));
     }
     // 3) Same mode, the ASSIGNED SDR profile changed (a re-calibration, a driver update, a fresh
     //    install, a removal). Suppressed entirely while Windows is managing colour: "Run Auto-detect
@@ -36792,21 +37654,8 @@ pub(crate) fn colour_settings_changed_msg(
     //    dropped the profile it is already using.
     if prev.mode == now.mode && !now.mode.windows_manages_colour() {
         match (prev.sdr_stem.as_deref(), now.sdr_stem.as_deref()) {
-            (was, Some(b)) if was != Some(b) => {
-                return Some((
-                    NotifLevel::Info,
-                    format!("Windows now assigns {b} to {d}. Run Auto-detect to pick it up."),
-                ))
-            }
-            (Some(_), None) => {
-                return Some((
-                    NotifLevel::Info,
-                    format!(
-                        "Windows no longer assigns a colour profile to {d} — Falcon keeps its \
-                         current output profile."
-                    ),
-                ))
-            }
+            (was, Some(b)) if was != Some(b) => return Some((NotifLevel::Info, ColourNotice::Assigns(b))),
+            (Some(_), None) => return Some((NotifLevel::Info, ColourNotice::NoLongerAssigns)),
             _ => {}
         }
     }
@@ -38422,22 +39271,50 @@ mod per_display_color_tests {
     #[test]
     fn the_auto_detect_label_is_bounded_before_it_reaches_the_card() {
         assert_eq!(
-            auto_detect_label("DELL S2725QS", true),
+            auto_detect_label("DELL S2725QS", true, false),
             "Auto-detect this monitor",
             "the ACTIVE/single section keeps the v0.8.106 string VERBATIM — it is the pinned copy"
         );
-        assert_eq!(auto_detect_label("DELL S2725QS", false), "Auto-detect DELL S2725QS");
+        assert_eq!(auto_detect_label("DELL S2725QS", false, false), "Auto-detect DELL S2725QS");
         assert_eq!(
-            auto_detect_label("DELL S2725QS + BenQ PD2700U (mirrored)", false),
+            auto_detect_label("DELL S2725QS + BenQ PD2700U (mirrored)", false, false),
             "Auto-detect this display",
             "a clone-group name (minted by this very feature) must not push the row off the card"
         );
-        assert_eq!(auto_detect_label("   ", false), "Auto-detect this display");
+        assert_eq!(auto_detect_label("   ", false, false), "Auto-detect this display");
         assert_eq!(
-            auto_detect_label("LG UltraFine 5K Display", false),
+            auto_detect_label("LG UltraFine 5K Display", false, false),
             "Auto-detect this display",
             "past the budget the label is generic — never 'this monitor', which is the ACTIVE row's"
         );
+    }
+
+    /// Language packs, round 2 (PLAN §4): the two English-tuned label cut-offs Rust owns apply with
+    /// Settings → Developer → Widen controls to fit text OFF, counted on the label as shown, and are
+    /// skipped with it ON, under the pseudo-language `xx-TEST`.
+    ///
+    /// FALSIFIERS: ignore `fit_text` in `auto_detect_label` (always spend `AUTO_DETECT_LABEL_MAX`)
+    /// and the "on" pill row fails; ignore it in `custom_gamut_label_is_long` (always count) and the
+    /// "on" chip row fails.
+    #[cfg(falcon_pseudo_language)]
+    #[test]
+    fn the_label_cut_offs_apply_off_and_are_skipped_on_under_the_pseudo_language() {
+        crate::i18n::use_pseudo_language();
+        // "⟦Auto-detect DELL S2725QS⟧" is 26 characters: past the 24 budget the English string fits.
+        assert_eq!(auto_detect_label("DELL S2725QS", false, false), "⟦Auto-detect this display⟧");
+        assert_eq!(auto_detect_label("DELL S2725QS", false, true), "⟦Auto-detect DELL S2725QS⟧", "on: the whole name");
+        assert_eq!(auto_detect_label("   ", false, true), "⟦Auto-detect this display⟧", "a nameless display still has no name to show");
+        assert_eq!(auto_detect_label("DELL S2725QS", true, true), "⟦Auto-detect this monitor⟧");
+        // The Custom chip: off, a label short enough shares the Rec. 2020 row exactly as today (a
+        // pack's six-character "Eigen…"), and the pseudo-language's own bare label is counted as
+        // shown; on, the chip always takes its own row, so any translation shows whole.
+        let bare = entry_custom_label("");
+        assert_eq!(bare, "⟦Custom…⟧");
+        assert!(custom_gamut_label_is_long(&bare, false), "9 characters as shown");
+        assert!(!custom_gamut_label_is_long("Eigen…", false));
+        assert!(custom_gamut_label_is_long("Eigen…", true), "on: its own row");
+        assert!(custom_gamut_label_is_long(&entry_custom_label("x.icc"), true));
+        crate::i18n::use_english();
     }
 
     /// v0.8.109 (V16): a Win+P Duplicate group OWNS every member's device path.
@@ -38668,8 +39545,8 @@ mod per_display_color_tests {
         assert_eq!(entry_custom_label("/Users/ab/p.icc"), "Custom: p");
         assert_eq!(entry_custom_label(""), "Custom…", "no profile ⇒ the bare form");
         // …and it feeds the SAME long-label gate the live label does (v0.8.76).
-        assert!(custom_gamut_label_is_long(&entry_custom_label("x.icc")));
-        assert!(!custom_gamut_label_is_long(&entry_custom_label("")));
+        assert!(custom_gamut_label_is_long(&entry_custom_label("x.icc"), false));
+        assert!(!custom_gamut_label_is_long(&entry_custom_label(""), false));
     }
 
     /// v0.8.108: the section header LINE — one grammar for every row, and the disconnect marker out
@@ -43236,6 +44113,20 @@ mod writer_tests {
         let saved = serde_json::to_string(&enabled).unwrap();
         let loaded: Settings = serde_json::from_str(&saved).unwrap();
         assert!(loaded.diagnostic_logging);
+    }
+
+    /// FALSIFIER: drop either field's `skip_serializing_if`, and an untouched file gains a key.
+    #[test]
+    fn language_and_fit_text_stay_out_of_old_files_until_chosen() {
+        let old: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.language, "", "an old file follows the system language");
+        assert!(!old.fit_text_widths);
+        let untouched = serde_json::to_string(&old).unwrap();
+        assert!(!untouched.contains("\"language\"") && !untouched.contains("fit_text_widths"), "{untouched}");
+        let chosen = Settings { language: "zh-CN".into(), fit_text_widths: true, ..old };
+        let loaded: Settings = serde_json::from_str(&serde_json::to_string(&chosen).unwrap()).unwrap();
+        assert_eq!(loaded.language, "zh-CN");
+        assert!(loaded.fit_text_widths);
     }
 
     #[test]
@@ -49102,7 +49993,7 @@ mod toasts_and_loading_words_tests {
             "…and `softzoom` keeps the `zoom > 1.0` term, which is what makes that true"
         );
         assert!(
-            c.contains("root.fitloading ? \"Loading\u{2026}\""),
+            c.contains("root.fitloading ? @tr(\"falcon\" => \"Loading\u{2026}\")"),
             "the fourth claim state is in the WORD ternary, where it belongs"
         );
     }

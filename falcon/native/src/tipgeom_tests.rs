@@ -70,9 +70,1301 @@ fn boot() -> ui::MainWindow {
         }
     });
     let app = ui::MainWindow::new().expect("MainWindow under the testing backend");
+    // The first window on a thread lets Slint guess a bundled language from the machine's locale;
+    // these rigs measure English, so pin it (no-op in a build without bundled languages).
+    let _ = slint::select_bundled_translation("en");
     app.window().set_size(slint::LogicalSize::new(1200.0, 800.0));
     require_element_debug_info(&app);
     app
+}
+
+/// FALSIFIER: stop `build_translations.rs` setting `SLINT_BUNDLE_TRANSLATIONS` (nothing is bundled
+/// and the label stays English), or drop the English pin from `boot()` (the second window keeps the
+/// pseudo-language).
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_pseudo_language_reaches_slint_text_and_each_rig_starts_in_english() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let count = |app: &ui::MainWindow, label: &str| E::find_by_accessible_label(app, label).count();
+    let app = boot();
+    app.set_settings_open(true);
+    assert_eq!(count(&app, "LANGUAGE"), 1);
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    assert_eq!(count(&app, "⟦LANGUAGE⟧"), 1, "the section label follows the selected language");
+    assert_eq!(count(&app, "LANGUAGE"), 0);
+    app.set_count_rated(1);
+    app.set_confirm_kind(7);
+    assert_eq!(count(&app, "⟦rated photo → write XMP sidecar⟧"), 1, "the plural's singular form");
+    app.set_count_rated(4);
+    assert_eq!(count(&app, "⟦rated photos → write XMP sidecars⟧"), 1, "the plural's plural form");
+    let again = boot();
+    again.set_settings_open(true);
+    assert_eq!(count(&again, "LANGUAGE"), 1, "a new rig is English again");
+}
+
+/// Round-1 review R5 (owner ruling: "Use a dropdown"): the LANGUAGE picker is a dropdown whose rows
+/// each get the menu's full width, scrolling when the list outgrows the window.
+/// FALSIFIERS: drop the height cap (`height: langbox.preferred-height`) and the long list runs off a
+/// short window; drop the Esc ladder's first arm and Esc closes Settings instead; drop the
+/// `changed settings-open` teardown and the menu outlives Settings; drop the trigger's
+/// `keys.focus()` and a focused Settings text field swallows Esc (re-check R5).
+#[test]
+fn the_language_dropdown_gives_every_language_a_row() {
+    use i_slint_backend_testing::ElementHandle as E;
+    use i_slint_core::items::PointerEventButton::Left;
+    let app = boot();
+    let win_h = 600.0;
+    app.window().set_size(slint::LogicalSize::new(1200.0, win_h));
+    let mut names: Vec<slint::SharedString> =
+        vec!["System (Português (Brasil))".into(), "English".into(), "Português (Brasil)".into(), "简体中文".into()];
+    names.extend((0..30).map(|i| slint::SharedString::from(format!("Language {i:02}"))));
+    app.set_language_options(std::rc::Rc::new(slint::VecModel::from(names)).into());
+    app.set_language_sel(0);
+    app.set_settings_open(true);
+    hover(&app, 600.0, 300.0); // layout pass
+    let count = |label: &str| E::find_by_accessible_label(&app, label).count();
+    let centre = |id: &str| {
+        let e = E::find_by_element_id(&app, id).next().unwrap_or_else(|| panic!("{id} is mounted"));
+        let (p, s) = (e.absolute_position(), e.size());
+        (p.x + s.width / 2.0, p.y + s.height / 2.0, s.width)
+    };
+    assert_eq!(count("System (Português (Brasil))"), 1, "the trigger shows the current choice");
+    let (tx, ty, tw) = centre("MainWindow::languagebtn");
+    click(&app, tx, ty, Left);
+    assert!(app.get_language_menu_open(), "a click opens the menu");
+
+    let panel = E::find_by_element_id(&app, "MainWindow::langpanel").next().expect("the menu is mounted");
+    let (mp, ms) = (panel.absolute_position(), panel.size());
+    assert!(mp.y >= 0.0 && mp.y + ms.height <= win_h, "the menu stays inside the window: y={} h={}", mp.y, ms.height);
+    assert!((ms.width - tw).abs() < 1.0, "the menu is as wide as its trigger ({} vs {tw})", ms.width);
+    let row = E::find_by_accessible_label(&app, "Português (Brasil)").next().expect("a long own name has a row");
+    assert!(
+        row.absolute_position().x + row.size().width <= mp.x + ms.width + 0.5,
+        "the row's text fits inside the menu"
+    );
+    assert_eq!(count("Language 29"), 0, "the last of 34 rows is scrolled out of a 600 px window, not drawn off it");
+
+    let (rx, ry) = (row.absolute_position().x + row.size().width / 2.0, row.absolute_position().y + row.size().height / 2.0);
+    click(&app, rx, ry, Left);
+    assert_eq!(app.get_language_sel(), 2, "picking a row selects it");
+    assert!(!app.get_language_menu_open(), "and closes the menu");
+    assert_eq!(count("Português (Brasil)"), 1, "the trigger now shows it");
+
+    click(&app, tx, ty, Left);
+    assert!(app.get_language_menu_open());
+    key(&app, slint::platform::Key::Escape);
+    assert!(!app.get_language_menu_open(), "Esc closes the menu");
+    assert!(app.get_settings_open(), "…and leaves Settings open");
+
+    click(&app, tx, ty, Left);
+    app.set_settings_open(false);
+    i_slint_core::properties::ChangeTracker::run_change_handlers();
+    assert!(!app.get_language_menu_open(), "closing Settings closes the menu");
+
+    // Re-check R5: a Settings text field that still holds the keyboard must not swallow the menu's
+    // Esc. The rows above start from boot's focus; this one starts from the Resolution limit field,
+    // put on screen by a taller window.
+    app.set_settings_open(true);
+    app.set_roi_hi_res(false);
+    app.set_res_limit_text("4321".into());
+    app.window().set_size(slint::LogicalSize::new(1200.0, 9000.0));
+    hover(&app, 600.0, 300.0); // layout pass
+    let field = i_slint_backend_testing::ElementQuery::from_root(&app)
+        .match_descendants()
+        .match_accessible_role(i_slint_backend_testing::AccessibleRole::TextInput)
+        .find_all()
+        .into_iter()
+        .find(|t| t.accessible_value().as_deref() == Some("4321"))
+        .expect("the Resolution limit field is mounted");
+    let (fp, fs) = (field.absolute_position(), field.size());
+    click(&app, fp.x + fs.width / 2.0, fp.y + fs.height / 2.0, Left);
+    for event in [
+        slint::platform::WindowEvent::KeyPressed { text: "7".into() },
+        slint::platform::WindowEvent::KeyReleased { text: "7".into() },
+    ] {
+        app.window().dispatch_event(event);
+    }
+    assert!(
+        field.accessible_value().is_some_and(|v| v.contains('7')),
+        "the field holds the keyboard: a typed digit lands in it"
+    );
+    let (tx, ty, _) = centre("MainWindow::languagebtn");
+    click(&app, tx, ty, Left);
+    assert!(app.get_language_menu_open());
+    key(&app, slint::platform::Key::Escape);
+    assert!(!app.get_language_menu_open(), "Esc closes the menu after a Settings text field had the keyboard");
+    assert!(app.get_settings_open(), "…and leaves Settings open");
+}
+
+/// FALSIFIER: drop `Theme.fit-text` or the picker row from `build_settings`, or the toggle's write in
+/// the row.
+#[test]
+fn the_fit_text_toggle_and_the_language_row_are_saved() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    app.set_settings_open(true);
+    let snapshot = |a: &ui::MainWindow| {
+        crate::support::build_settings(
+            a, true, true, &std::collections::HashMap::new(), "", "", &[], &[], "name.asc", &[], &[],
+            &std::collections::BTreeMap::new(), false, crate::support::INFO_VIEW_STANDARD,
+        )
+    };
+    let before = snapshot(&app);
+    assert!(!before.fit_text_widths);
+    assert_eq!(before.language, "", "the System row saves an empty preference");
+    // Tall enough that the whole Settings body, DEVELOPER included, is on screen to be clicked.
+    app.window().set_size(slint::LogicalSize::new(1200.0, 9000.0));
+    let row = E::find_by_accessible_label(&app, "Widen controls to fit text").next().expect("the Developer row is mounted");
+    let (p, s) = (row.absolute_position(), row.size());
+    assert!(p.y + s.height < 9000.0, "the row is inside the window");
+    let at = slint::LogicalPosition::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+    for event in [
+        slint::platform::WindowEvent::PointerPressed { position: at, button: slint::platform::PointerEventButton::Left },
+        slint::platform::WindowEvent::PointerReleased { position: at, button: slint::platform::PointerEventButton::Left },
+    ] {
+        app.window().dispatch_event(event);
+    }
+    assert!(app.global::<ui::Theme>().get_fit_text(), "the row turns it on");
+    app.set_language_sel(1);
+    let after = snapshot(&app);
+    assert!(after.fit_text_widths);
+    assert_eq!(after.language, "en", "the English row saves English");
+}
+
+/// Language packs, round 2 (PLAN §4): Settings → Developer → Widen controls to fit text reaches the
+/// colour card's Rust-owned cut-off. Under `xx-TEST` a second display's Auto-detect pill falls back to
+/// "this display" with the toggle off (its shown label is past the English budget) and shows the
+/// whole name with it on, through the real section composer.
+///
+/// FALSIFIER: make main.rs `fit_text` return `false` (the toggle never reaches the cut-off) and the
+/// "on" row fails.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_fit_text_toggle_reaches_the_colour_cards_auto_detect_pill() {
+    use slint::Model;
+    let a = boot();
+    crate::i18n::use_pseudo_language();
+    let lg = ident("LG", "LG");
+    let dell = ident("DELL", "DELL S2725QS");
+    let display = |id: &crate::support::DisplayIdent, x: i32| crate::support::LiveDisplay {
+        ident: id.clone(),
+        device: Some(format!(r"\\.\DISPLAY{x}")),
+        origin: Some((x * 3840, 0)),
+        native_id: None,
+        group_paths: vec![id.key.clone()],
+    };
+    let live = vec![display(&lg, 1), display(&dell, 2)];
+    let colors = std::collections::BTreeMap::new();
+    let open = std::collections::BTreeSet::new();
+    let no_fail = std::collections::BTreeSet::new();
+    let pill = |a: &ui::MainWindow| {
+        crate::rebuild_display_sections(a, &live, &colors, Some(&lg), &open, &no_fail);
+        let rows = a.get_display_sections();
+        (0..rows.row_count())
+            .filter_map(|i| rows.row_data(i))
+            .find(|r| r.key.as_str() == "DELL")
+            .expect("the second display has a section")
+            .auto_label
+            .to_string()
+    };
+    assert_eq!(pill(&a), "⟦Auto-detect this display⟧", "off: the English budget, counted as shown");
+    a.global::<ui::Theme>().set_fit_text(true);
+    assert_eq!(pill(&a), "⟦Auto-detect DELL S2725QS⟧", "on: the whole name");
+    crate::i18n::use_english();
+}
+
+/// Language packs, round 2 (PLAN §4): BASIC key tokens stay English where they are saved and
+/// compared; only what is drawn is translated. Under `xx-TEST` a Space binding is still "Space" in
+/// the keymap and in `kb-cmppin` (what the FocusScope's dispatch compares), while the Settings row
+/// and the welcome's keycaps show the translated key names.
+///
+/// FALSIFIERS: drop the `tr` from `support::key_token_name` (the Settings row shows "Space"); make
+/// `refresh_basic_keys` publish `pretty_key` instead of the token (`kb-cmppin` becomes "⟦Space⟧");
+/// make main_window.slint's `key-name` return its token (the welcome keycap shows "Space").
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn basic_key_tokens_stay_english_and_only_their_keycaps_are_translated() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    crate::i18n::use_pseudo_language();
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    let map: std::collections::HashMap<String, String> =
+        crate::BASIC_ACTIONS.iter().map(|(id, _, d)| (id.to_string(), d.to_string())).collect();
+    crate::support::refresh_basic_keys(&app, &map);
+    assert_eq!(app.get_kb_cmppin().as_str(), "Space", "the dispatch compares the English token");
+    assert_eq!(app.get_kb_cmpswap().as_str(), "Tab");
+    assert_eq!(map["cmppin"], "Space", "and the keymap that is saved keeps it");
+    let rows = crate::support::basic_rows(&map, &None, &None);
+    let pin = rows.iter().find(|r| r.action.as_str() == "cmppin").expect("the pin row");
+    assert_eq!(pin.key.as_str(), "⟦Space⟧", "the Settings keycap is drawn translated");
+    assert_eq!(pin.label.as_str(), "⟦Compare: pin active half⟧");
+    assert_eq!(crate::support::pretty_key("Left"), "←", "an arrow keeps its glyph");
+    assert_eq!(crate::support::pretty_key("x"), "X", "a letter is a letter");
+    app.set_welcome_open(true);
+    hover(&app, 600.0, 300.0); // layout pass
+    let count = |label: &str| E::find_by_accessible_label(&app, label).count();
+    assert_eq!(count("⟦Space⟧"), 1, "the welcome's pin keycap is drawn translated");
+    assert_eq!(count("⟦Tab⟧"), 1, "…and its swap keycap");
+    assert_eq!(count("Space"), 0);
+    crate::i18n::use_english();
+}
+
+/// Language packs, round 2 (PLAN §5): the welcome footer's Skip for now (110 px) and Done (88 px)
+/// buttons keep their English-tuned widths unless Settings → Developer → Widen controls to fit text
+/// is on, and then grow by exactly as much as their label is wider than the English it was tuned for
+/// — so each is at least its label's preferred width plus its English slack, and English itself does
+/// not move. Off: exactly 110 / 88 in every language.
+///
+/// FALSIFIERS: ignore `Theme.fit-text` at the Skip button (`width: 110px`) or at the Done button
+/// (`width: 88px`) and that button's "on" row fails.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_welcome_buttons_widen_to_a_translated_label_only_when_asked() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    app.set_welcome_open(true);
+    hover(&app, 600.0, 300.0); // layout pass
+    let width = |id: &str| E::find_by_element_id(&app, id).next().unwrap_or_else(|| panic!("{id} is mounted")).size().width;
+    let buttons = || (width("MainWindow::wcskip"), width("MainWindow::wcdone"));
+    assert_eq!(buttons(), (110.0, 88.0), "English, toggle off: the tuned widths");
+    app.global::<ui::Theme>().set_fit_text(true);
+    assert_eq!(buttons(), (110.0, 88.0), "English, toggle on: English already fits, nothing moves");
+    // Each label's own width, in English and then in the pseudo-language (a Text's width is its
+    // preferred width: the button sizes nothing inside it).
+    let label = |text: &str| E::find_by_accessible_label(&app, text).next().unwrap_or_else(|| panic!("{text}")).size().width;
+    let (skip_en, done_en) = (label("Skip for now"), label("Done"));
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    let (skip_tr, done_tr) = (label("⟦Skip for now⟧"), label("⟦Done⟧"));
+    assert!(skip_tr > skip_en && done_tr > done_en, "the pseudo-language's labels are wider: {skip_tr}/{skip_en}, {done_tr}/{done_en}");
+    let (skip, done) = buttons();
+    assert!((skip - (110.0 + skip_tr - skip_en)).abs() < 0.01, "Skip grows by its label's extra width: {skip}");
+    assert!((done - (88.0 + done_tr - done_en)).abs() < 0.01, "Done grows by its label's extra width: {done}");
+    assert!(skip >= skip_tr && done >= done_tr, "each button is at least as wide as its label");
+    app.global::<ui::Theme>().set_fit_text(false);
+    assert_eq!(buttons(), (110.0, 88.0), "toggle off: exactly the tuned widths, translated or not");
+}
+
+/// Language packs, round 2 (PLAN §4): the title bar's count and section chips publish TRANSLATED
+/// tips, and the L22 clears on their unmount seams compare hudclip's tip properties — the same
+/// translated text — so under `xx-TEST` a tip latched by a real hover still clears when its chip
+/// unmounts under the resting pointer (no pointer move: a destroyed TouchArea never fires `changed
+/// has-hover`, so only the seam's own clear can do it), and a foreign tip still survives.
+///
+/// FALSIFIERS: put the English literals back in toolbar.slint's `changed chips-show` guard (the
+/// count chips' tips stay up) or its `changed ctrl-show` guard (the section chips' tips stay up).
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_title_bar_chip_tips_clear_on_their_unmount_seams_under_the_pseudo_language() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    app.set_count_all(18);
+    app.set_hud_pos("9/18".into());
+    app.set_path_text("C:\\shoot".into());
+    let tip = |a: &ui::MainWindow| a.global::<ui::Tip>().get_text().to_string();
+    let resize = |a: &ui::MainWindow, w: f32| {
+        a.window().set_size(slint::LogicalSize::new(w, 800.0));
+        i_slint_core::properties::ChangeTracker::run_change_handlers();
+    };
+    // Band = W − 466: at W 800 (band 334) every chip mounts; W 760 (band 294) crosses only the
+    // count chips' T2 seam, W 500 (band 34) the section chips' T3 seam.
+    for (ty, narrow, n) in [("HudChip", 760.0, 3), ("SectionChip", 500.0, 2)] {
+        resize(&app, 800.0);
+        hover(&app, 100.0, 300.0);
+        let chips: Vec<(f32, f32)> = E::find_by_element_type_name(&app, ty)
+            .map(|c| {
+                let (p, s) = (c.absolute_position(), c.size());
+                (p.x + s.width / 2.0, p.y + s.height / 2.0)
+            })
+            .collect();
+        assert_eq!(chips.len(), n, "band 334: every {ty} mounts");
+        for (cx, cy) in chips {
+            resize(&app, 800.0);
+            hover(&app, 100.0, 300.0);
+            hover(&app, cx, cy);
+            let t = tip(&app);
+            assert!(t.starts_with('⟦') && t.ends_with('⟧'), "the {ty} at {cx},{cy} publishes a translated tip: {t:?}");
+            resize(&app, narrow);
+            assert_eq!(E::find_by_element_type_name(&app, ty).count(), 0, "the {ty} seam was crossed");
+            assert_eq!(tip(&app), "", "{t:?} clears when its {ty} unmounts under the pointer");
+        }
+        resize(&app, 800.0);
+        hover(&app, 100.0, 300.0);
+        app.global::<ui::Tip>().set_text("⟦Settings⟧".into());
+        resize(&app, narrow);
+        assert_eq!(tip(&app), "⟦Settings⟧", "the {ty} seam leaves a foreign tip alone");
+        app.global::<ui::Tip>().set_text("".into());
+    }
+}
+
+/// Language packs, round 2 (PLAN §4): the compare bar's focus badge publishes a TRANSLATED tip, and
+/// both of its clears — its own hover-out and the `changed compare` unmount edge — compare the root's
+/// `cmp-tip-one-to-one` / `cmp-tip-fit`, the properties it published, so under `xx-TEST` the tip (and
+/// its positioned `cy`) still clears on each.
+///
+/// FALSIFIERS: put `Tip.text == "Zoom to 1:1" || Tip.text == "Zoom to fit"` back in the badge's
+/// `hover-changed` (the hover-out row fails) or in `changed compare` (the unmount row fails).
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_compare_badge_tip_clears_on_leave_and_unmount_under_the_pseudo_language() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    app.set_compare(true);
+    app.set_zoom(1.0);
+    hover(&app, 600.0, 600.0);
+    let badge = E::find_by_element_id(&app, "MainWindow::cmpbadge").next().expect("the compare bar's focus badge");
+    let (bp, bs) = (badge.absolute_position(), badge.size());
+    let (cx, cy) = (bp.x + bs.width / 2.0, bp.y + bs.height / 2.0);
+    let tip = || app.global::<ui::Tip>().get_text().to_string();
+    let tip_cy = || app.global::<ui::Tip>().get_cy();
+    hover(&app, cx, cy);
+    assert_eq!(tip(), "⟦Zoom to 1:1⟧", "the badge's tip is translated");
+    assert!(tip_cy() > 0.0, "a positioned host");
+    hover(&app, 600.0, 600.0);
+    assert_eq!((tip().as_str(), tip_cy()), ("", 0.0), "hover-out clears the translated tip and its cy");
+    app.set_zoom(4.0);
+    hover(&app, cx, cy);
+    assert_eq!(tip(), "⟦Zoom to fit⟧", "the state-derived tip, translated");
+    app.set_compare(false);
+    i_slint_core::properties::ChangeTracker::run_change_handlers();
+    assert_eq!((tip().as_str(), tip_cy()), ("", 0.0), "the compare edge clears the tip its unmounted badge left");
+}
+
+/// Language packs, round 2 (PLAN §5): the compare bar's three fixed-width controls — the focus badge
+/// (116 px), Browse | Zoom (124 px) and the RAW toggle (104 px) — keep their tuned widths unless
+/// Settings → Developer → Widen controls to fit text is on; then each is at least as wide as its
+/// words: the badge's row, padding included, and each pill's widest label plus `Theme.space-1` a
+/// side in every cell. Off: exactly today's widths, translated or not.
+///
+/// FALSIFIERS: ignore `Theme.fit-text` at any of the three (`width: 116px` / `124px` / `104px`) and
+/// that control's "on" row fails.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_compare_bar_controls_widen_to_their_translated_words_only_when_asked() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    app.set_compare(true);
+    app.set_cmp_has_raw(true);
+    app.set_cmp_raw_only(false); // the finished-format cell: its default, "Images"
+    // The badge's widest bounded state, the one its 116 px was measured from.
+    app.set_cmp_zoom_pct(crate::tick::ZOOM_PCT_DISPLAY_MAX);
+    app.set_cmp_zoom_pct_valid(true);
+    app.set_cmp_detail_live(true);
+    app.set_cmp_one_to_one_known(true);
+    app.set_zoom(12.0);
+    hover(&app, 600.0, 600.0);
+    let el = |id: &str| E::find_by_element_id(&app, id).next().unwrap_or_else(|| panic!("{id} is mounted"));
+    let widths = || {
+        hover(&app, 600.0, 600.0); // layout pass
+        (el("MainWindow::cmpbadge").size().width, el("MainWindow::cmpwheel").size().width, el("MainWindow::cmpraw").size().width)
+    };
+    // How much room each control's words need: the badge's last cell ends inside its 8 px right
+    // padding; a pill's widest label (its own measurers) plus 4 px a side fills each cell.
+    let badge_spare = || {
+        let badge = el("MainWindow::cmpbadge");
+        let unit = badge.query_descendants().match_id("FocusBadge::fbunit").find_first().expect("the % cell");
+        badge.absolute_position().x + badge.size().width - 8.0 - (unit.absolute_position().x + unit.size().width)
+    };
+    let pill_need = |id: &str| {
+        let pill = el(id);
+        let widest = ["SegPill::fitm0", "SegPill::fitm1", "SegPill::fitm2"]
+            .iter()
+            .filter_map(|m| pill.query_descendants().match_id(*m).find_first())
+            .map(|t| t.size().width)
+            .fold(0.0f32, f32::max);
+        2.0 * (widest + 8.0) + 4.0
+    };
+    assert_eq!(widths(), (116.0, 124.0, 104.0), "English, toggle off: the tuned widths");
+    app.global::<ui::Theme>().set_fit_text(true);
+    assert_eq!(widths(), (116.0, 124.0, 104.0), "English, toggle on: English already fits, nothing moves");
+    app.set_cmp_raw_only(true); // the toggle's other English label, "Preview"
+    assert_eq!(widths(), (116.0, 124.0, 104.0), "English, toggle on, \"Preview | RAW\": nothing moves");
+    app.set_cmp_raw_only(false);
+    app.global::<ui::Theme>().set_fit_text(false);
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    assert_eq!(widths(), (116.0, 124.0, 104.0), "translated, toggle off: still the tuned widths");
+    // Premise, so the rows below can fail: the pseudo-language's words do not fit the tuned widths.
+    let (wheel_need, raw_need) = (pill_need("MainWindow::cmpwheel"), pill_need("MainWindow::cmpraw"));
+    assert!(badge_spare() < -0.01, "the translated badge overflows 116 px (spare {})", badge_spare());
+    assert!(wheel_need > 124.0 && raw_need > 104.0, "the translated pills need {wheel_need} / {raw_need}");
+    app.global::<ui::Theme>().set_fit_text(true);
+    let (_, wheel, raw) = widths();
+    assert!(badge_spare() >= -0.01, "on: the badge holds its translated words (spare {})", badge_spare());
+    assert!(wheel >= wheel_need - 0.01, "on: Browse | Zoom is {wheel}, its words need {wheel_need}");
+    assert!(raw >= raw_need - 0.01, "on: the RAW toggle is {raw}, its words need {raw_need}");
+    app.global::<ui::Theme>().set_fit_text(false);
+    assert_eq!(widths(), (116.0, 124.0, 104.0), "toggle off again: exactly the tuned widths");
+}
+
+/// Round-2 review R1: the empty stage card's log names the state by the English message recorded
+/// where it was published, never by working back from the drawn text — two messages may share one
+/// translation. A pack that gives all three the same words still logs three different states.
+///
+/// FALSIFIER: drop the record from `set_empty_stage_text` and the open-but-empty folder logs "No
+/// folder open". (The reverse search this replaced fails the same way: Codex's review probe.)
+#[test]
+fn the_empty_stage_log_keeps_each_state_when_translations_coincide() {
+    let app = boot();
+    crate::i18n::use_test_pack(
+        "xx-SAME",
+        "one_other",
+        r#"{"No folder open": "Nothing to display", "Couldn't read this folder": "Nothing to display",
+            "No photos in this folder": "Nothing to display"}"#,
+    );
+    for english in [tr_noop!("No photos in this folder"), tr_noop!("Couldn't read this folder"), tr_noop!("No folder open")] {
+        crate::support::set_empty_stage_text(&app, english);
+        assert_eq!(app.get_empty_text(), "Nothing to display", "the card draws the pack's words");
+        assert_eq!(crate::support::empty_stage_text_english(), english, "the log keeps the state");
+    }
+    crate::i18n::use_english();
+    crate::support::set_empty_stage_text(&app, tr_noop!("No photos in this folder"));
+    assert_eq!(app.get_empty_text(), "No photos in this folder", "English draws its own message");
+}
+
+/// Language packs, round 2 (PLAN §5): the photo and Review-tile context menus (224 px) grow to their
+/// widest translated row while Settings → Developer → Widen controls to fit text is on, capped at
+/// the window less the menus' 8 px margins; off, exactly 224 px. Measured the way
+/// `every_selection_menu_label_fits_inside_the_glass` measures English: every label inside the
+/// glass with 10 px to spare. Every `xx-TEST` row still fits 224 px (its brackets add ~20 px to rows
+/// tuned with room over), so the widest row — "Select new / edited (unreadable)", which production
+/// publishes from Rust — is given a test pack's longer translation, as a wordier language would.
+/// Owner ruling (4 October): the rows set the width — a long filename header never widens the menu,
+/// and neither does a roomier window.
+///
+/// FALSIFIERS: ignore `Theme.fit-text` at either menu (`width: 224px`) and that menu's "on" row
+/// fails; drop either header's `preferred-width: 0px` and its filename row fails.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_context_menus_widen_to_a_translated_row_only_when_asked() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    crate::i18n::use_test_pack(
+        "xx-LONG",
+        "one_other",
+        r#"{"Select new / edited (unreadable)": "⟦Select new / edited — the export record could not be read⟧"}"#,
+    );
+    app.set_count_all(9);
+    let label = crate::support::select_new_edited_label(crate::support::ManifestState::Unreadable);
+    assert!(label.starts_with('⟦'), "production publishes the pack's row: {label}");
+    app.set_ctx_sel_new_label(label.as_str().into());
+    // (glass width, glass right edge, the right edge of the widest label inside the glass's band)
+    let measure = |id: &str| {
+        hover(&app, 900.0, 700.0); // layout pass
+        let panel = E::find_by_element_id(&app, id).next().unwrap_or_else(|| panic!("{id} is mounted"));
+        let (p, s) = (panel.absolute_position(), panel.size());
+        let worst = E::find_by_element_type_name(&app, "Text")
+            .filter(|t| {
+                let q = t.absolute_position();
+                q.x >= p.x && q.x <= p.x + s.width && q.y >= p.y && q.y <= p.y + s.height
+            })
+            .map(|t| t.absolute_position().x + t.size().width)
+            .fold(0.0f32, f32::max);
+        (s.width, p.x + s.width, worst)
+    };
+    for (id, photo) in [("MainWindow::ctxpanel", true), ("MainWindow::sctxpanel", false)] {
+        app.window().set_size(slint::LogicalSize::new(1200.0, 800.0));
+        if photo {
+            app.set_ctx_x(200.0);
+            app.set_ctx_y(60.0);
+            app.set_ctx_open(true);
+        } else {
+            app.set_sel_ctx_x(200.0);
+            app.set_sel_ctx_y(100.0);
+            app.set_sel_ctx_open(true);
+        }
+        let (w, right, worst) = measure(id);
+        assert_eq!(w, 224.0, "{id}, toggle off: the tuned width");
+        assert!(worst > right - 10.0, "{id}: premise — the translated row overflows 224 px ({worst} vs {right})");
+        app.global::<ui::Theme>().set_fit_text(true);
+        let (w, right, worst) = measure(id);
+        assert!(w > 224.0 && worst <= right - 10.0, "{id}, toggle on: {w} px holds every row ({worst} vs {right})");
+        // Owner ruling (4 October): the width follows the longest ROW — never the filename header,
+        // which keeps shortening the name, and never the window while it has room.
+        let long_name = format!("{}.CR3", "IMG_20261004_a_long_exported_file_name_".repeat(6));
+        app.set_ctx_header(long_name.as_str().into());
+        let (with_name, _, _) = measure(id);
+        assert_eq!(with_name, w, "{id}: a long filename header never widens the menu");
+        app.set_ctx_header("".into());
+        app.window().set_size(slint::LogicalSize::new(1600.0, 800.0));
+        let (roomier, _, _) = measure(id);
+        assert_eq!(roomier, w, "{id}: a roomier window does not widen the menu");
+        // capped at the window less the two 8 px margins (never below the tuned 224 px)
+        app.window().set_size(slint::LogicalSize::new(w + 10.0, 800.0));
+        let (capped, _, _) = measure(id);
+        let expect = (w - 6.0).max(224.0);
+        assert!((capped - expect).abs() < 0.01, "{id}: capped at {expect} in a {} px window, got {capped}", w + 10.0);
+        app.global::<ui::Theme>().set_fit_text(false);
+        let (w, _, _) = measure(id);
+        assert_eq!(w, 224.0, "{id}, toggle off again: exactly 224 px");
+        app.set_ctx_open(false);
+        app.set_sel_ctx_open(false);
+    }
+    crate::i18n::use_english();
+}
+
+/// Language packs (round 2, batch 3): `cull-undo-label` is an English ID. Rust publishes "Undo move"
+/// or "Undo" (`support::undo_pill_label`), both context menus compare it to rename their Undo row,
+/// and the Events header pill reads it — and only the words each surface draws are translated.
+/// Under `xx-TEST` the published value stays English, both menus show the translated "Undo move"
+/// row (never the default "Undo last change"), and the header pill draws translated words.
+///
+/// FALSIFIERS: translate the published value (`undo_pill_label` returns `i18n::tr("Undo move")`)
+/// and both menus fall back to their default row; draw the id as is on the header pill
+/// (`text: root.cull-undo-label`) and the pill shows untranslated English.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_undo_label_is_an_english_id_and_only_its_words_are_translated() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    crate::i18n::use_pseudo_language();
+    app.window().set_size(slint::LogicalSize::new(1200.0, 1400.0)); // the whole menu is laid out
+    app.set_motion_ui(false);
+    app.set_ctx_target(-1);
+    app.set_can_cull_undo(true);
+    let published = crate::support::undo_pill_label(Some(crate::support::UndoArm::Move(40)));
+    assert_eq!(published, "Undo move", "the published value is the English id, whatever the language");
+    app.set_cull_undo_label(published.into());
+    let count = |label: &str| E::find_by_accessible_label(&app, label).count();
+    for photo in [true, false] {
+        if photo {
+            app.set_ctx_open(true);
+        } else {
+            app.set_sel_ctx_open(true);
+        }
+        hover(&app, 600.0, 300.0);
+        // (a menu row is found by its own label and by its Text's, so presence is `> 0`)
+        assert!(count("⟦Undo move⟧") > 0, "photo menu {photo}: a move on top renames the row, translated");
+        assert_eq!(count("⟦Undo last change⟧"), 0, "photo menu {photo}: …instead of the default row");
+        assert_eq!(count("Undo move"), 0, "photo menu {photo}: …and never untranslated");
+        app.set_ctx_open(false);
+        app.set_sel_ctx_open(false);
+    }
+    app.set_notif_open(true);
+    hover(&app, 600.0, 300.0);
+    assert!(count("⟦Undo move⟧") > 0, "the Events header pill draws the translated words");
+    assert_eq!(count("Undo move"), 0, "…and never the id itself");
+    app.set_cull_undo_label(crate::support::undo_pill_label(None).into());
+    hover(&app, 600.0, 300.0);
+    assert!(count("⟦Undo⟧") > 0, "the plain arm's id is drawn translated too");
+    assert_eq!(count("Undo"), 0, "…and never untranslated");
+    app.set_notif_open(false);
+    crate::i18n::use_english();
+}
+
+/// Language packs (round 2, PLAN §5, batch 3): the toast card is a hard 320 px, and its [Yes][No]
+/// row was tuned into a 124 px budget (the row's pills, the gap between them and the column's 12 px
+/// padding a side). With Settings → Developer → Widen controls to fit text on, the card grows by
+/// exactly as much as the row needs past that budget, so the question's sentence keeps its width
+/// beside a longer pair of words; off, exactly 320 px in any language; English never moves.
+///
+/// FALSIFIER: ignore `Theme.fit-text` at the card (`width: 320px`) and the translated "on" row fails.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_toast_card_widens_for_a_translated_yes_no_row_only_when_asked() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    app.set_motion_ui(false); // the card is fully shown (and its pills mounted) the same frame
+    app.set_toast_text("Rate all 12 photos 5★?".into());
+    app.set_toast_show(true);
+    app.set_toast_bulk_ask(true);
+    // (card left, card width, the row's need read off the mounted pills, the [No] pill's right edge)
+    let measure = || {
+        hover(&app, 100.0, 700.0); // layout pass, off the card
+        let card = E::find_by_element_id(&app, "MainWindow::toastcard").next().expect("the toast card");
+        let (cx, cw) = (card.absolute_position().x, card.size().width);
+        let (cy, ch) = (card.absolute_position().y, card.size().height);
+        let pills: Vec<_> = E::find_by_element_type_name(&app, "PillBtn")
+            .filter(|p| {
+                let q = p.absolute_position();
+                q.x >= cx && q.x <= cx + cw && q.y >= cy && q.y <= cy + ch
+            })
+            .collect();
+        assert_eq!(pills.len(), 2, "only the [Yes][No] pair is on the card");
+        let left = pills.iter().map(|p| p.absolute_position().x).fold(f32::MAX, f32::min);
+        let right = pills.iter().map(|p| p.absolute_position().x + p.size().width).fold(f32::MIN, f32::max);
+        (cx, cw, right - left + 24.0, right)
+    };
+    let (_, w, need_en, _) = measure();
+    assert_eq!(w, 320.0, "English, toggle off: the tuned 320 px");
+    assert!(need_en <= 124.0, "premise: English fits its 124 px budget (needs {need_en})");
+    app.global::<ui::Theme>().set_fit_text(true);
+    assert_eq!(measure().1, 320.0, "English, toggle on: English already fits, nothing moves");
+    app.global::<ui::Theme>().set_fit_text(false);
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    let (_, w, need, _) = measure();
+    assert_eq!(w, 320.0, "translated, toggle off: still 320 px");
+    assert!(need > 124.0, "premise: the translated pair passes its 124 px budget (needs {need})");
+    app.global::<ui::Theme>().set_fit_text(true);
+    let (cx, w, need_on, right) = measure();
+    assert!((need_on - need).abs() < 0.01, "the pills hug their words either way");
+    assert!(
+        (w - (320.0 + need - 124.0)).abs() < 0.01,
+        "toggle on: the card grows by what the row needs past its budget — {w} px for a {need} px row"
+    );
+    assert!(right <= cx + w - 12.0 + 0.01, "…and the row sits inside the card's padding");
+    app.global::<ui::Theme>().set_fit_text(false);
+    assert_eq!(measure().1, 320.0, "toggle off again: exactly 320 px");
+}
+
+/// Language packs (round 2, PLAN §5, batch 4): the preset editor's two LABEL COLUMNS were sized for
+/// the English words — 52 px on the left (Font, Colour, and the spacer that lines the font warning
+/// up under the controls) and 56 px on the right (Opacity, Size, Position, Format, Size, Quality,
+/// Colour). With Settings → Developer → Widen controls to fit text on, each column takes its widest
+/// label's width, never below today's, and every label in it shares that one width, so the
+/// controls beside them still start on one line; off, exactly today's widths in any language.
+/// The words' widths are read off the sheet's own measurers (the labels' text style).
+///
+/// FALSIFIERS (on Windows, where the premise is measured): ignore `Theme.fit-text` in either column
+/// (`lbl-left-w: 52px` or `lbl-right-w: 56px`) and that column's translated "on" rows fail.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_export_label_columns_widen_to_their_widest_translated_label_only_when_asked() {
+    use i_slint_backend_testing::ElementHandle as E;
+    const LEFT: [&str; 3] = ["MainWindow::exlfont", "MainWindow::exlwarn", "MainWindow::exlcolour"];
+    const RIGHT: [&str; 7] = [
+        "MainWindow::exrop",
+        "MainWindow::exrsize",
+        "MainWindow::exrpos",
+        "MainWindow::exrfmt",
+        "MainWindow::exrosize",
+        "MainWindow::exrq",
+        "MainWindow::exrcol",
+    ];
+    const LEFT_WORDS: [&str; 2] = ["MainWindow::exmfont", "MainWindow::exmcolour"];
+    const RIGHT_WORDS: [&str; 6] = [
+        "MainWindow::exmopacity",
+        "MainWindow::exmsize",
+        "MainWindow::exmposition",
+        "MainWindow::exmformat",
+        "MainWindow::exmquality",
+        "MainWindow::exmcolour",
+    ];
+    let app = boot();
+    app.window().set_size(slint::LogicalSize::new(1200.0, 900.0));
+    app.set_export_open(true);
+    app.set_export_mode(1); // the preset EDITOR: both columns
+    app.set_wm_type(2); // Text: the Font and Colour rows (left) and the PLACEMENT rows (right) mount
+    app.set_wm_text("Studio".into());
+    app.set_wm_font_missing(true); // …and the warning row with its label-column spacer
+    let el = |id: &str| E::find_by_element_id(&app, id).next().unwrap_or_else(|| panic!("{id} is mounted"));
+    // Every label's width, and every label's right edge (where the control beside it starts).
+    let column = |ids: &[&str]| -> (Vec<f32>, Vec<f32>) {
+        hover(&app, 8.0, 880.0); // layout pass, pointer off the sheet
+        ids.iter().map(|id| { let e = el(id); (e.size().width, e.absolute_position().x + e.size().width) }).unzip()
+    };
+    let need = |ids: &[&str]| -> f32 {
+        hover(&app, 8.0, 880.0);
+        ids.iter().map(|id| el(id).size().width).fold(0.0f32, f32::max)
+    };
+    let today = |what: &str| {
+        let (l, _) = column(&LEFT);
+        let (r, _) = column(&RIGHT);
+        assert!(l.iter().all(|w| *w == 52.0), "{what}: the left column is exactly 52 px, got {l:?}");
+        assert!(r.iter().all(|w| *w == 56.0), "{what}: the right column is exactly 56 px, got {r:?}");
+    };
+    today("English, toggle off");
+    let (left_en, right_en) = (need(&LEFT_WORDS), need(&RIGHT_WORDS));
+    assert!(left_en > 10.0 && right_en > 10.0, "anti-vacuity: the measurers measure ({left_en}, {right_en})");
+    assert!(left_en <= 52.0 && right_en <= 56.0, "premise: English fits today's columns ({left_en}, {right_en})");
+    app.global::<ui::Theme>().set_fit_text(true);
+    today("English, toggle on (English already fits, nothing moves)");
+    app.global::<ui::Theme>().set_fit_text(false);
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    today("translated, toggle off");
+    let (left_need, right_need) = (need(&LEFT_WORDS), need(&RIGHT_WORDS));
+    assert!(left_need > left_en && right_need > right_en, "premise: the pseudo-language's words are wider");
+    // Premise, so the rows below can fail: on Windows' fonts the pseudo-language's words pass both
+    // columns (54 > 52 and 61 > 56 px when written; the brackets come from a fallback font). Another
+    // platform's fallback glyphs may be narrower, so there the exact rule below is still asserted.
+    if cfg!(windows) {
+        assert!(left_need > 52.0, "premise: the translated left labels need more than 52 px ({left_need})");
+        assert!(right_need > 56.0, "premise: the translated right labels need more than 56 px ({right_need})");
+    }
+    app.global::<ui::Theme>().set_fit_text(true);
+    for (ids, tuned, need, name) in [(&LEFT[..], 52.0f32, left_need, "left"), (&RIGHT[..], 56.0, right_need, "right")] {
+        let want = need.max(tuned);
+        let (widths, rights) = column(ids);
+        assert!(
+            widths.iter().all(|w| (w - want).abs() < 0.01),
+            "on: every {name} label is its widest translated label's width, never below {tuned} px \
+             ({want} px), got {widths:?}"
+        );
+        assert!(
+            rights.iter().all(|r| (r - rights[0]).abs() < 0.01),
+            "on: the {name} column's controls still start on one line, got {rights:?}"
+        );
+    }
+    app.global::<ui::Theme>().set_fit_text(false);
+    today("toggle off again");
+    app.set_export_open(false);
+}
+
+/// Language packs (round 2, PLAN §5, batch 4): the Review panel's "Selected · N" pill. Its 122 px
+/// (ledger L5, `the_selected_chip_row_fits_the_panel`) was a MEASUREMENT of the English label, not
+/// a width the pill is held to: the pill hugs its words, so a longer translation widens it with
+/// Widen controls to fit text off or on, and there is no English-tuned width to unlock. This row
+/// pins that, with a test pack's longer translation of the Rust-composed label.
+///
+/// FALSIFIER: give `SelectedChip` a fixed width (`width: 122px;`) and the test fails (the × no
+/// longer fits inside the pill, already for the English "Selected · 8888").
+#[test]
+fn the_selected_pill_hugs_its_translated_label_in_either_state() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    app.set_sel_open(true);
+    app.set_count_selected(8888);
+    let measure = || {
+        hover(&app, 250.0, 300.0); // layout pass
+        let chip = E::find_by_element_type_name(&app, "SelectedChip").next().expect("the Selected chip");
+        let label = chip.query_descendants().match_id("SelectedChip::selchiplbl").find_first().expect("its label");
+        let x = chip.query_descendants().match_id("SelectedChip::selchipx").find_first().expect("its ×");
+        let (cx, cw) = (chip.absolute_position().x, chip.size().width);
+        // the label sits wholly inside the chip, before the ×, and the × inside the chip
+        let label_right = label.absolute_position().x + label.size().width;
+        assert!(label.absolute_position().x >= cx - 0.01 && label_right <= x.absolute_position().x + 0.01,
+                "the label sits inside the pill, before its ×");
+        assert!(x.absolute_position().x + x.size().width <= cx + cw + 0.01, "the × sits inside the pill");
+        (cw, label.size().width, cx + cw)
+    };
+    app.set_selected_chip_label(crate::support::selected_chip_label(8888).into());
+    let (w_en, label_en, _) = measure();
+    assert_eq!(app.get_selected_chip_label(), "Selected · 8888", "English is unchanged");
+    crate::i18n::use_test_pack(
+        "xx-LONG",
+        "one_other",
+        r#"{"Selected · {n}": "Photographs in the current selection · {n}"}"#,
+    );
+    app.set_selected_chip_label(crate::support::selected_chip_label(8888).into());
+    crate::i18n::use_english();
+    assert_eq!(app.get_selected_chip_label(), "Photographs in the current selection · 8888");
+    for on in [false, true] {
+        app.global::<ui::Theme>().set_fit_text(on);
+        let (w, label, right) = measure();
+        assert!(label > label_en + 50.0, "premise: the translation is much longer ({label} vs {label_en})");
+        assert!(
+            (w - w_en - (label - label_en)).abs() < 0.01,
+            "toggle {on}: the pill grows by exactly what its words grew ({w} vs {w_en})"
+        );
+        assert!(right <= 3.0 + 500.0 - 20.0 + 0.5, "toggle {on}: …and still fits the panel body ({right})");
+    }
+    app.global::<ui::Theme>().set_fit_text(false);
+    app.set_sel_open(false);
+}
+
+/// Language packs (round 2, owner request, 4 October): the copy sheet's three content choices —
+/// "RAW + image", "RAW only", "Image only" — are fixed thirds of the 392 px sheet's control row, and
+/// `Seg` cuts a label wider than its cell, with no ellipsis
+/// (`the_copy_sheets_content_segments_name_the_slot_and_fit_their_cells`). With Settings →
+/// Developer → Widen controls to fit text on, the copy sheet grows until every cell holds its
+/// widest label plus `Theme.space-3` (12 px) a side, capped at the window less 8 px a side; never
+/// below 392 px. Off: today's widths in any language. English never moves, and no other kind grows.
+///
+/// FALSIFIERS: ignore `Theme.fit-text` at the sheet (its width back to today's 480 / 392 px
+/// expression alone) and the translated "on" row fails; drop the `confirm-kind == 1` term and the
+/// move-rejects row fails.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_copy_sheet_widens_for_its_translated_content_choices_only_when_asked() {
+    use i_slint_backend_testing::ElementHandle as E;
+    const EN: [&str; 3] = ["RAW + image", "RAW only", "Image only"];
+    const TR: [&str; 3] = ["⟦RAW + image⟧", "⟦RAW only⟧", "⟦Image only⟧"];
+    let app = boot();
+    app.window().set_size(slint::LogicalSize::new(1200.0, 900.0));
+    let theme = app.global::<ui::Theme>();
+    // (sheet width, cell width, widest label): the sheet is `cfbox`, a cell is the Seg's pill.
+    let measure = |labels: [&str; 3]| {
+        hover(&app, 4.0, 880.0); // layout pass, off the sheet
+        let sheet = E::find_by_element_id(&app, "MainWindow::cfbox").next().expect("the confirm sheet");
+        let (sp, ss) = (sheet.absolute_position(), sheet.size());
+        let inside = |e: &E| {
+            let p = e.absolute_position();
+            e.size().width > 1.0 && p.x >= sp.x && p.x < sp.x + ss.width && p.y >= sp.y && p.y < sp.y + ss.height
+        };
+        let cell = E::find_by_element_id(&app, "Seg::pill").find(|e| inside(e)).map_or(0.0, |p| p.size().width);
+        let widest = labels
+            .iter()
+            .filter_map(|l| E::find_by_accessible_label(&app, l).find(|e| inside(e)))
+            .map(|t| t.size().width)
+            .fold(0.0f32, f32::max);
+        (ss.width, cell, widest)
+    };
+    // What the rule asks for: the sheet's 16 px padding a side, the Seg's 3 px track edges, and
+    // three cells of the widest label plus 12 px a side and the 3 px gap.
+    let need = |widest: f32| 2.0 * 16.0 + 3.0 + 3.0 * (widest + 24.0 + 3.0);
+    app.set_confirm_kind(1);
+    let (w, cell, widest_en) = measure(EN);
+    assert_eq!(w, 392.0, "English, toggle off: the tuned 392 px");
+    assert!(widest_en > 10.0 && cell > 10.0, "anti-vacuity: the labels and the cell measure ({widest_en}, {cell})");
+    assert!(need(widest_en) <= 392.0, "premise: English fits its cells with room ({} px)", need(widest_en));
+    theme.set_fit_text(true);
+    assert_eq!(measure(EN).0, 392.0, "English, toggle on: English already fits, nothing moves");
+    theme.set_fit_text(false);
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    let (w, cell, widest) = measure(TR);
+    assert_eq!(w, 392.0, "translated, toggle off: still 392 px");
+    assert!(widest > widest_en, "the pseudo-language's choices are wider ({widest} vs {widest_en})");
+    // Premise, so the rows below can fail: on Windows' fonts (95 px when written; the brackets come
+    // from a fallback font) the widest translated choice with its insets passes its 116 px cell.
+    // Another platform's fallback glyphs may be narrower, so there the exact rule is still asserted.
+    if cfg!(windows) {
+        assert!(widest + 24.0 > cell, "premise: the widest translated choice and its insets pass the {cell} px cell ({widest})");
+    }
+    theme.set_fit_text(true);
+    let (w, cell, widest_on) = measure(TR);
+    let want = need(widest).max(392.0);
+    assert!((w - want).abs() < 0.01, "toggle on: the sheet is {w} px; its widest choice asks for {want}");
+    assert!(cell >= widest_on + 24.0 - 0.01, "…so every cell holds its label with 12 px a side ({cell} vs {widest_on})");
+    if cfg!(windows) {
+        assert!(w > 392.0, "toggle on: the sheet grew ({w})");
+    }
+    // capped at the window less the two 8 px margins, never below 392 px
+    app.window().set_size(slint::LogicalSize::new(w + 10.0, 900.0));
+    let capped = measure(TR).0;
+    let expect = (w - 6.0).max(392.0);
+    assert!((capped - expect).abs() < 0.01, "capped at {expect} in a {} px window, got {capped}", w + 10.0);
+    app.window().set_size(slint::LogicalSize::new(1200.0, 900.0));
+    // only the copy sheet carries the choices, so no other kind grows
+    app.set_confirm_kind(2);
+    assert_eq!(measure(TR).0, 392.0, "move rejects, toggle on: still 392 px");
+    app.set_confirm_kind(6);
+    assert_eq!(measure(TR).0, 480.0, "delete, toggle on: still its 480 px");
+    app.set_confirm_kind(1);
+    theme.set_fit_text(false);
+    assert_eq!(measure(TR).0, 392.0, "toggle off again: exactly 392 px");
+    app.set_confirm_kind(0);
+}
+
+/// Language packs (round 2, owner request, 4 October): the web-export progress card is a fixed
+/// 300 px, and its title row — the run's title (it neither wraps nor elides) and the done / total
+/// counts — has no room to give: a long translated title pushes the counts out past the card's
+/// clipped edge. With Settings → Developer → Widen controls to fit text on, the card grows to fit
+/// that row, with room held for the done count so the card does not step wider as a run counts up,
+/// capped at the window less 8 px a side; never below 300 px. Off: exactly 300 px in any language.
+/// English never moves below six-digit totals: every set's title fits at 99,999. Review R2: Inter's
+/// digits are proportional, so the done count's room is the total's digit count times the widest
+/// digit — a smaller count ("100") can be wider than a narrow-digit total ("111").
+///
+/// FALSIFIERS: ignore `Theme.fit-text` at the card (`width: 300px`) and the translated toggle-on
+/// rows fail; hold no room for the done count (drop `exptotal.text.character-count *
+/// self.exp-digit-w`) and the counts run into the card's padding once the run has counts; hold it
+/// at the total's own width (`2 * exptotal.preferred-width`, the R2 bug) and the total-111 rows fail.
+#[test]
+fn the_export_progress_card_widens_for_a_translated_title_only_when_asked() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    let theme = app.global::<ui::Theme>();
+    app.set_export_running(true);
+    let run = |title: &str, done: i32, total: i32| {
+        app.set_web_progress_run_title(title.into());
+        app.set_export_done(done);
+        app.set_export_total(total);
+    };
+    // (card left, card width, the title's width, the right edge of the title row: the total)
+    let measure = || {
+        hover(&app, 4.0, 700.0); // layout pass, off the card
+        let el = |id: &str| E::find_by_element_id(&app, id).next().unwrap_or_else(|| panic!("{id} is mounted"));
+        let (card, title) = (el("MainWindow::expprog"), el("MainWindow::exptitle"));
+        let (ty, th) = (title.absolute_position().y, title.size().height);
+        let right = card
+            .query_descendants()
+            .match_type_name("Text")
+            .find_all()
+            .into_iter()
+            .filter(|t| t.absolute_position().y < ty + th && t.absolute_position().y + t.size().height > ty)
+            .map(|t| t.absolute_position().x + t.size().width)
+            .fold(0.0f32, f32::max);
+        (card.absolute_position().x, card.size().width, title.size().width, right)
+    };
+    // English, both states, every set (5 selected, 1 picks, 3 rated, 2 rejects, 0 displayed).
+    for on in [false, true] {
+        theme.set_fit_text(on);
+        for filt in [5, 1, 3, 2, 0] {
+            run(&crate::support::out_web_progress_title(filt, 99_999), 99_999, 99_999);
+            assert_eq!(measure().1, 300.0, "English, toggle {on}, set {filt} at 99,999: the tuned 300 px");
+        }
+    }
+    theme.set_fit_text(false);
+    crate::i18n::use_test_pack(
+        "xx-LONG",
+        "one_other",
+        r#"{"Exporting {n} pick": {"one": "Exportation en cours de {n} photo choisie pour le Web",
+            "other": "Exportation en cours de {n} photos choisies pour le Web"}}"#,
+    );
+    let long = crate::support::out_web_progress_title(1, 120);
+    crate::i18n::use_english();
+    assert!(long.starts_with("Exportation"), "production composes the pack's title: {long}");
+    // The title's own width: with the toggle on and done = total = one digit d, the title gets its
+    // width plus (widest digit − d's width); the smallest over the ten digits is its own width.
+    theme.set_fit_text(true);
+    let mut natural = f32::MAX;
+    for d in 0..=9 {
+        run(&long, d, d);
+        let (_, w, title, _) = measure();
+        assert!(w > 300.0, "anti-vacuity: the long title passes 300 px on its own ({w})");
+        natural = natural.min(title);
+    }
+    theme.set_fit_text(false);
+    run(&long, 120, 120);
+    let (cx, w, title, right) = measure();
+    assert_eq!(w, 300.0, "translated, toggle off: still 300 px");
+    assert!(
+        title < natural - 0.5 || right > cx + w - 12.0 + 0.5,
+        "premise: off, the row does not fit 300 px (title {title} of {natural} px, counts end at {right})"
+    );
+    theme.set_fit_text(true);
+    run(&long, 0, 120);
+    let (_, w0, _, _) = measure();
+    run(&long, 120, 120);
+    let (cx, w, title, right) = measure();
+    assert!(w > 300.0, "toggle on: the card grew ({w})");
+    assert_eq!(w0, w, "the card does not step wider as the run counts up");
+    assert!(title >= natural - 0.01, "toggle on: the whole title shows ({title} vs {natural})");
+    assert!(right <= cx + w - 12.0 + 0.01, "…and the counts sit inside the card's padding ({right})");
+    // Review R2: a narrow-digit total, with done counts whose digits are wider than its own.
+    run(&long, 0, 111);
+    let (_, still, _, _) = measure();
+    for done in [0, 1, 100, 104, 108, 110, 111] {
+        run(&long, done, 111);
+        let (cx, w, title, right) = measure();
+        assert_eq!(w, still, "total 111, done {done}: the card holds still");
+        assert!(title >= natural - 0.01, "total 111, done {done}: the whole title shows ({title} vs {natural})");
+        assert!(right <= cx + w - 12.0 + 0.01, "total 111, done {done}: the counts sit inside the padding ({right})");
+    }
+    run(&long, 120, 120);
+    // capped at the window less the two 8 px margins, never below 300 px
+    app.window().set_size(slint::LogicalSize::new(w + 10.0, 800.0));
+    let capped = measure().1;
+    let expect = (w - 6.0).max(300.0);
+    assert!((capped - expect).abs() < 0.01, "capped at {expect} in a {} px window, got {capped}", w + 10.0);
+    app.window().set_size(slint::LogicalSize::new(1200.0, 800.0));
+    theme.set_fit_text(false);
+    assert_eq!(measure().1, 300.0, "toggle off again: exactly 300 px");
+    app.set_export_running(false);
+}
+
+/// Language packs (round 2, owner request, 4 October): the toast's "Open Settings" row was listed
+/// beside the [Yes][No] row's 124 px figure, but for this row that figure is its English width
+/// (12 px padding a side around a ~91 px pill), not a limit: the pill sits alone on its own
+/// right-aligned row with all 296 px inside the 320 px card's padding, and hugs its words. So a
+/// longer translation widens the pill and still fits, with Widen controls to fit text off or on,
+/// and there is no English-tuned width to unlock — the words would have to be about 3.7 times as
+/// wide as the English to reach the card's padding. This row pins that.
+///
+/// FALSIFIER: give the pill a fixed width tuned to English (`PillBtn { width: 91px; text:
+/// @tr("falcon" => "Open Settings"); …`) and the translated rows fail (the words run past the pill).
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_toast_open_settings_pill_hugs_its_translated_label_in_either_state() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    let theme = app.global::<ui::Theme>();
+    app.set_motion_ui(false); // the card is fully shown (and its pill mounted) the same frame
+    app.set_toast_text("Couldn't load the colour profile “Dell_S2725QS_Native_v2.icm”.".into());
+    app.set_toast_show(true);
+    app.set_toast_settings(true);
+    // (card width, pill width, label width), after checking the words sit inside the pill's 8 px
+    // insets and the pill inside the card's 12 px padding.
+    let measure = |what: &str| {
+        hover(&app, 100.0, 700.0); // layout pass, off the card
+        let card = E::find_by_element_id(&app, "MainWindow::toastcard").next().expect("the toast card");
+        let (cx, cw) = (card.absolute_position().x, card.size().width);
+        let pills: Vec<_> = E::find_by_element_type_name(&app, "PillBtn").collect();
+        assert_eq!(pills.len(), 1, "{what}: only the Open Settings pill is on the card");
+        let (px, pw) = (pills[0].absolute_position().x, pills[0].size().width);
+        let label = pills[0].query_descendants().match_type_name("Text").find_first().expect("its words");
+        let (lx, lw) = (label.absolute_position().x, label.size().width);
+        assert!(
+            lx >= px + 8.0 - 0.01 && lx + lw <= px + pw - 8.0 + 0.01,
+            "{what}: the words sit inside the pill's insets ({lx} + {lw} in {px} + {pw})"
+        );
+        assert!(px >= cx + 12.0 - 0.01 && px + pw <= cx + cw - 12.0 + 0.01, "{what}: the pill sits inside the card's padding");
+        (cw, pw, lw)
+    };
+    let (w, pill_en, label_en) = measure("English, toggle off");
+    assert_eq!(w, 320.0, "English, toggle off: the tuned 320 px");
+    theme.set_fit_text(true);
+    assert_eq!(measure("English, toggle on").0, 320.0, "English, toggle on: nothing moves");
+    theme.set_fit_text(false);
+    slint::select_bundled_translation("xx-TEST").expect("every non-release build bundles xx-TEST");
+    let (w, pill, label) = measure("translated, toggle off");
+    assert_eq!(w, 320.0, "translated, toggle off: still 320 px");
+    assert!(label > label_en, "the pseudo-language's words are wider ({label} vs {label_en})");
+    assert!((pill - pill_en - (label - label_en)).abs() < 0.01, "the pill grows by exactly what its words grew ({pill} vs {pill_en})");
+    // (Windows' fonts) the translated row passes the 124 px figure and still fits: never a limit.
+    if cfg!(windows) {
+        assert!(pill + 24.0 > 124.0, "premise: the translated row passes 124 px ({})", pill + 24.0);
+    }
+    theme.set_fit_text(true);
+    assert_eq!(measure("translated, toggle on").1, pill, "toggle on: the same pill");
+    theme.set_fit_text(false);
+}
+
+/// Language packs (round 2, batch 5): the info panel's settle step on a real MainWindow — the rig
+/// `expand_after_collapsed_navigation_renders_blank_not_the_previous_shot` and
+/// `colour_chip_blanks_until_the_gamut_probe_lands` drive, packed so a test can fill the EXIF cache
+/// and settle on a shot. Every tick is a settled one; the request channels' receivers stay alive.
+struct ExifPanelRig {
+    last_motion: std::cell::RefCell<std::time::Instant>,
+    now: std::time::Instant,
+    last_mounted: std::cell::Cell<bool>,
+    exif_built: std::cell::Cell<Option<(usize, bool, u32)>>,
+    cs_built: std::cell::Cell<Option<crate::meta::ColorChipSignature>>,
+    exif_cache: std::cell::RefCell<std::collections::HashMap<usize, Vec<(String, String)>>>,
+    exif_requested: std::cell::RefCell<std::collections::HashSet<usize>>,
+    exif_retry: std::cell::RefCell<std::collections::HashMap<usize, crate::tick::ExifRetry>>,
+    exif_tx: std::sync::mpsc::Sender<(usize, u64, u8)>,
+    _exif_rx: std::sync::mpsc::Receiver<(usize, u64, u8)>,
+    roi_src: std::cell::RefCell<std::collections::HashMap<usize, (u32, u32)>>,
+    dims_requested: std::cell::RefCell<std::collections::HashSet<usize>>,
+    dims_tx: std::sync::mpsc::Sender<(usize, u64)>,
+    _dims_rx: std::sync::mpsc::Receiver<(usize, u64)>,
+    wb_cache: std::cell::RefCell<std::collections::HashMap<usize, Option<u32>>>,
+    wb_requested: std::cell::RefCell<std::collections::HashSet<usize>>,
+    wb_tx: std::sync::mpsc::Sender<(usize, u64, std::path::PathBuf)>,
+    _wb_rx: std::sync::mpsc::Receiver<(usize, u64, std::path::PathBuf)>,
+    exif_model: std::rc::Rc<slint::VecModel<ui::ExifRow>>,
+    output_gamut: std::sync::atomic::AtomicU32,
+    shot_gamut: std::cell::RefCell<std::collections::HashMap<usize, falcon_color::Gamut>>,
+    rot: crate::RotState,
+    file_gamuts: crate::meta::FileGamuts,
+}
+
+impl ExifPanelRig {
+    fn new(app: &ui::MainWindow) -> Self {
+        let (exif_tx, _exif_rx) = std::sync::mpsc::channel();
+        let (dims_tx, _dims_rx) = std::sync::mpsc::channel();
+        let (wb_tx, _wb_rx) = std::sync::mpsc::channel();
+        let last_motion = std::time::Instant::now();
+        let rig = ExifPanelRig {
+            last_motion: std::cell::RefCell::new(last_motion),
+            now: last_motion + std::time::Duration::from_secs(1), // settled (>= SETTLE_MS)
+            last_mounted: std::cell::Cell::new(true),
+            exif_built: std::cell::Cell::new(None),
+            cs_built: std::cell::Cell::new(None),
+            exif_cache: Default::default(),
+            exif_requested: Default::default(),
+            exif_retry: Default::default(),
+            exif_tx,
+            _exif_rx,
+            roi_src: Default::default(),
+            dims_requested: Default::default(),
+            dims_tx,
+            _dims_rx,
+            wb_cache: Default::default(),
+            wb_requested: Default::default(),
+            wb_tx,
+            _wb_rx,
+            exif_model: std::rc::Rc::new(slint::VecModel::default()),
+            output_gamut: std::sync::atomic::AtomicU32::new(0),
+            shot_gamut: Default::default(),
+            rot: crate::RotState::new(true),
+            file_gamuts: crate::meta::FileGamuts::default(),
+        };
+        app.set_exif_rows(rig.exif_model.clone().into());
+        rig
+    }
+
+    /// Settle on shot `c` and rebuild the panel from the cache (as a landed parse does).
+    fn settle(&self, app: &ui::MainWindow, c: usize) {
+        self.exif_built.set(None);
+        crate::tick::step_settle_exif(
+            app, c, self.now, true, 1, &[], &self.last_motion, &self.last_mounted, &self.exif_built,
+            &self.cs_built, &self.exif_cache, &self.exif_requested, &self.exif_retry, &self.exif_tx,
+            &self.roi_src, &self.dims_requested, &self.dims_tx, &self.wb_cache, &self.wb_requested,
+            &self.wb_tx, &self.exif_model, &self.output_gamut, &self.shot_gamut, &self.rot,
+            &self.file_gamuts,
+        );
+    }
+
+    /// The expanded list as published: (drawn label, value) per row.
+    fn rows(&self) -> Vec<(String, String)> {
+        use slint::Model;
+        self.exif_model.iter().map(|r| (r.k.to_string(), r.v.to_string())).collect()
+    }
+}
+
+fn exif_pairs(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+    pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+}
+
+/// Language packs (round 2, PLAN §4, batch 5): EXIF rows are found and filtered by the English KEY
+/// falcon-decode gives each row, and only the label Slint draws is translated. Under the
+/// pseudo-language the folded grid still picks the model, ISO and the white-balance mode (whose
+/// "Auto" is the camera's value and stays as it is), the expanded list still drops "Model" and still
+/// puts "Color temp" right after "White balance", and every drawn label is translated while every
+/// value is not. A label the table does not know is drawn as it is. English is unchanged.
+///
+/// FALSIFIERS: find a row by its drawn label (`k == i18n::tr("ISO")` in the folded grid, or
+/// `key == i18n::tr("White balance")` for the insertion) and the ISO cell empties / "Color temp"
+/// moves to the end; publish the key in `support::exif_row_shown` instead of `exif_label_shown`'s
+/// label and the drawn labels stay English.
+#[cfg(falcon_pseudo_language)]
+#[test]
+fn the_exif_rows_are_found_by_their_english_keys_and_only_the_drawn_labels_are_translated() {
+    let app = boot();
+    app.set_info_open(true);
+    app.set_info_min(false);
+    let rig = ExifPanelRig::new(&app);
+    rig.exif_cache.borrow_mut().insert(
+        0,
+        exif_pairs(&[
+            ("Camera", "NIKON Z 8"),
+            ("Model", "Z 8"),
+            ("ISO", "400"),
+            ("White balance", "Auto"),
+            ("Flash", "Fired"),
+            ("Color space", "sRGB"),
+            ("Lens serial", "2031044"), // not a label falcon-decode writes today: drawn as it is
+        ]),
+    );
+    rig.wb_cache.borrow_mut().insert(0, Some(5650));
+
+    crate::i18n::use_pseudo_language();
+    rig.settle(&app, 0);
+    let brief = app.get_exif_brief();
+    assert_eq!(brief.camera.as_str(), "Z 8", "the folded camera cell still finds Model by its key");
+    assert_eq!(brief.iso.as_str(), "⟦ISO 400⟧", "…and ISO; the words Falcon adds around the value are a message");
+    assert_eq!(brief.wb.as_str(), "⟦AWB 5650K⟧", "…and the white-balance mode, whose \"Auto\" is matched as the camera's value");
+    assert_eq!(brief.colorspace.as_str(), "sRGB", "values are the camera's and stay as they are");
+    assert_eq!(
+        rig.rows(),
+        exif_pairs(&[
+            ("⟦Camera⟧", "NIKON Z 8"),
+            ("⟦ISO⟧", "400"),
+            ("⟦White balance⟧", "Auto"),
+            ("⟦Color temp⟧", "⟦5650 K⟧"),
+            ("⟦Flash⟧", "Fired"),
+            ("⟦Color space⟧", "sRGB"),
+            ("Lens serial", "2031044"),
+        ]),
+        "Model is still filtered out, Color temp still follows White balance, and only the drawn labels are translated"
+    );
+
+    crate::i18n::use_english();
+    rig.settle(&app, 0);
+    let brief = app.get_exif_brief();
+    assert_eq!((brief.iso.as_str(), brief.wb.as_str()), ("ISO 400", "AWB 5650K"), "English is unchanged");
+    assert_eq!(
+        rig.rows(),
+        exif_pairs(&[
+            ("Camera", "NIKON Z 8"),
+            ("ISO", "400"),
+            ("White balance", "Auto"),
+            ("Color temp", "5650 K"),
+            ("Flash", "Fired"),
+            ("Color space", "sRGB"),
+            ("Lens serial", "2031044"),
+        ]),
+        "English rows are unchanged"
+    );
+}
+
+/// Language packs (round 2, PLAN §5, batch 5): the info panel's STANDARD grid floors six short cells
+/// at 54 px (shutter, exposure bias) and 64 px (ISO, focal length, aperture, colour space) so the
+/// camera, lens and date cells elide first. Five of them draw the camera's values exactly as
+/// falcon-decode formats them; values are not translated, so nothing in those cells can grow, and
+/// they keep their floors with Widen controls to fit text on or off. The ISO cell draws Falcon's own
+/// words ("ISO {iso}"): with the toggle on it is never narrower than its translated text and never
+/// below 64 px, and its grid column widens with it; off, exactly 64 px in any language. English at
+/// an everyday ISO never moves. A long camera name squeezes the grid so every floored column sits
+/// on its floor.
+///
+/// FALSIFIERS: ignore the toggle at the ISO cell (`min-width: 64px`) and the translated "on" step
+/// fails; give the shutter cell the same toggle rule and English moves when the toggle is turned on.
+#[test]
+fn the_iso_cell_widens_to_its_translated_words_only_when_asked_and_the_value_cells_keep_their_floors() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    app.set_info_open(true);
+    app.set_info_min(false);
+    app.set_info_view(crate::support::INFO_VIEW_STANDARD);
+    let rig = ExifPanelRig::new(&app);
+    let shot = |iso: &str| {
+        exif_pairs(&[
+            ("Model", "A camera whose model name is far too long for the panel to hold"),
+            ("Lens", "50mm f/1.8"),
+            ("Focal length", "50 mm"),
+            ("Aperture", "f/2.8"),
+            ("Shutter", "1/1000.4324342 s"), // drawn "1/1000.4 s": wider than its 54 px floor
+            ("ISO", iso),
+            ("Exposure bias", "-0.33 EV"),
+            ("White balance", "Manual"),
+            ("Color space", "Adobe RGB"),
+            ("Date", "2026-10-04 12:00:00"),
+        ])
+    };
+    rig.exif_cache.borrow_mut().insert(0, shot("6400"));
+    rig.exif_cache.borrow_mut().insert(1, shot("102400"));
+    let metrics = BriefCellMetrics::new().expect("isolated production BriefCell metrics");
+    let text_w = |s: &str| {
+        metrics.set_sample(s.into());
+        metrics.get_text_width()
+    };
+    // Every grid cell as (drawn text, width), read off the panel itself.
+    let cells = || -> Vec<(String, f32)> {
+        hover(&app, 700.0, 400.0); // layout pass, pointer off the panel
+        E::find_by_element_type_name(&app, "BriefCell")
+            .filter(|e| e.size().width > 0.0)
+            .map(|e| (e.accessible_label().unwrap_or_default().to_string(), e.size().width))
+            .collect()
+    };
+    let width = |cells: &[(String, f32)], text: &str| {
+        cells.iter().find(|(t, _)| t == text).map(|c| c.1).unwrap_or_else(|| panic!("a cell draws {text:?}: {cells:?}"))
+    };
+    let (iso_en, shutter, ev) = ("ISO 6400", "1/1000.4 s", "-0.33 EV");
+    let col5 = ["50 mm", "f/2.8", "Adobe RGB"];
+
+    rig.settle(&app, 0);
+    assert_eq!(app.get_exif_brief().iso.as_str(), iso_en);
+    assert_eq!(app.get_exif_brief().shutter.as_str(), shutter);
+    let en_off = cells();
+    // Premises: the grid is squeezed onto its floors; the English ISO words fit 64 px, so English
+    // cannot move; the shutter value is wider than its 54 px floor, so a shutter cell that followed
+    // the toggle would move English.
+    assert_eq!(width(&en_off, iso_en), 64.0, "premise: squeezed, the ISO column sits on its 64 px floor");
+    assert_eq!(width(&en_off, shutter), 54.0, "premise: …and the shutter column on its 54 px floor");
+    assert!(text_w(iso_en) <= 64.0, "premise: the English ISO words fit 64 px ({})", text_w(iso_en));
+    assert!(text_w(shutter) > 54.0, "premise: the shutter value is wider than 54 px ({})", text_w(shutter));
+    app.global::<ui::Theme>().set_fit_text(true);
+    assert_eq!(cells(), en_off, "English, toggle on: no cell moves");
+    app.global::<ui::Theme>().set_fit_text(false);
+
+    crate::i18n::use_test_pack("xx-LONG", "one_other", r#"{"ISO {iso}": "Sensitivity (ISO) {iso}"}"#);
+    rig.settle(&app, 1);
+    crate::i18n::use_english();
+    let iso_tr = "Sensitivity (ISO) 102400";
+    assert_eq!(app.get_exif_brief().iso.as_str(), iso_tr, "the ISO cell's words are a message");
+    let need = text_w(iso_tr);
+    assert!(need > 64.0, "premise: the translation is wider than 64 px ({need})");
+    let tr_off = cells();
+    assert_eq!(width(&tr_off, iso_tr), 64.0, "translated, toggle off: exactly 64 px");
+    for v in [shutter, ev].iter().chain(col5.iter()) {
+        assert_eq!(width(&tr_off, v), width(&en_off, v), "the value cell {v:?} draws the camera's value as in English");
+    }
+    app.global::<ui::Theme>().set_fit_text(true);
+    let tr_on = cells();
+    let iso_w = width(&tr_on, iso_tr);
+    assert!(iso_w >= need - 0.01, "toggle on: the ISO cell holds its translated words ({iso_w} vs {need})");
+    for v in col5 {
+        assert_eq!(width(&tr_on, v), iso_w, "…and its grid column ({v:?}) widens with it");
+    }
+    for v in [shutter, ev] {
+        assert_eq!(width(&tr_on, v), 54.0, "the value cell {v:?} keeps its 54 px floor");
+    }
+    app.global::<ui::Theme>().set_fit_text(false);
+    assert_eq!(width(&cells(), iso_tr), 64.0, "toggle off again: exactly 64 px");
+
+    // The same rule in English: an ISO whose own words outgrow 64 px (Windows' Inter draws
+    // "ISO 102400" at 65 px) shows them whole with the toggle on, and keeps 64 px off.
+    rig.settle(&app, 1);
+    let iso_max = "ISO 102400";
+    assert_eq!(width(&cells(), iso_max), 64.0, "English, toggle off: exactly 64 px");
+    app.global::<ui::Theme>().set_fit_text(true);
+    assert_eq!(width(&cells(), iso_max), text_w(iso_max).max(64.0), "English, toggle on: max(64 px, its words)");
+    app.global::<ui::Theme>().set_fit_text(false);
 }
 
 #[test]
@@ -4037,6 +5329,8 @@ fn info_seg_drags_but_commits_once_on_release() {
     let pms = panel_seen(); // v0.8.98: the recorder's last-seen pair, exactly as main.rs passes it
     // Tall enough that the DISPLAY section's Info panel card is inside the Settings viewport (the
     // Flickable clips, so an off-screen card would swallow the synthetic pointer).
+    // Language packs (4 October 2026): grown 2200 → 2400 for the LANGUAGE section that now leads
+    // Settings.
     // v0.8.195 fix tail: grown 1800 → 2200 — PERFORMANCE's Efficiency-mode card gained a
     // three-sentence caption and a live-state note line, which pushed this DISPLAY card back out of
     // the viewport. Exactly the v0.8.171 event below, one round on; the rows themselves are
@@ -4045,7 +5339,7 @@ fn info_seg_drags_but_commits_once_on_release() {
     // one — which is the remedy `seg_cell_centres`' own assertion message names, and the reason it
     // names it: this number is a property of everything ABOVE the card, so it moves whenever the
     // sheet does.
-    app.window().set_size(slint::LogicalSize::new(1200.0, 2200.0));
+    app.window().set_size(slint::LogicalSize::new(1200.0, 2400.0));
     // Every cell this seg EMITS, in order. `apply_panels_seg` is the whole of what a commit does, so
     // this list is exactly what the per-folder panel-min recorder downstream can ever observe.
     let emitted = std::rc::Rc::new(std::cell::RefCell::new(Vec::<i32>::new()));
@@ -4166,11 +5460,11 @@ fn info_seg_drags_but_commits_once_on_release() {
 fn deferred_seg_pill_follows_the_finger() {
     let app = boot();
     let pms = panel_seen(); // v0.8.98: the recorder's last-seen pair, exactly as main.rs passes it
-    // v0.8.195 fix tail: grown 1800 → 2200 for the Efficiency card's caption + note line. See the
-    // sibling row above.
+    // v0.8.195 fix tail: grown 1800 → 2200 for the Efficiency card's caption + note line; 2200 →
+    // 2400 for the LANGUAGE section (4 October 2026). See the sibling row above.
     // v0.8.171: grown from 1600 — PERFORMANCE gained a card above the DISPLAY section. See the
     // sibling row above.
-    app.window().set_size(slint::LogicalSize::new(1200.0, 2200.0));
+    app.window().set_size(slint::LogicalSize::new(1200.0, 2400.0));
     let awz = app.as_weak();
     app.on_set_panels_default(move |cell| {
         if let Some(a) = awz.upgrade() {
@@ -4245,8 +5539,9 @@ fn deferred_seg_pill_follows_the_finger() {
 #[test]
 fn right_click_on_a_seg_commits_nothing() {
     let app = boot();
-    // Tall enough that the Fast View card is inside the Settings viewport (the Flickable clips).
-    app.window().set_size(slint::LogicalSize::new(1200.0, 1600.0));
+    // Tall enough that the Fast View card is inside the Settings viewport (the Flickable clips);
+    // 1600 → 1800 when the LANGUAGE section came to lead Settings (4 October 2026).
+    app.window().set_size(slint::LogicalSize::new(1200.0, 1800.0));
     app.set_settings_open(true);
     hover(&app, 600.0, 300.0); // layout pass
     let (dxs, dy) = seg_cell_centres(&app, "MainWindow::detailseg", 2);
@@ -4822,7 +6117,7 @@ fn controls_info_row_label_follows_the_panel_state() {
     app.set_keybinds(std::rc::Rc::new(slint::VecModel::from(rows)).into());
     // RIG GOTCHA: the element finder SKIPS items that are clipped away (`ItemRc::is_visible`), and
     // CONTROLS is the second-to-last section of a very tall Settings body inside a clipping
-    // Flickable. At the sibling seg tests' 1600px the sheet mounts and `detailseg` (Fast View) is
+    // Flickable. At the sibling seg tests' 1800px the sheet mounts and `detailseg` (Fast View) is
     // found while every CONTROLS row silently reports zero matches — indistinguishable from a
     // broken binding. The window is sized past the whole body instead of scrolling the Flickable
     // (whose viewport-y no rig-reachable property exposes).
@@ -23430,11 +24725,12 @@ fn the_chevron_is_one_drawing_centred_in_every_cell() {
         }
     }
     assert_eq!(
-        plain, 7,
-        "seven ChevronGlyph mounts app-wide — five in main_window (the EXIF header, the \
-         per-display colour sections, the font dropdown W3-A created, and the TWO developer \
-         folds v1.0.0-rc item 33 split the one legacy fold into) and two on the edge pills — \
-         all seven exactly centred"
+        plain, 8,
+        "eight ChevronGlyph mounts app-wide — six in main_window (the EXIF header, the \
+         per-display colour sections, the font dropdown W3-A created, the TWO developer \
+         folds v1.0.0-rc item 33 split the one legacy fold into, and the LANGUAGE dropdown \
+         the round-1 language review asked for) and two on the edge pills — all eight exactly \
+         centred"
     );
 
     // ── AND THE LIVE GEOMETRY: each mounted chevron sits at (cell − glyph) / 2 in its own host.
@@ -24075,7 +25371,7 @@ fn the_copy_sheets_content_segments_name_the_slot_and_fit_their_cells() {
     let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/ui/main_window.slint"))
         .expect("the shipped markup");
     assert_eq!(
-        src.matches(r#"opts: ["RAW + image", "RAW only", "Image only"];"#).count(),
+        src.matches(r#"opts: [@tr("falcon" => "RAW + image"), @tr("falcon" => "RAW only"), @tr("falcon" => "Image only")];"#).count(),
         1,
         "the copy-content Seg names the finished-image SLOT — this choice copies a PNG folder's \
          PNGs and always has"
@@ -24158,7 +25454,7 @@ fn the_efficiency_mode_control_is_three_fitting_states_in_performance() {
     let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/ui/main_window.slint"))
         .expect("the shipped markup");
     assert_eq!(
-        src.matches(r#"opts: ["Auto", "On", "Off"];"#).count(),
+        src.matches(r#"opts: [@tr("falcon" => "Auto"), @tr("falcon" => "On"), @tr("falcon" => "Off")];"#).count(),
         1,
         "the efficiency control is the owner's option (c): Auto (follow power source) | On | Off"
     );
@@ -26293,12 +27589,12 @@ fn the_welcome_keys_card_teaches_the_right_click_menu() {
     let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/ui/main_window.slint"))
         .expect("the shipped markup");
     assert_eq!(
-        src.matches(r#"wkmenu := WkRow { label: "a photo for everything else";"#).count(),
+        src.matches(r#"wkmenu := WkRow { label: @tr("falcon" => "a photo for everything else");"#).count(),
         1,
         "the owner's sentence, read across the row — one mount, no second copy"
     );
     assert_eq!(
-        src.matches(r#"KeyHint { text: "Right-click"; }"#).count(),
+        src.matches(r#"KeyHint { text: @tr("falcon" => "Right-click"); }"#).count(),
         1,
         "…and its cap is the gesture, in the card's own caps-left grammar"
     );

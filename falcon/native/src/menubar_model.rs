@@ -27,6 +27,8 @@
 
 use std::hash::{Hash, Hasher};
 
+use crate::i18n;
+
 // ── command tags (NSMenuItem.tag; 0 = structural item with no command) ───────────────────────────
 pub(crate) const TAG_SETTINGS: i32 = 1; // app menu: Settings… ⌘,
 pub(crate) const TAG_WELCOME: i32 = 2; // app menu: Show Welcome Guide
@@ -226,11 +228,12 @@ impl ItemDef {
 
 /// "Flag" + "P" → "Flag (P)"; unbound key → bare title. The RULED presentation for display-only
 /// bare-key hints (NSMenu can't show a right-column key without registering it live).
+/// Language packs (round 2): the title and its key make one message, so a language can place them.
 fn hint(title: &str, key: &str) -> String {
     if key.is_empty() {
         title.to_string()
     } else {
-        format!("{title} ({key})")
+        tr_format!("{title} ({key})", title = title, key = key)
     }
 }
 
@@ -272,21 +275,75 @@ pub(crate) fn recent_title(path: &str) -> String {
 /// Quit is retargeted in place — see mac_menu.)
 pub(crate) fn app_menu_inserts() -> Vec<ItemDef> {
     vec![
-        ItemDef::act(TAG_SETTINGS, "Settings…").key(","),
-        ItemDef::act(TAG_WELCOME, "Show Welcome Guide"),
+        ItemDef::act(TAG_SETTINGS, i18n::tr("Settings…")).key(","),
+        ItemDef::act(TAG_WELCOME, i18n::tr("Show Welcome Guide")),
     ]
+}
+
+/// The top-level menus Falcon adds to the bar, by a stable id.
+///
+/// Language packs (round 2, PLAN §4): a language pack translates each menu's drawn title, so the
+/// bar must never find a menu by its title. `mac_menu` asks [`TopMenu::role`] which menu is Help
+/// (registered as the help menu, with the Window menu placed before it) and which run explicit
+/// enablement (File and View), and draws [`TopMenu::title`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TopMenu {
+    File,
+    Edit,
+    Photo,
+    View,
+    Help,
+}
+
+/// How the bar realizes one top-level menu. Decided from the menu's id, never from its title.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TopMenuRole {
+    /// The standard Window menu goes right before this menu (macOS puts it before Help).
+    pub(crate) window_before: bool,
+    /// `autoenablesItems` off, so a submenu parent can honestly disable: File → Open Recent and
+    /// View → Sort take their enabled state from [`enabled_for`].
+    pub(crate) explicit_enables: bool,
+    /// Registered as `NSApp.helpMenu` (the system search field comes with it).
+    pub(crate) help_menu: bool,
+}
+
+impl TopMenu {
+    /// The title drawn on the bar, in this run's language.
+    pub(crate) fn title(self) -> &'static str {
+        let english = match self {
+            TopMenu::File => tr_noop!("File"),
+            TopMenu::Edit => tr_noop!("Edit"),
+            TopMenu::Photo => tr_noop!("Photo"),
+            TopMenu::View => tr_noop!("View"),
+            TopMenu::Help => tr_noop!("Help"),
+        };
+        i18n::tr(english)
+    }
+
+    pub(crate) fn role(self) -> TopMenuRole {
+        TopMenuRole {
+            window_before: self == TopMenu::Help,
+            explicit_enables: matches!(self, TopMenu::File | TopMenu::View),
+            help_menu: self == TopMenu::Help,
+        }
+    }
+}
+
+/// The full custom menu tree with each menu's drawn title: File · Edit · Photo · View · Help.
+pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)> {
+    top_menus(s).into_iter().map(|(id, items)| (id.title(), items)).collect()
 }
 
 /// The full custom menu tree: File · Edit · Photo · View · Help (Window is built mac-side from
 /// AppKit standard selectors so the OS populates it). Titles/checks re-derive from the snapshot on
 /// every fingerprint change and on menu open.
-pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)> {
+pub(crate) fn top_menus(s: &MenuSnapshot) -> Vec<(TopMenu, Vec<ItemDef>)> {
     let k = &s.keys;
 
     // File — realized with autoenablesItems OFF (explicit enables via `enabled_for`) so the
     // Open Recent PARENT can honestly disable when the recents list is empty (constraint 6).
     let recents: Vec<ItemDef> = if s.recents.is_empty() {
-        vec![ItemDef::act(TAG_RECENT_EMPTY, "No Recent Folders")]
+        vec![ItemDef::act(TAG_RECENT_EMPTY, i18n::tr("No Recent Folders"))]
     } else {
         s.recents
             .iter()
@@ -296,26 +353,26 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
             .collect()
     };
     let file = vec![
-        ItemDef::act(TAG_OPEN_IMAGE, "Open Image…"),
-        ItemDef::act(TAG_OPEN_FOLDER, "Open Folder…").key("o"),
-        ItemDef::parent(TAG_RECENT_PARENT, "Open Recent", recents),
+        ItemDef::act(TAG_OPEN_IMAGE, i18n::tr("Open Image…")),
+        ItemDef::act(TAG_OPEN_FOLDER, i18n::tr("Open Folder…")).key("o"),
+        ItemDef::parent(TAG_RECENT_PARENT, i18n::tr("Open Recent"), recents),
         ItemDef::sep(),
         // v1.0.0-rc (queue item 27, sheet 2.1 B3 b — the L26 parity question, ANSWERED): the two
         // context menus gain a counted "Reveal N in Finder" this round and THIS ROW STAYS SINGULAR,
         // because the File menu's subject is the CURRENT file — it sits between "Open Image…" and
         // "Close", both of which are about that one file too — and a counted row here would be the
         // only member of the menu whose subject is the selection.
-        ItemDef::act(TAG_REVEAL, crate::platform::PLATFORM.reveal_verb),
+        ItemDef::act(TAG_REVEAL, i18n::tr(crate::platform::PLATFORM.reveal_verb)),
         ItemDef::sep(),
-        ItemDef::act(TAG_CLOSE, "Close").key("w"),
+        ItemDef::act(TAG_CLOSE, i18n::tr("Close")).key("w"),
     ];
 
     // Edit — the Undo title is DYNAMIC: "Undo Delete" exactly when the next ⌘Z recovers the deleted
     // shot (on_undo's own preference order), plain "Undo" for a rating/flag/rotation undo. The ⌘Z
     // equivalent routes to the SAME invoke_undo() as the in-app key, so behavior is identical.
     let undo_title = match s.undo {
-        UndoKind::Delete => "Undo Delete",
-        _ => "Undo",
+        UndoKind::Delete => i18n::tr("Undo Delete"),
+        _ => i18n::tr("Undo"),
     };
     //
     // ── v0.9.63: WHY THERE IS NO "Select All" ROW HERE [VD] ─────────────────────────────────────
@@ -342,7 +399,7 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
     // outside CI. The row is a good idea and it is one snapshot field away; it is not a merge rider.
     let edit = vec![
         ItemDef::act(TAG_UNDO, undo_title).key("z"),
-        ItemDef::act(TAG_COPY, "Copy").key("c"),
+        ItemDef::act(TAG_COPY, i18n::tr("Copy")).key("c"),
     ];
 
     // Photo — the five rating actions (same-key-clears semantics live in the dispatch, exactly like
@@ -385,18 +442,20 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
         // ask-first toast SAYS it in full ("Clear rating on 12 photos?") before a byte is written.
         // The checkmark is the same cue the single-photo row has always carried — checked means the
         // press is a re-press, which is the state a clear can come out of.
+        // Language packs (round 2): each counted row in this menu is one whole message ("Rate {n}
+        // Photos {stars}"), no longer a verb joined to a separately counted "12 Photos".
         let (title, checked) = match bulk {
             Some(n_sel) => {
-                (format!("Rate {} {stars}", crate::support::menubar_photo_count(n_sel)), s.sel_rating == n)
+                (tr_plural!(n_sel, "Rate {n} Photo {stars}", "Rate {n} Photos {stars}", stars = stars), s.sel_rating == n)
             }
-            None => (format!("Rate {stars}"), s.rating == n),
+            None => (tr_format!("Rate {stars}", stars = stars), s.rating == n),
         };
         photo.push(ItemDef::act(TAG_RATE1 + n - 1, hint(&title, &k.rate[(n - 1) as usize])).check(checked));
     }
     let rate0_title = match bulk {
         // "Clear Rating on 12 Photos" — the toast's own preposition, one register up.
-        Some(n) => format!("Clear Rating on {}", crate::support::menubar_photo_count(n)),
-        None => "Clear Rating".to_string(),
+        Some(n) => tr_plural!(n, "Clear Rating on {n} Photo", "Clear Rating on {n} Photos"),
+        None => i18n::tr("Clear Rating").to_string(),
     };
     photo.push(ItemDef::act(TAG_RATE0, hint(&rate0_title, &k.rate0)));
     photo.push(ItemDef::sep());
@@ -408,22 +467,22 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
             crate::support::bulk_menubar_mark_title("Flag", "Unflag", n, s.sel_flag_sets),
             !s.sel_flag_sets,
         ),
-        None => ("Flag".to_string(), s.flagged),
+        None => (i18n::tr("Flag").to_string(), s.flagged),
     };
     let (reject_title, reject_check) = match bulk {
         Some(n) => (
             crate::support::bulk_menubar_mark_title("Reject", "Un-reject", n, s.sel_reject_sets),
             !s.sel_reject_sets,
         ),
-        None => ("Reject".to_string(), s.rejected),
+        None => (i18n::tr("Reject").to_string(), s.rejected),
     };
     photo.push(ItemDef::act(TAG_FLAG, hint(&flag_title, &k.flag)).check(flag_check));
     photo.push(ItemDef::act(TAG_REJECT, hint(&reject_title, &k.reject)).check(reject_check));
     // Unmark carries no direction because it HAS none: `BulkOp::Clear` clears both marks, always —
     // it is an imperative, not a toggle, exactly as the `u` key's plural is.
     let unmark_title = match bulk {
-        Some(n) => format!("Unmark {}", crate::support::menubar_photo_count(n)),
-        None => "Unmark".to_string(),
+        Some(n) => tr_plural!(n, "Unmark {n} Photo", "Unmark {n} Photos"),
+        None => i18n::tr("Unmark").to_string(),
     };
     photo.push(ItemDef::act(TAG_UNMARK, hint(&unmark_title, &k.unflag)));
     photo.push(ItemDef::sep());
@@ -440,11 +499,11 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
     // Unmark two rows up — a quarter-turn right is a quarter-turn right whatever the set already
     // carries — so the direction word is the row's own and only the count moves.
     let (rot_left_title, rot_right_title) = match bulk {
-        Some(n) => {
-            let c = crate::support::menubar_photo_count(n);
-            (format!("Rotate {c} Left"), format!("Rotate {c} Right"))
-        }
-        None => ("Rotate Left".to_string(), "Rotate Right".to_string()),
+        Some(n) => (
+            tr_plural!(n, "Rotate {n} Photo Left", "Rotate {n} Photos Left"),
+            tr_plural!(n, "Rotate {n} Photo Right", "Rotate {n} Photos Right"),
+        ),
+        None => (i18n::tr("Rotate Left").to_string(), i18n::tr("Rotate Right").to_string()),
     };
     photo.push(ItemDef::act(TAG_ROT_LEFT, hint(&rot_left_title, &k.rotccw)));
     photo.push(ItemDef::act(TAG_ROT_RIGHT, hint(&rot_right_title, &k.rotcw)));
@@ -454,12 +513,12 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
     // "Move to Trash" phrasing: the verb the dialog uses is Delete, and a row promising a plural
     // action should be answerable by reading the dialog it opens.
     let trash_title = match bulk {
-        Some(n) => format!("Delete {}…", crate::support::menubar_photo_count(n)),
-        None => format!("{}…", crate::platform::PLATFORM.move_to_trash),
+        Some(n) => tr_plural!(n, "Delete {n} Photo…", "Delete {n} Photos…"),
+        None => tr_format!("{title}…", title = i18n::tr(crate::platform::PLATFORM.move_to_trash)),
     };
     photo.push(ItemDef::act(TAG_TRASH, hint(&trash_title, &k.delete)));
     photo.push(ItemDef::sep());
-    photo.push(ItemDef::act(TAG_XMP, "Sync ratings to XMP").check(s.xmp_sync));
+    photo.push(ItemDef::act(TAG_XMP, i18n::tr("Sync ratings to XMP")).check(s.xmp_sync));
 
     // View — compare trio, zoom pair, the two dock toggles (check state = live visibility), the ONE
     // fullscreen row (dynamic Enter/Exit Full Screen carrying the live ⌃⌘F chord), and the Sort
@@ -468,16 +527,23 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
     // confusing; the in-app F still toggles immersive, it simply is not a menu row anymore.
     let sort_items: Vec<ItemDef> = {
         // Mirrors the in-app sort menu's rows (main_window.slint ~6014) — structure = that menu.
-        const METHODS: [&str; 7] =
-            ["Name", "Date taken", "Date modified", "Date created", "Size", "Type", "Rating"];
+        const METHODS: [&str; 7] = [
+            tr_noop!("Name"),
+            tr_noop!("Date taken"),
+            tr_noop!("Date modified"),
+            tr_noop!("Date created"),
+            tr_noop!("Size"),
+            tr_noop!("Type"),
+            tr_noop!("Rating"),
+        ];
         let mut v: Vec<ItemDef> = METHODS
             .iter()
             .enumerate()
-            .map(|(i, m)| ItemDef::act(TAG_SORT_M0 + i as i32, *m).check(s.sort_method == i as i32))
+            .map(|(i, &m)| ItemDef::act(TAG_SORT_M0 + i as i32, i18n::tr(m)).check(s.sort_method == i as i32))
             .collect();
         v.push(ItemDef::sep());
-        v.push(ItemDef::act(TAG_SORT_ASC, "Ascending").check(!s.sort_desc));
-        v.push(ItemDef::act(TAG_SORT_DESC, "Descending").check(s.sort_desc));
+        v.push(ItemDef::act(TAG_SORT_ASC, i18n::tr("Ascending")).check(!s.sort_desc));
+        v.push(ItemDef::act(TAG_SORT_DESC, i18n::tr("Descending")).check(s.sort_desc));
         v
     };
     // v0.9.63 (B-R5-2): the row says which way the command will actually go, and since B-R5-2 the
@@ -485,18 +551,21 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
     // title used to read `immersive` alone, so inside a green-button fullscreen it said "Enter Full
     // Screen" over a window that was already fullscreen. Under the old F semantics that was merely
     // odd; under the new ones it would have been a row promising the opposite of what it does.
-    let fs_title =
-        if s.immersive || s.os_fullscreen { "Exit Full Screen" } else { "Enter Full Screen" };
+    let fs_title = if s.immersive || s.os_fullscreen {
+        i18n::tr("Exit Full Screen")
+    } else {
+        i18n::tr("Enter Full Screen")
+    };
     let view = vec![
-        ItemDef::act(TAG_COMPARE, hint("Compare A|B", &k.compare)).check(s.compare),
-        ItemDef::act(TAG_SWAP, hint("Swap", &k.cmpswap)),
-        ItemDef::act(TAG_PIN, hint("Pin", &k.cmppin)),
+        ItemDef::act(TAG_COMPARE, hint(i18n::tr("Compare A|B"), &k.compare)).check(s.compare),
+        ItemDef::act(TAG_SWAP, hint(i18n::tr("Swap"), &k.cmpswap)),
+        ItemDef::act(TAG_PIN, hint(i18n::tr("Pin"), &k.cmppin)),
         ItemDef::sep(),
-        ItemDef::act(TAG_ZOOM_11, "Zoom 1:1"),
-        ItemDef::act(TAG_ZOOM_FIT, hint("Zoom to Fit", &k.zoom)),
+        ItemDef::act(TAG_ZOOM_11, i18n::tr("Zoom 1:1")),
+        ItemDef::act(TAG_ZOOM_FIT, hint(i18n::tr("Zoom to Fit"), &k.zoom)),
         ItemDef::sep(),
-        ItemDef::act(TAG_GRID, "Photo Grid").check(s.grid_open),
-        ItemDef::act(TAG_FILM, "Filmstrip").check(s.film_visible),
+        ItemDef::act(TAG_GRID, i18n::tr("Photo Grid")).check(s.grid_open),
+        ItemDef::act(TAG_FILM, i18n::tr("Filmstrip")).check(s.film_visible),
         // v0.9.24 (owner ruling): the info panel joins its sibling panel-visibility toggles — the
         // group directly above the separator and the fullscreen row, which is where macOS puts
         // view-furniture commands. NOT a checkbox: three states cannot be told by one checkmark, so
@@ -517,7 +586,7 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
         ItemDef::sep(),
         ItemDef::act(TAG_FULLSCREEN, fs_title).key("f").ctrl(),
         ItemDef::sep(),
-        ItemDef::parent(TAG_SORT_PARENT, "Sort", sort_items),
+        ItemDef::parent(TAG_SORT_PARENT, i18n::tr("Sort"), sort_items),
     ];
 
     // Help — registered as NSApp.helpMenu (the system search field comes free). Opens Settings
@@ -533,11 +602,17 @@ pub(crate) fn build_menus(s: &MenuSnapshot) -> Vec<(&'static str, Vec<ItemDef>)>
     // + "Show log file": that command existed ONLY in the photo's right-click menu, and Help is
     // where a Mac user (and a field tester chasing a repro) looks for it. Same dispatch.
     let help = vec![
-        ItemDef::act(TAG_HELP_SHORTCUTS, "Shortcuts in Settings…"),
-        ItemDef::act(TAG_HELP_LOG, "Show log file"),
+        ItemDef::act(TAG_HELP_SHORTCUTS, i18n::tr("Shortcuts in Settings…")),
+        ItemDef::act(TAG_HELP_LOG, i18n::tr("Show log file")),
     ];
 
-    vec![("File", file), ("Edit", edit), ("Photo", photo), ("View", view), ("Help", help)]
+    vec![
+        (TopMenu::File, file),
+        (TopMenu::Edit, edit),
+        (TopMenu::Photo, photo),
+        (TopMenu::View, view),
+        (TopMenu::Help, help),
+    ]
 }
 
 /// The ONE enablement predicate — read by validateMenuItem: (autoenabled menus: Edit/Photo/View/
@@ -2017,6 +2092,57 @@ mod tests {
         }
         s.opening_photo=false; s.modal=false;
         assert!(enabled_for(TAG_SORT_M0,&s));
+    }
+
+    /// Language packs, round 2 (PLAN §4): the bar finds Help, File and View by their ids, never by
+    /// their drawn titles, which a language pack translates. Under the pseudo-language every title
+    /// is wrapped in ⟦…⟧, and the three roles `mac_menu` realizes still land on the same menus: the
+    /// Window menu goes before Help and Help becomes the help menu; File (Open Recent) and View
+    /// (Sort) run explicit enablement.
+    ///
+    /// FALSIFIERS: decide a role from the drawn title instead of the id — `help_menu:
+    /// self.title() == "Help"`, `window_before: self.title() == "Help"`, or `explicit_enables:
+    /// matches!(self.title(), "File" | "View")` — and the matching row fails.
+    #[cfg(falcon_pseudo_language)]
+    #[test]
+    fn the_bar_finds_help_file_and_view_by_id_when_their_titles_are_translated() {
+        let km = default_keymap();
+        let s = snap_with(&km);
+        let roles = |menus: &[(TopMenu, Vec<ItemDef>)], pick: fn(TopMenuRole) -> bool| -> Vec<TopMenu> {
+            menus.iter().filter(|(id, _)| pick(id.role())).map(|(id, _)| *id).collect()
+        };
+        for pseudo in [false, true] {
+            if pseudo {
+                crate::i18n::use_pseudo_language();
+            }
+            let menus = top_menus(&s);
+            let titles: Vec<&str> = menus.iter().map(|(id, _)| id.title()).collect();
+            let want: [&str; 5] = if pseudo {
+                ["⟦File⟧", "⟦Edit⟧", "⟦Photo⟧", "⟦View⟧", "⟦Help⟧"]
+            } else {
+                ["File", "Edit", "Photo", "View", "Help"]
+            };
+            assert_eq!(titles, want, "only the drawn titles change (pseudo={pseudo})");
+            let drawn: Vec<&str> = build_menus(&s).iter().map(|(t, _)| *t).collect();
+            assert_eq!(drawn, want, "the bar draws the same titles (pseudo={pseudo})");
+            assert_eq!(roles(&menus, |r| r.help_menu), [TopMenu::Help], "the help menu (pseudo={pseudo})");
+            assert_eq!(roles(&menus, |r| r.window_before), [TopMenu::Help], "Window goes before Help (pseudo={pseudo})");
+            assert_eq!(
+                roles(&menus, |r| r.explicit_enables),
+                [TopMenu::File, TopMenu::View],
+                "explicit enablement (pseudo={pseudo})"
+            );
+            // The menus found by id are the ones holding what each role exists for.
+            let items_of = |id: TopMenu| &menus.iter().find(|(m, _)| *m == id).unwrap().1;
+            assert!(items_of(TopMenu::File).iter().any(|i| i.tag == TAG_RECENT_PARENT));
+            assert!(items_of(TopMenu::View).iter().any(|i| i.tag == TAG_SORT_PARENT));
+            assert!(items_of(TopMenu::Help).iter().any(|i| i.tag == TAG_HELP_LOG));
+            if pseudo {
+                let log = items_of(TopMenu::Help).iter().find(|i| i.tag == TAG_HELP_LOG).unwrap();
+                assert_eq!(log.title, "⟦Show log file⟧", "the rows' drawn titles are translated too");
+            }
+        }
+        crate::i18n::use_english();
     }
 
 }

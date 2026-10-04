@@ -64,8 +64,9 @@ pub(crate) fn web_pixel_source(
     }
 }
 
+/// Language packs (round 2): marked here, translated where the tick publishes it.
 pub(crate) const RAW_DEVELOP_CAPTION: &str =
-    "Uses Falcon’s RAW development; colours may differ from the camera preview.";
+    tr_noop!("Uses Falcon’s RAW development; colours may differ from the camera preview.");
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ExportStatus {

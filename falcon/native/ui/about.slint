@@ -18,9 +18,9 @@ export component AboutCard inherits SolidPanel {
             about-icon := Image { width: 72px; height: 72px; source: @image-url("../assets/icons/app-256.png"); image-fit: contain; }
             about-identity := VerticalLayout {
                 alignment: center; spacing: Theme.space-1; horizontal-stretch: 1;
-                about-title := Text { text: "Falcon Photo Viewer"; color: Theme.text; font-size: Theme.display-md; font-weight: 600; wrap: word-wrap; }
+                about-title := Text { text: @tr("falcon" => "Falcon Photo Viewer"); color: Theme.text; font-size: Theme.display-md; font-weight: 600; wrap: word-wrap; }
                 about-version := Text { text: root.version; color: Theme.text-mute; font-size: Theme.font-md; wrap: word-wrap; }
-                about-credit := Text { text: "Designed by Hancheng Wu"; color: Theme.text; font-size: Theme.font-body; wrap: word-wrap; }
+                about-credit := Text { text: @tr("falcon" => "Designed by Hancheng Wu"); color: Theme.text; font-size: Theme.font-body; wrap: word-wrap; }
             }
             about-x := IconBtn {
                 width: Theme.hit-primary; height: Theme.hit-primary;

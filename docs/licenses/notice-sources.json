@@ -5954,6 +5954,81 @@
           "note": "Verified fixed Chromium reference; the crate cites moving main and does not identify the adapted revision. These BSD terms already ship in the Chromium supplement."
         }
       ]
+    },
+    "natord 1.0.9": {
+      "files": [
+        {
+          "file": "docs/licenses/upstream/7f62263ee3860c67a160.txt",
+          "sha256": "7f62263ee3860c67a16082f48472ccc4446c576f7ac2daa2264d019e7ad44d68",
+          "origin": "LICENSE.txt",
+          "kind": "crate-file",
+          "source_sha256": "7f62263ee3860c67a16082f48472ccc4446c576f7ac2daa2264d019e7ad44d68"
+        }
+      ]
+    },
+    "rspolib 0.1.2": {
+      "files": [
+        {
+          "file": "docs/licenses/upstream/4fe9b5fce8fd02826195.txt",
+          "sha256": "4fe9b5fce8fd028261959d039d19ef66182be088ab48ffa97dbeaef7b35e39c3",
+          "origin": "LICENSE",
+          "kind": "upstream",
+          "url": "https://raw.githubusercontent.com/mondeja/rspolib/12343ca23f0c9cbe6d7a2cdcfbf5881a6cb1fbe8/LICENSE",
+          "revision": "12343ca23f0c9cbe6d7a2cdcfbf5881a6cb1fbe8"
+        }
+      ]
+    },
+    "snafu 0.8.9": {
+      "files": [
+        {
+          "file": "docs/licenses/upstream/7003375a1162b7510d6f.txt",
+          "sha256": "7003375a1162b7510d6f053c4a505a0771bbc38d674c4d0687ff6063c000b175",
+          "origin": "LICENSE-MIT",
+          "kind": "crate-file",
+          "source_sha256": "7003375a1162b7510d6f053c4a505a0771bbc38d674c4d0687ff6063c000b175"
+        },
+        {
+          "file": "docs/licenses/upstream/53231f493e357180e66a.txt",
+          "sha256": "53231f493e357180e66a7f5c5c6e5027726976bc5dbb75abcff37b4710fe0133",
+          "origin": "LICENSE-APACHE",
+          "kind": "crate-file",
+          "source_sha256": "53231f493e357180e66a7f5c5c6e5027726976bc5dbb75abcff37b4710fe0133"
+        }
+      ],
+      "exception": "The crate's MIT licence file credits Jake Goulding with the open-ended date \"2019-\", a spelling the holder parser does not accept; the file is kept verbatim.",
+      "provenance": {
+        "repository": "https://github.com/shepmaster/snafu",
+        "authors": [
+          "Jake Goulding <jake.goulding@gmail.com>"
+        ],
+        "licence_file_sha256": "7003375a1162b7510d6f053c4a505a0771bbc38d674c4d0687ff6063c000b175"
+      }
+    },
+    "snafu-derive 0.8.9": {
+      "files": [
+        {
+          "file": "docs/licenses/upstream/7003375a1162b7510d6f.txt",
+          "sha256": "7003375a1162b7510d6f053c4a505a0771bbc38d674c4d0687ff6063c000b175",
+          "origin": "LICENSE-MIT",
+          "kind": "crate-file",
+          "source_sha256": "7003375a1162b7510d6f053c4a505a0771bbc38d674c4d0687ff6063c000b175"
+        },
+        {
+          "file": "docs/licenses/upstream/53231f493e357180e66a.txt",
+          "sha256": "53231f493e357180e66a7f5c5c6e5027726976bc5dbb75abcff37b4710fe0133",
+          "origin": "LICENSE-APACHE",
+          "kind": "crate-file",
+          "source_sha256": "53231f493e357180e66a7f5c5c6e5027726976bc5dbb75abcff37b4710fe0133"
+        }
+      ],
+      "exception": "The crate's MIT licence file credits Jake Goulding with the open-ended date \"2019-\", a spelling the holder parser does not accept; the file is kept verbatim.",
+      "provenance": {
+        "repository": "https://github.com/shepmaster/snafu",
+        "authors": [
+          "Jake Goulding <jake.goulding@gmail.com>"
+        ],
+        "licence_file_sha256": "7003375a1162b7510d6f053c4a505a0771bbc38d674c4d0687ff6063c000b175"
+      }
     }
   }
 }

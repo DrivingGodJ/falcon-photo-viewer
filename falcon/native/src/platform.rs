@@ -12,6 +12,10 @@
 /// The OS-specific user-visible strings + modifier glyphs, resolved once per target at compile time.
 /// Any field that names a Recycle-Bin/Trash concept, an Explorer/Finder reveal, a modifier glyph, or a
 /// cloud provider lives here.
+///
+/// Language packs (round 2): the fields that are words are marked with `tr_noop!` in both tables and
+/// translated with `i18n::tr` where they are shown; the values themselves stay the English literals
+/// (`windows_strings_unchanged`). Brand names, key chords and modifier glyphs are not marked.
 #[allow(dead_code)] // some fields are macOS-arm scaffolding, deliberately unread on the Windows trunk
                     // (they pin the future Mac wiring's Windows counterpart via windows_strings_unchanged).
 pub(crate) struct PlatformStrings {
@@ -103,12 +107,12 @@ pub(crate) struct PlatformStrings {
 /// The Windows trunk table — every string is the pre-v0.9.3 literal, VERBATIM (pinned).
 #[cfg(windows)]
 pub(crate) const PLATFORM: PlatformStrings = PlatformStrings {
-    reveal_verb: "Reveal in Explorer",
-    file_manager: "Explorer",
-    trash_noun: "Recycle Bin",
-    move_to_trash: "Move to Recycle Bin",
-    empty_to_trash: "Empty to Bin",
-    empty_action_label: "Empty → Bin",
+    reveal_verb: tr_noop!("Reveal in Explorer"),
+    file_manager: tr_noop!("Explorer"),
+    trash_noun: tr_noop!("Recycle Bin"),
+    move_to_trash: tr_noop!("Move to Recycle Bin"),
+    empty_to_trash: tr_noop!("Empty to Bin"),
+    empty_action_label: tr_noop!("Empty → Bin"),
     cloud_hint: "OneDrive",
     mod_shift: "Shift+",
     mod_ctrl: "Ctrl+",
@@ -120,20 +124,20 @@ pub(crate) const PLATFORM: PlatformStrings = PlatformStrings {
     redo_shortcut_display: "Ctrl+Y",
     file_assoc_visible: true,
     cmyk_route_visible: true,
-    gamut_copy: "Photos are converted to this gamut for display. Set it to match your monitor's gamut mode — and on a wide-gamut monitor turn OFF Windows Auto Colour Management and HDR. Interface colours follow this setting too, so the app matches colour-managed tools like Photoshop.",
-    accel_unavail_note: "No CUDA/nvJPEG GPU detected — decodes run on the CPU.",
+    gamut_copy: tr_noop!("Photos are converted to this gamut for display. Set it to match your monitor's gamut mode — and on a wide-gamut monitor turn OFF Windows Auto Colour Management and HDR. Interface colours follow this setting too, so the app matches colour-managed tools like Photoshop."),
+    accel_unavail_note: tr_noop!("No CUDA/nvJPEG GPU detected — decodes run on the CPU."),
 };
 
 /// The macOS arm — inert scaffolding on the Windows trunk (compiled out). Sensible Mac equivalents
 /// the branch's later Mac wiring surfaces; NOT byte-identity-pinned (the pin is Windows-only).
 #[cfg(not(windows))]
 pub(crate) const PLATFORM: PlatformStrings = PlatformStrings {
-    reveal_verb: "Reveal in Finder",
-    file_manager: "Finder",
-    trash_noun: "Trash",
-    move_to_trash: "Move to Trash",
-    empty_to_trash: "Empty to Trash",
-    empty_action_label: "Empty → Trash",
+    reveal_verb: tr_noop!("Reveal in Finder"),
+    file_manager: tr_noop!("Finder"),
+    trash_noun: tr_noop!("Trash"),
+    move_to_trash: tr_noop!("Move to Trash"),
+    empty_to_trash: tr_noop!("Empty to Trash"),
+    empty_action_label: tr_noop!("Empty → Trash"),
     cloud_hint: "iCloud Drive",
     mod_shift: "⇧",
     mod_ctrl: "⌘",
@@ -146,7 +150,7 @@ pub(crate) const PLATFORM: PlatformStrings = PlatformStrings {
     file_assoc_visible: true, // v0.9.16 (Round B): the Mac default-handler card is live
     cmyk_route_visible: false, // v1.0.0-rc TAIL: the row names Windows' codec — see the field's doc
 
-    gamut_copy: "Photos are converted to this gamut for display. Set it to match your display's gamut — macOS assigns each display's profile in System Settings → Displays (ColorSync). Interface colours follow this setting too, so the app matches colour-managed tools like Photoshop.",
+    gamut_copy: tr_noop!("Photos are converted to this gamut for display. Set it to match your display's gamut — macOS assigns each display's profile in System Settings → Displays (ColorSync). Interface colours follow this setting too, so the app matches colour-managed tools like Photoshop."),
     // macOS: `accel_avail` is hardwired true, so the row never disables and this never mounts.
     accel_unavail_note: "",
 };
@@ -161,26 +165,42 @@ pub(crate) const PLATFORM: PlatformStrings = PlatformStrings {
 // the test and production share one composition. Reading `PLATFORM.<field>` keeps the macOS arm free
 // (these surface "Trash"/"iCloud Drive" wording automatically), exactly as the inline `format!`s did.
 
+/// Language packs (round 2): the bin noun as shown, for the composers below. Each sentence is one
+/// whole message with the noun as its `{bin}` value; Windows English is unchanged (pinned).
+pub(crate) fn bin_noun() -> &'static str {
+    crate::i18n::tr(PLATFORM.trash_noun)
+}
+
 /// Delete-recycle success toast: "Sent N file(s) to the Recycle Bin". Routes `trash_noun`.
 /// v0.8.131 (F-P11 rule 5): a PARTIAL recycle, stated as an OBSERVATION rather than an inference.
 /// The app knows two things after re-statting: how many files left the folder, and how many did
 /// not. It does not know WHY any single one stayed (an `IFileOperationProgressSink` is the only
 /// route to that, and it is a future item), so the sentence says what was counted and stops.
 pub(crate) fn partial_recycle_toast_text(ok: usize, total: usize, failed: usize) -> String {
-    format!(
-        "Sent {ok} of {total} file{} to the {} — {failed} did not go",
-        if total == 1 { "" } else { "s" },
-        PLATFORM.trash_noun
+    tr_plural!(
+        total,
+        "Sent {ok} of {n} file to the {bin} — {failed} did not go",
+        "Sent {ok} of {n} files to the {bin} — {failed} did not go",
+        ok = ok,
+        bin = bin_noun(),
+        failed = failed
     )
 }
 
+/// Language packs (round 2): "file(s)" for every count is today's English, so both English forms
+/// are equal; a pack can still give its own forms.
 pub(crate) fn recycle_toast_text(n: usize) -> String {
-    format!("Sent {} file(s) to the {}", n, PLATFORM.trash_noun)
+    tr_plural!(n, "Sent {n} file(s) to the {bin}", "Sent {n} file(s) to the {bin}", bin = bin_noun())
 }
 
 /// Empty-./Rejected success toast: "Sent N file(s) from ./Rejected to the Recycle Bin." Routes `trash_noun`.
 pub(crate) fn empty_rejected_toast_text(n: usize) -> String {
-    format!("Sent {} file(s) from ./Rejected to the {}.", n, PLATFORM.trash_noun)
+    tr_plural!(
+        n,
+        "Sent {n} file(s) from ./Rejected to the {bin}.",
+        "Sent {n} file(s) from ./Rejected to the {bin}.",
+        bin = bin_noun()
+    )
 }
 
 /// Recover failure (bin unreadable): "Couldn't recover NAME — the Recycle Bin is unavailable". Routes
@@ -188,24 +208,27 @@ pub(crate) fn empty_rejected_toast_text(n: usize) -> String {
 /// never lists the Trash, so it has no "unavailable" path (a missing entry routes `recover_missing_text`).
 #[cfg_attr(target_os = "macos", allow(dead_code))]
 pub(crate) fn recover_unavailable_text(name: &str) -> String {
-    format!("Couldn't recover {name} — the {} is unavailable", PLATFORM.trash_noun)
+    tr_format!("Couldn't recover {name} — the {bin} is unavailable", name = name, bin = bin_noun())
 }
 
 /// Recover failure (no longer present): "Couldn't recover NAME — it's no longer in the Recycle Bin".
 /// Routes `trash_noun`. Used on BOTH platforms now (v0.9.18): Windows when the bin holds no match;
 /// macOS when every captured Trash entry is gone (the user emptied the Trash — see `mac_recover_message`).
 pub(crate) fn recover_missing_text(name: &str) -> String {
-    format!("Couldn't recover {name} — it's no longer in the {}", PLATFORM.trash_noun)
+    tr_format!("Couldn't recover {name} — it's no longer in the {bin}", name = name, bin = bin_noun())
 }
 
 /// Cross-folder recover-refused toast: "Deleted file was in another folder — recover it from the Recycle Bin". Routes `trash_noun`.
 pub(crate) fn cross_folder_recover_text() -> String {
-    format!("Deleted file was in another folder — recover it from the {}", PLATFORM.trash_noun)
+    tr_format!("Deleted file was in another folder — recover it from the {bin}", bin = bin_noun())
 }
 
 /// Cloud-placeholder decode note: "Cloud file — not downloaded. Falcon will retry; check OneDrive if this persists." Routes `cloud_hint`.
 pub(crate) fn cloud_not_downloaded_text() -> String {
-    format!("Cloud file — not downloaded. Falcon will retry; check {} if this persists.", PLATFORM.cloud_hint)
+    tr_format!(
+        "Cloud file — not downloaded. Falcon will retry; check {provider} if this persists.",
+        provider = PLATFORM.cloud_hint
+    )
 }
 
 /// HEIC decode-failure note. Windows names the OS HEVC/HEIF Image Extension (which may not be installed
@@ -215,11 +238,11 @@ pub(crate) fn cloud_not_downloaded_text() -> String {
 pub(crate) fn heic_decode_failed_text() -> String {
     #[cfg(windows)]
     {
-        "Couldn't decode — the HEVC/HEIF Image Extension may not be installed".to_string()
+        crate::i18n::tr("Couldn't decode — the HEVC/HEIF Image Extension may not be installed").to_string()
     }
     #[cfg(not(windows))]
     {
-        "Couldn't decode this HEIC — the file may be corrupt or an unsupported variant".to_string()
+        crate::i18n::tr("Couldn't decode this HEIC — the file may be corrupt or an unsupported variant").to_string()
     }
 }
 
@@ -235,20 +258,19 @@ pub(crate) fn empty_rejected_confirm_body() -> String {
     // (macOS says "the Trash" twice; Windows says "the OS Recycle Bin" then "the bin"), and each
     // reads naturally on its own platform; what they now share is the single source of the word.
     // The Windows bytes are unchanged and stay pinned by `windows_strings_unchanged`.
+    // Language packs (round 2): one whole message per platform, the noun as `{bin}`.
     #[cfg(windows)]
     {
-        format!(
-            "Sends every file currently in ./Rejected to the OS {} — recoverable from there until \
-             you empty the bin. Photos NOT yet moved to ./Rejected are untouched.",
-            PLATFORM.trash_noun
+        tr_format!(
+            "Sends every file currently in ./Rejected to the OS {bin} — recoverable from there until you empty the bin. Photos NOT yet moved to ./Rejected are untouched.",
+            bin = bin_noun()
         )
     }
     #[cfg(not(windows))]
     {
-        format!(
-            "Sends every file currently in ./Rejected to the {n} — recoverable from there until you \
-             empty the {n}. Photos NOT yet moved to ./Rejected are untouched.",
-            n = PLATFORM.trash_noun
+        tr_format!(
+            "Sends every file currently in ./Rejected to the {bin} — recoverable from there until you empty the {bin}. Photos NOT yet moved to ./Rejected are untouched.",
+            bin = bin_noun()
         )
     }
 }
@@ -261,11 +283,11 @@ pub(crate) fn empty_rejected_confirm_body() -> String {
 pub(crate) fn accel_toggle_label() -> String {
     #[cfg(windows)]
     {
-        "GPU JPEG decode (nvJPEG)".to_string()
+        crate::i18n::tr("GPU JPEG decode (nvJPEG)").to_string()
     }
     #[cfg(not(windows))]
     {
-        "Hardware JPEG/HEIC decode (Image I/O)".to_string()
+        crate::i18n::tr("Hardware JPEG/HEIC decode (Image I/O)").to_string()
     }
 }
 
@@ -276,7 +298,7 @@ pub(crate) fn accel_toggle_label() -> String {
 /// names the Windows codec story because only Windows can surface it. Pinned byte-for-byte by
 /// `windows_strings_unchanged` (a NEW Windows-visible string, owner-directed wording).
 pub(crate) fn heic_assoc_missing_tip() -> String {
-    "Requires the HEVC/HEIF Image Extensions from the Microsoft Store".to_string()
+    crate::i18n::tr("Requires the HEVC/HEIF Image Extensions from the Microsoft Store").to_string()
 }
 
 /// v1.0 MERGE TAIL [B-R1] — **THE EFFICIENCY CARD'S AUTO CLAUSE, ROUTED.**
@@ -294,13 +316,20 @@ pub(crate) fn heic_assoc_missing_tip() -> String {
 /// pre-tail `.slint` literal VERBATIM (pinned by `windows_strings_unchanged`); the macOS arm names
 /// only the half that is real there. When Low Power Mode is wired, this is the one string to widen.
 pub(crate) fn efficiency_auto_clause() -> String {
+    let english = efficiency_auto_clause_english();
+    crate::i18n::tr(english).to_string()
+}
+
+/// Language packs (round 2): the same clause in English, for the `efficiency mode:` log line (logs
+/// stay English); the card shows `efficiency_auto_clause`, translated.
+pub(crate) fn efficiency_auto_clause_english() -> &'static str {
     #[cfg(windows)]
     {
-        "Auto follows your power source and Windows' Battery saver.".to_string()
+        tr_noop!("Auto follows your power source and Windows' Battery saver.")
     }
     #[cfg(not(windows))]
     {
-        "Auto follows your power source.".to_string()
+        tr_noop!("Auto follows your power source.")
     }
 }
 
@@ -318,19 +347,19 @@ pub(crate) fn efficiency_auto_clause() -> String {
 /// One composition, both platforms, with the noun from the table — the `empty_rejected_confirm_body`
 /// pattern. The Windows bytes are unchanged and pinned.
 pub(crate) fn overwrite_confirm_body() -> String {
-    format!(
-        "Overwrite re-renders those files and replaces them in place \u{2014} the old versions are gone \
-         for good, not moved to the {} (each replacement is atomic, so a file is never left \
-         half-written). Skip existing leaves them untouched and exports the rest. To keep both \
-         versions, cancel and turn on \u{201c}Append the preset name to filenames\u{201d}.",
-        PLATFORM.trash_noun
+    tr_format!(
+        "Overwrite re-renders those files and replaces them in place \u{2014} the old versions are gone for good, not moved to the {bin} (each replacement is atomic, so a file is never left half-written). Skip existing leaves them untouched and exports the rest. To keep both versions, cancel and turn on \u{201c}Append the preset name to filenames\u{201d}.",
+        bin = bin_noun()
     )
 }
 
+/// Language packs (round 2): the phrase beside the dialog's big count holds no number, and a
+/// counted message must, so the two English phrases are two whole messages chosen by English's
+/// rule (`n == 1`) — exactly the `one_other` rule, and one text twice for a `none` language.
 pub(crate) fn empty_confirm_title(n: usize) -> String {
-    format!(
-        "{} in ./Rejected → {}",
-        if n == 1 { "file" } else { "files" },
-        PLATFORM.trash_noun
-    )
+    if n == 1 {
+        tr_format!("file in ./Rejected → {bin}", bin = bin_noun())
+    } else {
+        tr_format!("files in ./Rejected → {bin}", bin = bin_noun())
+    }
 }

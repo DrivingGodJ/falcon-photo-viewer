@@ -64,6 +64,8 @@ rfd = "0.15"
 # Send culled files to the OS Recycle Bin (recoverable) for "Empty ./Rejected" (#24) — the
 # recoverable discard tail of the cull. Cross-platform (Windows Shell / macOS / freedesktop).
 trash = "5"
+# The system's preferred languages, in order (already in the build through Slint).
+sys-locale = "0.3"
 
 # Query the GPU's video-memory budget (DXGI) so the texture caches scale to the actual
 # VRAM — bigger cards cache more (smoother), small/busy cards stay safe. Windows-only.
@@ -133,6 +135,12 @@ winreg = "0.55"
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"
 cc = "1"
+
+# Language packs (build_translations.rs): read the pack JSON, and turn on the Slint compiler's
+# bundled translations. Cargo merges this feature into the copy the `slint!` macro already uses.
+[build-dependencies]
+serde_json = "1"
+i-slint-compiler = { version = "=1.17.0", default-features = false, features = ["bundle-translations"] }
 
 # macOS (v0.9.7, Phase 6): the Mac arms of the capability/OS seams. `flock` (LOCK_EX|LOCK_NB) for the
 # single-instance advisory lock (support::claim_primary_instance) — the Mac analogue of the Windows

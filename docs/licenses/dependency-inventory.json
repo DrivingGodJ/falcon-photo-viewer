@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "tool": "cargo-about 0.9.2",
-  "lock_sha256": "e8722f963300211ff404ebcc7774f44c53e481f6ab010ef4b56ed2a7bd7cf3d0",
+  "lock_sha256": "c8f059898deb174abf2d4decaa7f49da971b776e3cbe6154691885c7fd1f289c",
   "text_hash_format": "UTF-8, LF line endings",
   "project_inputs": {
     "falcon/Cargo.toml": "eabb77d13a6d28a8c6d6c34d56c0dd8b96bdcd575e8536a4b9546b9b2cc58be9",
@@ -11,13 +11,13 @@
     "falcon/crates/falcon-gpu/Cargo.toml": "6a33547cdbde1dc23360f889c8824b4a5e1a91e17a67d78d19a9ca59cefb9c86",
     "falcon/crates/falcon-hwdec/Cargo.toml": "5518a8095d56abc56a2e2fcff68dbaaf31dbb99c019837a5a4e5a18509e71b3c",
     "falcon/crates/falcon-nvjpeg/Cargo.toml": "6be1c4244b39794f85ef1a5833fc58b96ab3bb501601ec943308d2768f8b24ef",
-    "falcon/native/Cargo.toml": "72fc9cbb7bd0c659afcdaae648f4849afb3ea9517649e9da8238755ee95c2a36",
+    "falcon/native/Cargo.toml": "1e35de9ab1dd1dca436a850085d0fa5a9fbd8e147cbab78cb907e84be412d80b",
     "falcon/vendor/femtovg/Cargo.toml": "52ce2ade2f33c14aa023dcc4e26972db738ab598ae4df08906603c655dce49e7",
     "falcon/vendor/winit/Cargo.toml": "4c8b88b4a501155443a893ffbda5f5eb23aa03d5a873554a00a23b8f55a91148",
     "falcon/vendor/zune-jpeg/Cargo.toml": "cc3be1dd6f068b881ddc5445e7ca521920430311c9a134d1dd6b35c8e72d8ff1"
   },
   "notice_source_inputs": {
-    "docs/licenses/notice-sources.json": "e4884e102fd822687b2af3cf4d3b29fd68a8e9ebb58049a7dec7f7ea9d755d1a",
+    "docs/licenses/notice-sources.json": "ea2dff64bd81665f5b94638cc6bf3c5d84a6697061a535677a1aba0751a235d2",
     "docs/licenses/upstream/a6cba85bc92e0cff7a45.txt": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "docs/licenses/upstream/fff7d277429072bbdce4.txt": "fff7d277429072bbdce4dce4a580a3580e42a871dcb887afebbcbc7d8680cde7",
     "docs/licenses/upstream/f5af8beef8f5f88f1b78.txt": "f5af8beef8f5f88f1b78494703bbfa019c4f3630ac111344390d6f9975ab22ed",
@@ -247,7 +247,11 @@
     "docs/licenses/upstream/d201d14804d3bcd3b944.txt": "d201d14804d3bcd3b944147173175e4abfbd838b7c8069b6bd3452496bf13e6c",
     "docs/licenses/upstream/adbeebebf11206920171.txt": "adbeebebf1120692017116e9c60b65670cfbbc2181a2e07425e4bb482d0129cb",
     "docs/licenses/upstream/368cca1106be99d39ecd.txt": "368cca1106be99d39ecd32a38d8305585d802a475effb66380b91ffc9bcf709b",
-    "docs/licenses/upstream/08a959077fe4d731c957.txt": "08a959077fe4d731c9571891fe49d3f6adc2b3581ead46a2f5752520bd97d645"
+    "docs/licenses/upstream/08a959077fe4d731c957.txt": "08a959077fe4d731c9571891fe49d3f6adc2b3581ead46a2f5752520bd97d645",
+    "docs/licenses/upstream/7f62263ee3860c67a160.txt": "7f62263ee3860c67a16082f48472ccc4446c576f7ac2daa2264d019e7ad44d68",
+    "docs/licenses/upstream/4fe9b5fce8fd02826195.txt": "4fe9b5fce8fd028261959d039d19ef66182be088ab48ffa97dbeaef7b35e39c3",
+    "docs/licenses/upstream/7003375a1162b7510d6f.txt": "7003375a1162b7510d6f053c4a505a0771bbc38d674c4d0687ff6063c000b175",
+    "docs/licenses/upstream/53231f493e357180e66a.txt": "53231f493e357180e66a7f5c5c6e5027726976bc5dbb75abcff37b4710fe0133"
   },
   "supplementary_inputs": {
     "falcon/native/assets/fonts/Inter-OFL.txt": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a",
@@ -1832,6 +1836,14 @@
       ]
     },
     {
+      "name": "natord",
+      "version": "1.0.9",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
       "name": "no_std_io2",
       "version": "0.9.4",
       "declared": "Apache-2.0 OR MIT",
@@ -2416,6 +2428,14 @@
       ]
     },
     {
+      "name": "rspolib",
+      "version": "0.1.2",
+      "declared": "MIT",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
       "name": "rustc-demangle",
       "version": "0.1.27",
       "declared": "MIT OR Apache-2.0",
@@ -2618,6 +2638,22 @@
     {
       "name": "smol_str",
       "version": "0.3.6",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "snafu",
+      "version": "0.8.9",
+      "declared": "MIT OR Apache-2.0",
+      "selected": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "snafu-derive",
+      "version": "0.8.9",
       "declared": "MIT OR Apache-2.0",
       "selected": [
         "MIT"
@@ -3489,5 +3525,5 @@
       ]
     }
   ],
-  "notices_sha256": "ba52c176a8be808de3371b326af316ddb50ad237c265f705494144bfa7e78ff6"
+  "notices_sha256": "0ade3894e06a252dbc73b4440c833bc7f9f2de98bc79af1bf30a0a0829381fce"
 }
