@@ -84,12 +84,13 @@ class ReleaseMaterials(unittest.TestCase):
             'falcon/Cargo.lock',
             'falcon/Cargo.toml',
             'falcon/about.toml',
-            'falcon/vendor/winit/Cargo.toml',
-            'falcon/vendor/zune-jpeg/Cargo.toml',
         ]
+        # Every vendored and workspace manifest is a release input; a fixed vendor list went
+        # stale when the femtovg copy was added.
         names += [
             str(p.relative_to(ROOT)).replace('\\', '/')
-            for p in (ROOT / 'falcon/crates').glob('*/Cargo.toml')
+            for folder in ('falcon/vendor', 'falcon/crates')
+            for p in (ROOT / folder).glob('*/Cargo.toml')
         ]
         names += ['falcon/native/Cargo.toml']
         names += ['falcon/native/src/main.rs']
