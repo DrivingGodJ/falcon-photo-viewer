@@ -22858,6 +22858,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             // v0.8.195 (consumer 4): the browse-rate ceiling, same term as the other two.
             // v0.8.196 (WAVE 2): …and the ceiling is derived, so all three take the whole value.
             limits,
+            // A held step asks for a blank free half's next thumbnail (grid review R1).
+            Some(tick::ThumbAsk { tx: &thumb_req_t, film: &film_t, rot: &rot_t }),
         );
 
         // 1) current-change bookkeeping (returns current `c`; see fn doc above). G1: also syncs
@@ -24261,6 +24263,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         film_t.observe_models(&film_model, &grid_model, app.get_grid_open());
         mk!("grid");
+
+        // 8c-ii) After all three visible producers: drop queued thumbnail requests whose tiles have
+        // left every visible window, so a scroll's new rows are not stuck behind the old ones.
+        let strip_window = { let k = *fk_t.borrow(); (k.0, k.3) };
+        let thumb_keep = tick::thumb_keep_around(
+            c, compare_t.get().then(|| (cmp_a_idx_t.get(), cmp_b_idx_t.get())));
+        tick::step_retire_thumbs(&thumb_req_t, &film_t, strip_window, &thumb_keep, gen_now, &thumb_gen_t);
+        mk!("thumb_retire");
 
         // 8b) v0.8.24 (D3): cloud-placeholder retry sweep (~30 s; free on local folders via the is_empty
         // gate — see step_cloud_retry). Clears the per-session failure latches of tagged shots so an

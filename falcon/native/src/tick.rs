@@ -820,9 +820,15 @@ pub(crate) fn drain_thumbs(
         // half of the rule.
         tc.insert(idx, (slint::Image::from_rgba8(buf), cm));
     }
-    // Distance to the nearer viewport (stage `c` OR the strip's visible centre) — the eviction rule
-    // for BOTH maps below.
-    let dist = |i: usize| (i as i64 - c as i64).abs().min((i as i64 - strip_anchor as i64).abs());
+    // Distance to the nearest viewport (stage `c`, the strip's visible centre, or the middle of the
+    // open grid dock) — the eviction rule for BOTH maps below. Without the grid term, a dock scrolled
+    // far from `c` lost the rows the user had just left first, and returning to them re-decoded
+    // every tile. Grid closed ⇒ `None` ⇒ the two-anchor rule unchanged.
+    let grid = film.grid_anchor.get();
+    let dist = |i: usize| {
+        let near = (i as i64 - c as i64).abs().min((i as i64 - strip_anchor as i64).abs());
+        grid.map_or(near, |g| near.min((i as i64 - g as i64).abs()))
+    };
     if tc.len() > THUMB_CACHE_MAX {
         // v0.8.42 (Selection demand-loading): tiles in the OPEN Selection panel's live viewport are
         // PINNED (`film.pinned`, fed wholesale each tick by step_selection) and exempt from eviction —
@@ -1764,6 +1770,11 @@ pub(crate) fn step_wheel_advance(
 /// ALL-OR-NONE, deliberately: with neither half pinned a browse moves BOTH in lockstep, and a
 /// per-half gate would let A step while B stalled - which is C1's "a half wearing another shot's
 /// name" seam, re-cut one round after it was closed. If either target is blank, neither moves.
+///
+/// A held step ASKS for each blank free target's thumbnail (`ask`, see [`ask_compare_target`]):
+/// the filmstrip, blur feeder and preview prefetch follow the focused half only, and the grid's
+/// request for the other half's next photo may have been retired after a scroll, so otherwise
+/// nothing would ever fill it. `None` = do not ask (rows that test the gate alone).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn step_compare_browse_advance(
     app: &MainWindow,
@@ -1787,6 +1798,7 @@ pub(crate) fn step_compare_browse_advance(
     fast_failed: &Mutex<HashSet<(u64, usize)>>,
     // v0.8.195: the browse-rate ceiling — see the single-view siblings. v0.8.196: derived.
     efficiency: support::EfficiencyLimits,
+    ask: Option<ThumbAsk<'_>>,
 ) {
     if accum.get() == 0 {
         return;
@@ -1838,6 +1850,14 @@ pub(crate) fn step_compare_browse_advance(
                     fast_failed,
                 );
             if !(a_ok && b_ok) {
+                if let Some(ask) = &ask {
+                    if !a_ok {
+                        ask_compare_target(ask, gen_now, na);
+                    }
+                    if !b_ok {
+                        ask_compare_target(ask, gen_now, nb);
+                    }
+                }
                 *wa = now; // HOLD - the notch stays banked and applies when the frame lands
                 break;
             }
@@ -6448,6 +6468,97 @@ pub(crate) fn feed_visible_thumb(
         send_or_rollback(tx, support::ThumbReq::promote(idx, gen, delta), ReqLane::Thumb, || {});
     } else if pending.len() < limit && pending.insert(idx) {
         send_or_rollback(tx, support::ThumbReq::explicit(idx, gen, delta), ReqLane::Thumb, || { pending.remove(&idx); });
+    }
+}
+
+/// Retire thumbnail requests whose tiles have scrolled out of every visible window before their
+/// decode started, so the newly visible rows are not queued behind rows the user has left.
+///
+/// Runs after the three visible producers each tick. A tile is on screen when it is in the
+/// filmstrip's model window (`strip`: first index, count), in `film.pinned` (the Review panel's
+/// and the grid dock's live windows, margins included) or next to a photo in `keep`
+/// ([`thumb_keep_around`]: the stage stand-in and "Never browse onto a blank photo" read those).
+/// Only a pending request that was once on screen is retired, so the blur feeder's own requests
+/// are left alone. The pending slot is released here and `thumb_gen` bumped, so the key-gated grid
+/// and filmstrip refill admits the new rows on the next tick; the queue then drops the job
+/// (`ThumbQueue::park`). A job a worker has already started still lands and is cached. Returns how
+/// many were retired.
+///
+/// FALSIFIER: return before the retirement loop and
+/// `a_grid_scroll_serves_the_new_rows_before_the_rows_it_left` retires nothing.
+pub(crate) fn step_retire_thumbs(
+    tx: &Sender<support::ThumbReq>,
+    film: &Film,
+    strip: (i64, usize),
+    keep: &[usize],
+    gen_now: u64,
+    thumb_gen: &Cell<u64>,
+) -> usize {
+    let mut tp = film.pending.borrow_mut();
+    let mut seen = film.visible_pending.borrow_mut();
+    seen.retain(|i| tp.contains(i));
+    if tp.is_empty() {
+        return 0;
+    }
+    let pin = film.pinned.borrow();
+    let (s0, sn) = strip;
+    let on_screen = |i: usize| {
+        pin.contains(&i)
+            || (i as i64 >= s0 && (i as i64) < s0 + sn as i64)
+            || keep.iter().any(|&k| i.abs_diff(k) <= 1)
+    };
+    let mut gone = Vec::new();
+    for &i in tp.iter() {
+        if on_screen(i) {
+            seen.insert(i);
+        } else if seen.contains(&i) {
+            gone.push(i);
+        }
+    }
+    for &i in &gone {
+        tp.remove(&i);
+        seen.remove(&i);
+        let _ = tx.send(support::ThumbReq::retire(i, gen_now));
+    }
+    if !gone.is_empty() {
+        thumb_gen.set(thumb_gen.get().wrapping_add(1));
+    }
+    gone.len()
+}
+
+/// Where a held Compare wheel step asks for a missing target's thumbnail.
+pub(crate) struct ThumbAsk<'a> {
+    pub(crate) tx: &'a Sender<support::ThumbReq>,
+    pub(crate) film: &'a Film,
+    pub(crate) rot: &'a RotState,
+}
+
+/// Ask for `idx`'s thumbnail through the ordinary visible-tile path: pending dedup (a queued
+/// blur-feeder job is promoted, never duplicated), the strip's admission limit, and the start-up
+/// hold. A decode that fails latches `film.failed`, which `scrub_wait_ready` reads as ready, so a
+/// held step can never wait on a file that will not decode.
+///
+/// FALSIFIER: return at the top and `a_compare_browse_survives_two_steps_after_a_grid_scroll`
+/// stays held on its second step.
+pub(crate) fn ask_compare_target(ask: &ThumbAsk<'_>, gen_now: u64, idx: usize) {
+    if ask.film.defer_requests.get() {
+        return;
+    }
+    let mut tp = ask.film.pending.borrow_mut();
+    feed_visible_thumb(ask.tx, &mut tp, idx, gen_now, ask.rot.delta_of(idx), THUMB_PENDING_MAX);
+}
+
+/// The photos whose neighbours' thumbnails are read off screen: the current photo and, in Compare,
+/// both halves. A Compare wheel step with "Never browse onto a blank photo" waits for each
+/// unpinned half's next photo (`step_compare_browse_advance` → [`scrub_wait_ready`]), and the far
+/// half is often outside every visible window.
+///
+/// FALSIFIER: return `[c; 3]` in Compare and
+/// `a_compare_halfs_next_photo_survives_a_grid_scroll` retires the far half's next photo.
+pub(crate) fn thumb_keep_around(c: usize, compare: Option<(usize, usize)>) -> [usize; 3] {
+    match compare {
+        Some((a, b)) => [c, a, b],
+        None => [c; 3],
     }
 }
 
@@ -13399,6 +13510,8 @@ pub(crate) fn step_folder_grid(
     // without touching was-open or the scroll mirror — grid-vp-y persists through the unmount
     // (the <=> alias stores on root), so exit re-lands exactly where the user left.
     if app.get_immersive() {
+        // The hidden dock stops steering thumbnail eviction; the first tick after exit re-sets it.
+        film.grid_anchor.set(None);
         return;
     }
     let open = app.get_grid_open() && len > 0;
@@ -13412,6 +13525,7 @@ pub(crate) fn step_folder_grid(
         // set needs no explicit clear — step_selection's wholesale replace/clear owns the
         // residue.
         last_grid_view.set((false, last_grid_view.get().1));
+        film.grid_anchor.set(None);
         return;
     }
     // v0.8.50 (G2): re-validate the splitter width every tick against the LIVE window (the dock +
@@ -13472,6 +13586,9 @@ pub(crate) fn step_folder_grid(
     let (base, live) = grid_window(scroll, view_h, vrows, GRID_MARGIN_ROWS);
     let count = live as usize * cols;
     app.set_grid_win_y(GRID_PAD + base as f32 * GRID_ROW_PITCH);
+    // The eviction anchor for the rows the user is looking at (see `Film::grid_anchor`).
+    let mid_row = (((scroll + view_h / 2.0 - GRID_PAD) / GRID_ROW_PITCH).floor() as i64).clamp(0, vrows - 1) as usize;
+    film.grid_anchor.set(Some((mid_row * cols + cols / 2).saturating_sub(leading).min(len - 1)));
 
     // PIN the live window every tick (visible + margin rows): membership = "on or near the
     // user's eye in the dock" — exempt from drain_thumbs' farthest-from-anchor eviction.
@@ -16820,6 +16937,171 @@ mod prefetch_priority_tests {
         // TURNS: a satisfied bucket baked for the wrong rotation reads as ABSENT, not as serving.
         assert_eq!(fast_want_class(Some(&e(3840, 1)), 3840, 0), Some(false));
         assert_eq!(fast_want_class(Some(&e(3840, 2)), 3840, 2), None); // …matching turns serve normally
+    }
+}
+
+#[cfg(test)]
+mod thumb_retire_tests {
+    use super::*;
+
+    fn feed(film: &Film, tx: &Sender<support::ThumbReq>, idxs: std::ops::Range<usize>, limit: usize) {
+        let mut tp = film.pending.borrow_mut();
+        for i in idxs {
+            feed_visible_thumb(tx, &mut tp, i, 7, 0, limit);
+        }
+    }
+
+    fn landed(idx: usize) -> ThumbDrop {
+        (idx, 7, vec![255; 4], 1, 1, 0, 0, 0)
+    }
+
+    /// The old rows' requests hold every pending slot when the dock scrolls. The new rows must
+    /// still be decoded first, and the old queued rows not at all.
+    /// FALSIFIER: return before the retirement loop in `step_retire_thumbs`; nothing retires, the
+    /// new rows are never admitted and the workers keep taking 101..109.
+    #[test]
+    fn a_grid_scroll_serves_the_new_rows_before_the_rows_it_left() {
+        let film = Film::new();
+        let (tx, rx) = channel();
+        let mut queue = support::ThumbQueue::new(rx);
+        let tg = Cell::new(0u64);
+        let strip = (0, 5); // the filmstrip around the current photo 2
+        film.pinned.borrow_mut().extend(100..110);
+        feed(&film, &tx, 100..110, 10);
+        assert_eq!(step_retire_thumbs(&tx, &film, strip, &thumb_keep_around(2, None), 7, &tg), 0, "nothing has left the screen");
+        assert_eq!(queue.try_take(), Some(support::ThumbReq::explicit(100, 7, 0)), "a worker starts the first old tile");
+
+        // The dock scrolls: rows 200..210 replace 100..110 in its live window (`film.pinned`).
+        film.pinned.borrow_mut().clear();
+        film.pinned.borrow_mut().extend(200..210);
+        feed(&film, &tx, 200..210, 10);
+        assert!(!film.pending.borrow().contains(&200), "every slot is held by the old rows");
+        assert_eq!(step_retire_thumbs(&tx, &film, strip, &thumb_keep_around(2, None), 7, &tg), 10, "all ten old requests retire, the running one too");
+        assert_eq!(tg.get(), 1, "one arrival-counter bump, so the key-gated dock refills next tick");
+        feed(&film, &tx, 200..210, 10); // that refill
+        let next: Vec<usize> = std::iter::from_fn(|| queue.try_take().map(|r| r.idx)).collect();
+        assert_eq!(next, (200..210).collect::<Vec<_>>(), "the new rows run first; the old queued rows never run");
+    }
+
+    /// Only a request that was once on screen is retired: the blur feeder's requests for shots
+    /// nobody has looked at stay queued, and the filmstrip window and the current photo's
+    /// neighbours count as on screen.
+    /// FALSIFIER: retire every off-screen request (drop the `seen` test) and the blur feeder's
+    /// shot 5 is retired on the second pass.
+    #[test]
+    fn only_requests_that_were_on_screen_are_retired() {
+        let film = Film::new();
+        let (tx, rx) = channel();
+        let tg = Cell::new(0u64);
+        film.pending.borrow_mut().extend([5, 7]); // 5: the blur feeder's; 7: a grid tile
+        film.pinned.borrow_mut().insert(7);
+        let far = (40, 5); // the filmstrip shows shots 40..45
+        assert_eq!(step_retire_thumbs(&tx, &film, far, &thumb_keep_around(30, None), 7, &tg), 0);
+        film.pinned.borrow_mut().clear();
+        assert_eq!(step_retire_thumbs(&tx, &film, far, &thumb_keep_around(30, None), 7, &tg), 1, "the grid tile left the screen");
+        assert_eq!(rx.try_recv().unwrap(), support::ThumbReq::retire(7, 7));
+        assert_eq!(*film.pending.borrow(), HashSet::from([5]), "the blur feeder's request stays");
+        assert_eq!(step_retire_thumbs(&tx, &film, far, &thumb_keep_around(6, None), 7, &tg), 0, "next to the current photo is on screen");
+        assert_eq!(step_retire_thumbs(&tx, &film, (3, 5), &thumb_keep_around(30, None), 7, &tg), 0, "so is the filmstrip's window");
+        assert_eq!(step_retire_thumbs(&tx, &film, far, &thumb_keep_around(30, None), 7, &tg), 1, "once seen, leaving retires it");
+        assert!(film.pending.borrow().is_empty());
+        assert_eq!(tg.get(), 2);
+    }
+
+    /// A retired tile is never left grey: a decode that had already started still lands and is
+    /// cached, and a tile that scrolls back before then is requested again.
+    /// FALSIFIER: keep the pending slot in `step_retire_thumbs` (send the retirement only); 101's
+    /// re-request becomes a promotion of a job that no longer exists and nothing is queued.
+    #[test]
+    fn a_retired_tile_is_never_left_without_a_thumbnail() {
+        let film = Film::new();
+        let (tx, rx) = channel();
+        let (res_tx, res_rx) = channel::<ThumbDrop>();
+        let rot = RotState::new(true);
+        let tg = Cell::new(0u64);
+        let mut queue = support::ThumbQueue::new(rx);
+        film.pinned.borrow_mut().extend([100, 101]);
+        feed(&film, &tx, 100..102, 10);
+        step_retire_thumbs(&tx, &film, (0, 5), &thumb_keep_around(2, None), 7, &tg);
+        assert_eq!(queue.try_take().map(|r| r.idx), Some(100), "100 starts decoding");
+        film.pinned.borrow_mut().clear();
+        assert_eq!(step_retire_thumbs(&tx, &film, (0, 5), &thumb_keep_around(2, None), 7, &tg), 2);
+
+        film.pinned.borrow_mut().insert(101); // scrolls back before anything lands
+        feed(&film, &tx, 101..102, 10);
+        assert_eq!(queue.try_take().map(|r| r.idx), Some(101), "the re-request outlives the earlier retirement");
+        assert!(queue.try_take().is_none());
+
+        res_tx.send(landed(100)).unwrap(); // the decode that started before its retirement
+        drain_thumbs(&res_rx, &film, &rot, &tg, 7, 0, 2, 0);
+        assert!(film.thumbs.borrow().contains_key(&100), "finished work is cached, not discarded");
+        assert!(film.pending.borrow().contains(&101), "and it does not free another tile's slot");
+    }
+
+    /// Compare with both halves free: A (the current photo) is at the top of the folder and B far
+    /// down. The grid asked for B's next photo (501) while those rows were on screen, then scrolled
+    /// away before the decode started. With "Never browse onto a blank photo" the wheel waits for
+    /// 501, so the request must survive, run, and make that step ready.
+    /// FALSIFIER: return `[c; 3]` from `thumb_keep_around` in Compare; 501 is retired and the
+    /// readiness check never turns true.
+    #[test]
+    fn a_compare_halfs_next_photo_survives_a_grid_scroll() {
+        let film = Film::new();
+        let (tx, rx) = channel();
+        let (res_tx, res_rx) = channel::<ThumbDrop>();
+        let mut queue = support::ThumbQueue::new(rx);
+        let rot = RotState::new(true);
+        let tg = Cell::new(0u64);
+        let shots: Vec<Shot> = (0..600)
+            .map(|id| Shot {
+                id,
+                name: format!("IMG_{id:04}"),
+                has_raw: false,
+                has_jpg: true,
+                raw: None,
+                jpg: Some(std::path::PathBuf::from("C:/f/a.jpg")),
+                kind: SrcKind::Jpeg,
+                cloud_placeholder: false,
+                sniffed: None,
+            })
+            .collect();
+        let fast = RefCell::new(FastCache::new());
+        let fast_failed = Mutex::new(HashSet::new());
+        let ready = |film: &Film| scrub_wait_ready(501, 500, 7, &shots, &film.thumbs, &fast, &film.failed, &fast_failed);
+        let keep = thumb_keep_around(0, Some((0, 500)));
+        let strip = (0, 5); // the filmstrip follows A
+        film.pinned.borrow_mut().extend(495..510); // the grid shows B's rows
+        feed(&film, &tx, 501..502, 10);
+        step_retire_thumbs(&tx, &film, strip, &keep, 7, &tg);
+        film.pinned.borrow_mut().clear(); // the dock scrolls away before 501's decode starts
+        assert_eq!(step_retire_thumbs(&tx, &film, strip, &keep, 7, &tg), 0, "B's next photo stays requested");
+        assert!(!ready(&film), "the wheel step is waiting for 501");
+        assert_eq!(queue.try_take().map(|r| r.idx), Some(501));
+        res_tx.send(landed(501)).unwrap();
+        drain_thumbs(&res_rx, &film, &rot, &tg, 7, 0, 0, 0);
+        assert!(ready(&film), "its thumbnail lands and the Compare step can go");
+        assert_eq!(thumb_keep_around(9, None), [9; 3], "outside Compare only the current photo is kept");
+    }
+
+    /// With the grid dock open far from the current photo, the rows around the dock's viewport
+    /// survive eviction, so scrolling back to rows just left needs no new decode.
+    /// FALSIFIER: drop the `grid` term from `drain_thumbs`'s distance and 900..1000 are evicted.
+    #[test]
+    fn the_grid_docks_neighbourhood_survives_eviction() {
+        let film = Film::new();
+        let (res_tx, res_rx) = channel::<ThumbDrop>();
+        let rot = RotState::new(true);
+        let tg = Cell::new(0u64);
+        film.grid_anchor.set(Some(900));
+        for i in (0..300).chain(800..1000) {
+            res_tx.send(landed(i)).unwrap();
+        }
+        drain_thumbs(&res_rx, &film, &rot, &tg, 7, 0, 0, 0);
+        let tc = film.thumbs.borrow();
+        assert_eq!(tc.len(), THUMB_CACHE_MAX);
+        assert!((800..1000).all(|i| tc.contains_key(&i)), "the dock's neighbourhood is kept");
+        assert!((0..200).all(|i| tc.contains_key(&i)), "and so is the current photo's");
+        assert!((200..300).all(|i| !tc.contains_key(&i)), "the farthest from every anchor go first");
     }
 }
 

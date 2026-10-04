@@ -1981,18 +1981,39 @@ fn grid_dock_reopen_recenters_on_current_shot() {
         "the OPEN transition must recenter on the current shot (want {want}, got {})",
         app.get_grid_vp_y()
     );
+    // The thumbnail cache's grid anchor is the shot in the middle of the viewport: row 10's
+    // middle column here. FALSIFIER: drop the write in `step_folder_grid` and these read None.
+    assert_eq!(film.grid_anchor.get(), Some(31));
     // manual scroll to the top → a steady tick must NOT recentre it away (the v0.8.52 rule)
     app.set_grid_vp_y(0.0);
     step(30);
+    let top_mid_row = ((vh / 2.0 - GRID_PAD) / GRID_ROW_PITCH).floor() as usize;
+    assert_eq!(film.grid_anchor.get(), Some(top_mid_row * 3 + 1), "the anchor follows a manual scroll");
     assert_eq!(
         app.get_grid_vp_y(),
         0.0,
         "a steady tick recentred away a manual scroll (the never-on-manual-scroll rule broke)"
     );
+    // Immersive hides the dock: its eviction anchor clears, and the scroll it is restored to is
+    // untouched. FALSIFIER: drop the clear in `step_folder_grid`'s immersive branch and the first
+    // assertion reads the old anchor.
+    app.set_immersive(true);
+    hover(&app, 600.0, 300.0);
+    step(30);
+    assert_eq!(film.grid_anchor.get(), None, "a hidden dock anchors nothing");
+    app.set_immersive(false);
+    hover(&app, 600.0, 300.0);
+    if app.get_grid_vp_h() <= 0.0 {
+        app.set_grid_vp_h(vh); // the remounted Flickable's mirror, as arranged above
+    }
+    step(30);
+    assert_eq!(app.get_grid_vp_y(), 0.0, "exit restores the dock where the user left it");
+    assert_eq!(film.grid_anchor.get(), Some(top_mid_row * 3 + 1), "and anchors those rows again");
     // close (the closed tick re-arms the shared cell) → re-open = the ruling's moment
     app.set_grid_open(false);
     hover(&app, 600.0, 300.0);
     step(30);
+    assert_eq!(film.grid_anchor.get(), None, "a closed dock anchors nothing");
     app.set_grid_open(true);
     hover(&app, 600.0, 300.0);
     step(30);
@@ -11216,6 +11237,7 @@ fn the_wait_setting_governs_the_wheel_and_the_keys_alike() {
             &app, now, shots.len(), 0, &compare, &accum, &wheel_at, &wheel_adv, &last_motion,
             &a_idx, &b_idx, &cur, &ff, &nkind, &shots, &thumbs, &fastc, &tfail, &ffail,
             crate::support::EfficiencyLimits::RELEASED, // v0.8.195: released for every pre-existing row
+            None, // the gate alone: nothing asks for a missing target here
         );
         (b_idx.get(), accum.get())
     };
@@ -12255,6 +12277,7 @@ fn every_scrub_cap_the_estimator_can_hold_is_one_the_advance_loops_can_step() {
                 &app, now, shots.len(), 0, &compare, &accum, &wheel_at, &wheel_adv, &last_motion,
                 &a_idx, &b_idx, &cur, &ff, &nkind, &shots, &thumbs, &fastc, &tfail, &ffail,
                 eff, // v0.8.195 fix tail (skeptic A, O1 / L29)
+                None,
             );
             if b_idx.get() != 0 {
                 out = Some(tick_ms * k);
@@ -30938,4 +30961,105 @@ fn release_review_corner_caption_is_singular_at_one_second() {
         caption.absolute_position().y + caption.size().height <= wheel_label.absolute_position().y,
         "single-photo explanation stays with the loading preference, above the wheel setting"
     );
+}
+
+/// Grid review R1 (re-check): Compare with both halves free and "Never browse onto a blank photo"
+/// on, A at the top of the folder and B far down. The grid asked for B's next two photos while
+/// their rows were on screen, then scrolled away: retirement keeps 501 (B's next) but drops 502.
+/// The first wheel step lands on 501; the SECOND needs 502, which nothing else would ever ask for
+/// again. The held step asks for it, and the browse goes on.
+/// FALSIFIER: return at the top of `tick::ask_compare_target` and the second step stays held.
+#[test]
+fn a_compare_browse_survives_two_steps_after_a_grid_scroll() {
+    use crate::tick::{
+        drain_thumbs, feed_visible_thumb, step_compare_browse_advance, step_retire_thumbs,
+        thumb_keep_around, FastCache, NavKind, ThumbAsk, ThumbDrop,
+    };
+    use std::cell::{Cell, RefCell};
+    use std::collections::HashSet;
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+
+    let app = boot();
+    app.set_scrub_fps(30.0);
+    app.set_zoom(1.0);
+    app.set_zoom_always_sharp(false);
+    app.set_scrub_wait_cache(true);
+    app.set_compare(true);
+    app.set_pin_a(false);
+    app.set_pin_b(false);
+    app.set_cmp_focus(0);
+    let shots: Vec<falcon_decode::Shot> = (0..600)
+        .map(|i| falcon_decode::Shot {
+            id: i,
+            name: format!("IMG_{i:04}"),
+            has_raw: false,
+            has_jpg: true,
+            raw: None,
+            jpg: Some(std::path::PathBuf::from("C:/f/a.jpg")),
+            kind: falcon_decode::SrcKind::Jpeg,
+            cloud_placeholder: false,
+            sniffed: None,
+        })
+        .collect();
+    let film = crate::Film::new();
+    let rot = crate::RotState::new(true);
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut queue = crate::support::ThumbQueue::new(rx);
+    let (res_tx, res_rx) = std::sync::mpsc::channel::<ThumbDrop>();
+    let tg = Cell::new(0u64);
+    let fastc = RefCell::new(FastCache::new());
+    let ffail: Mutex<HashSet<(u64, usize)>> = Mutex::new(HashSet::new());
+    // A's side is the focused half: the filmstrip and preview prefetch already cover it.
+    for i in 1..=3 {
+        film.thumbs.borrow_mut().insert(i, (slint::Image::from_rgba8(slint::SharedPixelBuffer::new(1, 1)), 0));
+    }
+    // Every request the workers take now lands (the drain the tick runs).
+    let land = |queue: &mut crate::support::ThumbQueue| {
+        while let Some(r) = queue.try_take() {
+            res_tx.send((r.idx, r.gen, vec![255; 4], 1, 1, 0, 0, 0)).unwrap();
+        }
+        drain_thumbs(&res_rx, &film, &rot, &tg, 0, 0, 0, 0);
+    };
+    let keep = |a: usize, b: usize| thumb_keep_around(a, Some((a, b)));
+
+    film.pinned.borrow_mut().extend(495..510); // the grid dock shows B's rows
+    {
+        let mut tp = film.pending.borrow_mut();
+        for i in [501, 502] {
+            feed_visible_thumb(&tx, &mut tp, i, 0, 0, crate::GRID_FEED_PENDING_MAX);
+        }
+    }
+    step_retire_thumbs(&tx, &film, (0, 5), &keep(0, 500), 0, &tg);
+    film.pinned.borrow_mut().clear(); // the dock scrolls away before either decode starts
+    assert_eq!(step_retire_thumbs(&tx, &film, (0, 5), &keep(0, 500), 0, &tg), 1, "502 retires; 501 is kept");
+    land(&mut queue);
+
+    let compare = Cell::new(true);
+    let a_idx = Cell::new(0usize);
+    let b_idx = Cell::new(500usize);
+    let cur = RefCell::new(0usize);
+    let ff = Cell::new(false);
+    let nkind = Cell::new(NavKind::Absolute);
+    let notch = || {
+        let now = Instant::now();
+        let accum = Cell::new(1i32);
+        let wheel_at = RefCell::new(now);
+        let wheel_adv = RefCell::new(now - Duration::from_millis(100));
+        let last_motion = RefCell::new(now);
+        step_compare_browse_advance(
+            &app, now, shots.len(), 0, &compare, &accum, &wheel_at, &wheel_adv, &last_motion,
+            &a_idx, &b_idx, &cur, &ff, &nkind, &shots, &film.thumbs, &fastc, &film.failed, &ffail,
+            crate::support::EfficiencyLimits::RELEASED,
+            Some(ThumbAsk { tx: &tx, film: &film, rot: &rot }),
+        );
+        (a_idx.get(), b_idx.get())
+    };
+    assert_eq!(notch(), (1, 501), "the first step lands on B's kept next photo");
+    assert_eq!(notch(), (1, 501), "the second step waits: 502 was retired");
+    assert!(film.pending.borrow().contains(&502), "the held step asked for 502 again");
+    assert_eq!(step_retire_thumbs(&tx, &film, (0, 5), &keep(1, 501), 0, &tg), 0, "and it is protected now");
+    land(&mut queue);
+    assert_eq!(notch(), (2, 502), "its thumbnail lands and the browse goes on");
+    app.set_compare(false);
 }

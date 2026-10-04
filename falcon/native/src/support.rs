@@ -960,20 +960,29 @@ pub(crate) struct ThumbReq {
     pub(crate) explicit: bool,
     /// Upgrade an existing queued job only; never start another decode if it has left the queue.
     pub(crate) promote_only: bool,
+    /// Remove this shot's still-queued job from both lanes. Never starts, answers or interrupts
+    /// a decode: the interface has already released the request's pending slot
+    /// (`tick::step_retire_thumbs`), and a job that is already running lands as usual.
+    pub(crate) retire: bool,
 }
 impl ThumbReq {
     /// A tile the user is looking at — the strip's window, the Review panel's visible tiles, the
     /// folder dock's visible cells.
     pub(crate) fn explicit(idx: usize, gen: u64, delta: u8) -> ThumbReq {
-        ThumbReq { idx, gen, delta, explicit: true, promote_only: false }
+        ThumbReq { idx, gen, delta, explicit: true, promote_only: false, retire: false }
     }
     /// The frost feeder's mip coverage: nobody is waiting for it.
     pub(crate) fn speculative(idx: usize, gen: u64, delta: u8) -> ThumbReq {
-        ThumbReq { idx, gen, delta, explicit: false, promote_only: false }
+        ThumbReq { idx, gen, delta, explicit: false, promote_only: false, retire: false }
     }
 
     pub(crate) fn promote(idx: usize, gen: u64, delta: u8) -> ThumbReq {
-        ThumbReq { idx, gen, delta, explicit: true, promote_only: true }
+        ThumbReq { idx, gen, delta, explicit: true, promote_only: true, retire: false }
+    }
+
+    /// The tile scrolled out of every visible window before its decode started.
+    pub(crate) fn retire(idx: usize, gen: u64) -> ThumbReq {
+        ThumbReq { idx, gen, delta: 0, explicit: false, promote_only: false, retire: true }
     }
 }
 
@@ -1019,6 +1028,14 @@ impl ThumbQueue {
         ThumbQueue { rx, explicit: VecDeque::new(), speculative: VecDeque::new() }
     }
     fn park(&mut self, r: ThumbReq) {
+        if r.retire {
+            // Channel order means this removes only requests sent before the retirement; a later
+            // re-request of the same tile arrives after it and is kept.
+            let stale = |q: &ThumbReq| (q.gen, q.idx) == (r.gen, r.idx);
+            self.explicit.retain(|q| !stale(q));
+            self.speculative.retain(|q| !stale(q));
+            return; // like a promotion, it never becomes a job of its own
+        }
         if r.promote_only {
             if let Some(i) = self.speculative.iter().position(|q| (q.gen, q.idx, q.delta) == (r.gen, r.idx, r.delta)) {
                 if let Some(mut job) = self.speculative.remove(i) {
@@ -14983,6 +15000,38 @@ mod cold_thumbnail_queue_tests {
         assert!(queue.try_take().is_none(),"a promotion cannot duplicate an in-flight job");
         crate::tick::feed_visible_thumb(&tx,&mut pending,3,7,0,2);
         assert!(queue.try_take().is_none(),"new requests still obey the pending cap");
+    }
+    /// A retirement removes only that shot's still-queued job, from either lane. It cannot stop a
+    /// running job, cross a folder generation, or drop a re-request sent after it.
+    /// FALSIFIER: skip `park`'s `retire` branch and the retirements are queued as jobs.
+    #[test]
+    fn a_retirement_removes_only_that_shots_queued_job() {
+        let (tx,rx) = std::sync::mpsc::channel();
+        let mut queue = ThumbQueue::new(rx);
+        for r in [ThumbReq::explicit(1,7,0),ThumbReq::explicit(2,7,0),ThumbReq::speculative(3,7,0),ThumbReq::explicit(4,7,1)] {
+            tx.send(r).unwrap();
+        }
+        assert_eq!(queue.try_take(),Some(ThumbReq::explicit(1,7,0)),"shot 1 is decoding");
+        for r in [ThumbReq::retire(1,7),ThumbReq::retire(2,7),ThumbReq::retire(3,7),ThumbReq::retire(4,6)] {
+            tx.send(r).unwrap();
+        }
+        tx.send(ThumbReq::explicit(2,7,0)).unwrap();
+        assert_eq!(queue.try_take(),Some(ThumbReq::explicit(4,7,1)),"another generation's retirement leaves it");
+        assert_eq!(queue.try_take(),Some(ThumbReq::explicit(2,7,0)),"a re-request sent after the retirement is kept");
+        assert!(queue.try_take().is_none(),"2's and 3's queued jobs are gone, and no retirement became a job");
+    }
+    /// Wake-up neutral: an idle worker woken by a retirement alone waits again.
+    #[test]
+    fn an_idle_worker_waits_again_after_a_retirement() {
+        let (tx,rx) = std::sync::mpsc::channel();
+        let mut queue = ThumbQueue::new(rx);
+        let mut waits = 0;
+        let result = queue.take_with_idle_hook(|| {
+            waits += 1;
+            tx.send(if waits == 1 { ThumbReq::retire(1,7) } else { ThumbReq::explicit(2,7,0) }).unwrap();
+        }).unwrap();
+        assert_eq!(waits,2);
+        assert_eq!(result,ThumbReq::explicit(2,7,0));
     }
     #[test]
     fn png_can_tighten_from_measurement_without_changing_jpeg_or_heic_lane_policy() {

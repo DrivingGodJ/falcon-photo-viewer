@@ -97,6 +97,14 @@ pub(crate) struct Film {
     pub(crate) frost: tick::FrostMap,
     pub(crate) failed: Arc<Mutex<HashSet<(u64, usize)>>>,
     pub(crate) pinned: RefCell<HashSet<usize>>,
+    /// Pending requests that have been inside a visible window (filmstrip, Review panel or grid
+    /// dock) while pending. Only these are retired when they leave every window; requests the
+    /// blur feeder made for shots nobody has looked at are never retired. Pruned to `pending`.
+    pub(crate) visible_pending: RefCell<HashSet<usize>>,
+    /// The shot at the middle of the grid dock's viewport while the dock is open. `drain_thumbs`
+    /// keeps thumbnails near it as well as near the current photo and the filmstrip, so rows the
+    /// user scrolls back to are still in RAM when the dock is far from the current photo.
+    pub(crate) grid_anchor: Cell<Option<usize>>,
     pub(crate) visible_signal: Arc<(Mutex<(u64, usize)>, std::sync::Condvar)>,
     startup_at: Cell<Option<Instant>>,
     startup_request: Cell<(u64, usize)>,
@@ -115,6 +123,8 @@ impl Film {
             frost: Arc::new(Mutex::new(HashMap::new())),
             failed: Arc::new(Mutex::new(HashSet::new())),
             pinned: RefCell::new(HashSet::new()),
+            visible_pending: RefCell::new(HashSet::new()),
+            grid_anchor: Cell::new(None),
             visible_signal: Arc::new((Mutex::new((0, 0)), std::sync::Condvar::new())),
             startup_at: Cell::new(None), startup_request: Cell::new((0, 0)),
             models_ready: Cell::new(false), any_thumb: Cell::new(false),
@@ -203,6 +213,8 @@ impl Film {
         self.frost.lock().unwrap_or_else(|e| e.into_inner()).clear();
         self.failed.lock().unwrap_or_else(|e| e.into_inner()).clear();
         self.pinned.borrow_mut().clear();
+        self.visible_pending.borrow_mut().clear();
+        self.grid_anchor.set(None);
     }
 }
 
@@ -247,6 +259,8 @@ mod tests {
         f.frost.lock().unwrap().insert(7, (Arc::from(vec![0u8; 4]), 1, 1, falcon_color::Gamut::Srgb));
         f.failed.lock().unwrap().insert((3, 7));
         f.pinned.borrow_mut().insert(7); // v0.8.42: the Selection-viewport eviction exemption
+        f.visible_pending.borrow_mut().insert(9);
+        f.grid_anchor.set(Some(7));
     }
 
     /// The direct swap-clear test (the review's "cheap first target", film edition): populate every owned
@@ -266,6 +280,8 @@ mod tests {
         assert!(f.frost.lock().unwrap().is_empty(), "thumb-derived frost-mip map cleared on swap");
         assert!(f.failed.lock().unwrap().is_empty(), "(gen,idx) thumb failure latch cleared on swap");
         assert!(f.pinned.borrow().is_empty(), "Selection-viewport pin set cleared on swap (v0.8.42)");
+        assert!(f.visible_pending.borrow().is_empty(), "the retirement marks are folder-scoped too");
+        assert_eq!(f.grid_anchor.get(), None, "so is the grid dock's eviction anchor");
     }
 
     /// Idempotence: `on_folder_swap` on an already-clean tier is a no-op — this pins that a second swap in a
