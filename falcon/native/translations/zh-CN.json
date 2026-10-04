@@ -1,0 +1,1343 @@
+{
+  " (one XMP sidecar goes too)": {
+    "other": "（同时移动 {n} 个 XMP 附属文件）"
+  },
+  " · full-res on {engine}; measured at pool width {width}": " · 在 {engine} 上以原分辨率处理；测量时解码池并发数为 {width}",
+  " · generated {format} test images, warm cache; full-res on {engine}": " · 生成的 {format} 测试图像，缓存已预热；在 {engine} 上以原分辨率处理",
+  " · generated {format} test images, warm cache; full-res on {engine}; measured at pool width {width}": " · 生成的 {format} 测试图像，缓存已预热；在 {engine} 上以原分辨率处理；测量时解码池并发数为 {width}",
+  " · generated {mp} MP {format} test images, warm cache; full-res on {engine}": " · 生成的 {mp} 百万像素 {format} 测试图像，缓存已预热；在 {engine} 上以原分辨率处理",
+  " · generated {mp} MP {format} test images, warm cache; full-res on {engine}; measured at pool width {width}": " · 生成的 {mp} 百万像素 {format} 测试图像，缓存已预热；在 {engine} 上以原分辨率处理；测量时解码池并发数为 {width}",
+  " · including {n} replaced (your choice)": {
+    "other": " · 其中 {n} 个已按你的选择替换"
+  },
+  " · {format} source, warm cache; full-res on {engine}": " · {format} 源文件，缓存已预热；在 {engine} 上以原分辨率处理",
+  " · {format} source, warm cache; full-res on {engine}; measured at pool width {width}": " · {format} 源文件，缓存已预热；在 {engine} 上以原分辨率处理；测量时解码池并发数为 {width}",
+  " · {n} FAILED (see log)": {
+    "other": " · {n} 个失败（见日志）"
+  },
+  " · {n} RAW-only skipped (edit from ./Picks first)": {
+    "other": " · 已跳过 {n} 张仅有 RAW 的照片（请先从 ./Picks 编辑）"
+  },
+  " · {n} already there": {
+    "other": " · {n} 个已存在"
+  },
+  " · {n} already there (the original has changed since)": {
+    "other": " · {n} 个已存在（原文件此后已更改）"
+  },
+  " · {n} developed from RAW": {
+    "other": " · {n} 张由 RAW 显影"
+  },
+  " · {n} differ from the originals — left untouched (see log)": {
+    "other": " · {n} 个与原文件不同，已保留不动（见日志）"
+  },
+  " · {n} failed": {
+    "other": " · {n} 个失败"
+  },
+  " · {n} file in a format this PC can't open": {
+    "other": " · {n} 个文件的格式无法在此电脑上打开"
+  },
+  " · {n} from camera previews": {
+    "other": " · {n} 张来自相机预览"
+  },
+  " · {n} had no RAW": {
+    "other": " · {n} 张没有 RAW"
+  },
+  " · {n} had no image": {
+    "other": " · {n} 张没有图像文件"
+  },
+  " · {n} need attention (see log)": {
+    "other": " · {n} 个需要处理（见日志）"
+  },
+  " · {n} skipped": {
+    "other": " · 已跳过 {n} 个"
+  },
+  " · {n} skipped (your choice)": {
+    "other": " · 已按你的选择跳过 {n} 个"
+  },
+  " · {n} unsupported skipped": {
+    "other": " · 已跳过 {n} 个不支持的文件"
+  },
+  " · {n} {format} file this PC can't open": {
+    "other": " · 此电脑无法打开 {n} 个 {format} 文件"
+  },
+  " · {n} {format} file this PC can't open — a Mac or phone can": {
+    "other": " · 此电脑无法打开 {n} 个 {format} 文件，可在 Mac 或手机上打开"
+  },
+  "(simulated)": "（模拟）",
+  "./Rejected is already empty.": "./Rejected 已为空。",
+  "1 · THE KEYS": "1 · 按键",
+  "1:1 needs this photo's true size — this RAW has no finished file to measure, so only its embedded preview is on screen.": "1:1 需要照片的真实尺寸 — 此 RAW 没有可测量的成品图像，因此仅显示内嵌预览。",
+  "1:1 needs this photo's true size, which isn't known yet.": "1:1 需要照片的真实尺寸，目前尚未读取。",
+  "2 · THE FEEL": "2 · 体验",
+  "3 · THE COLOUR": "3 · 色彩",
+  "A frame upload crashed and was skipped — the photo reloads automatically.": "画面上传失败，已跳过 — 照片会自动重新加载。",
+  "A launch default for folders you have not arranged; a folder you have already read in Simple or Full keeps its own. The panel's own header buttons change the view you are in now — only this row changes the default.": "作为尚未调整过的文件夹的启动默认值；已使用简洁或完整视图的文件夹保留原选择。面板标题栏按钮仅调整当前视图，此处用于更改默认值。",
+  "A preset name can't contain {characters} -- it becomes part of the filename": "预设名称不能包含 {characters}，因为它会成为文件名的一部分",
+  "A preset name can't end in a dot -- it isn't allowed in portable file names": "预设名称不能以句点结尾 — 跨平台文件名不允许这样命名",
+  "AWB {kelvin}K": "自动白平衡 {kelvin}K",
+  "Active — Battery saver is on.": "已启用，系统节电模式已开启。",
+  "Active — on battery.": "已启用，正在使用电池。",
+  "Active — turned on.": "已启用，已手动开启。",
+  "Adaptive Hi-Res": "自适应高分辨率",
+  "Add to Open With": "添加至打开方式",
+  "Adds Falcon to Windows' “Open with” menu for these formats. Windows doesn't let apps set themselves as default — after adding, pick Falcon once in the “Open with” dialog.": "将 Falcon 加入这些格式的 Windows“打开方式”菜单。Windows 不允许应用自行设为默认；添加后请在“打开方式”对话框中选择 Falcon。",
+  "Advanced": "高级",
+  "Advanced · {0} changed": "高级 · 已更改 {0} 项",
+  "After a short rest": "稍作停留后",
+  "After that, each panel's own controls move it on its own.": "此后可通过各面板的控件分别调整。",
+  "All files": "所有文件",
+  "All photos": "所有照片",
+  "All shortcuts + change keys → Settings": "全部快捷键与按键修改 → 设置",
+  "All supported formats": "所有支持的格式",
+  "All {n} photo are already {target}★": {
+    "other": "全部 {n} 张照片已为 {target}★"
+  },
+  "Allow photo edits": "允许编辑照片",
+  "Altitude": "海拔",
+  "Always sharp": "始终清晰",
+  "Aperture": "光圈",
+  "Appears": "显示时机",
+  "Append the preset name to filenames": "在文件名后附加预设名称",
+  "Applied": "已应用",
+  "Applies to this screen when the Falcon window is on it.": "Falcon 窗口位于此屏幕时生效。",
+  "Applies when you open a single photo and the rest of its folder is still loading.": "打开单张照片且其所在文件夹仍在加载时生效。",
+  "Apply": "应用",
+  "Apply rotations": "应用旋转",
+  "Apply to all": "应用至全部",
+  "Applying rotations…": "正在应用旋转…",
+  "Artist": "作者",
+  "Ascending": "升序",
+  "Async frosted blur (decode pool)": "异步磨砂模糊（解码线程池）",
+  "At most {setting} speculative HEIC decodes in flight on a folder the hardware lane has promoted to CHEAP. The displayed photo is exempt, so the ceiling is {ceiling}. Applies live.": "在硬件通道判定为低开销的文件夹中，最多同时进行 {setting} 个 HEIC 推测解码。当前显示的照片不受此限制，因此上限为 {ceiling}。立即生效。",
+  "At once": "立即",
+  "Auto": "自动",
+  "Auto Colour Management": "自动色彩管理",
+  "Auto follows your power source and Windows' Battery saver.": "自动模式跟随电源状态及 Windows 的节电模式。",
+  "Auto follows your power source.": "自动模式跟随电源状态。",
+  "Auto-detect can use the display's profile again.": "自动检测现在可以再次使用显示器的配置文件。",
+  "Auto-detect can use the display's profile again: {profile}.": "自动检测现在可以再次使用显示器的配置文件：{profile}。",
+  "Auto-detect this display": "自动检测此显示器",
+  "Auto-detect this monitor": "自动检测此显示器",
+  "Auto-detect {name}": "自动检测 {name}",
+  "Auto-orient (EXIF)": "自动旋转（EXIF）",
+  "BASIC SHORTCUTS": "基本快捷键",
+  "Battery saver is on — reducing background work.": "已开启节电模式 — 减少后台工作。",
+  "Benchmark with": "测试素材",
+  "Benchmarking…": "正在测试…",
+  "Both floating panels start hidden when you open a folder or photo, and stay hidden until you bring them back.": "打开文件夹或照片时，两个浮动面板默认隐藏，直到你手动显示。",
+  "Both floating panels start open — image/RAW & zoom over the photo's bottom-left corner, shot info & EXIF bottom-right.": "两个浮动面板默认展开：图像/RAW 与缩放位于照片左下角，拍摄信息与 EXIF 位于右下角。",
+  "Both floating panels start parked as small buttons in the photo's bottom corners — a magnifier bottom-left for image/RAW & zoom, an \"i\" bottom-right for shot info & EXIF. Click either to open that panel.": "两个浮动面板默认收起为照片底部的小按钮：左下角的放大镜对应图像/RAW 与缩放，右下角的“i”对应拍摄信息与 EXIF。点击按钮可展开相应面板。",
+  "Both halves are pinned — the wheel zooms": "两侧均已固定 — 滚轮用于缩放",
+  "Both halves are pinned — unpin one to move it.": "两侧均已固定，请先取消固定一侧再切换。",
+  "Browse": "浏览",
+  "Browse at maximum speed · Faster preview {res} px": "以最快速度浏览 · 更快预览 {res} px",
+  "Browse at maximum speed · Sharper preview {res} px": "以最快速度浏览 · 更清晰预览 {res} px",
+  "Browse at {fps} photos/s · Faster preview {res} px": "以每秒 {fps} 张浏览 · 更快预览 {res} px",
+  "Browse at {fps} photos/s · Sharper preview {res} px": "以每秒 {fps} 张浏览 · 更清晰预览 {res} px",
+  "Browse speed": "浏览速度",
+  "Browse-priority detail scheduling": "优先浏览的细节调度",
+  "Browsing waits until the next photo has something to show — a thumbnail or a preview — instead of landing on an empty frame. Applies to the wheel and the arrow keys, in single view and in compare.": "等待下一张照片具备缩略图或预览后再切换，避免显示空白画面。适用于滚轮和方向键，以及单图和对比模式。",
+  "Busy with another file operation — delete cancelled": "正在执行其他文件操作 — 已取消删除",
+  "Busy with another file operation — undo cancelled": "正在执行其他文件操作 — 已取消撤销",
+  "CHOOSE A PRESET": "选择预设",
+  "COLOUR": "色彩",
+  "CONTROLS": "操作",
+  "COPY SHORTCUT": "复制快捷键",
+  "Cache · behind {behind_cached}/{behind_avail} · ahead {ahead_cached}/{ahead_avail}": "缓存 · 后方 {behind_cached}/{behind_avail} · 前方 {ahead_cached}/{ahead_avail}",
+  "Camera": "相机",
+  "Camera preview": "相机预览",
+  "Cancel": "取消",
+  "Center": "居中",
+  "Check them in the Review panel and Apply to write them into your photos — or close without applying.": "可在筛选面板中检查并应用，将旋转写入照片；也可不应用直接关闭。",
+  "Choose PNG…": "选择 PNG…",
+  "Choose a PNG in the sheet to add a watermark": "在面板中选择 PNG 添加水印",
+  "Choose a font": "选择字体",
+  "Choose a monitor / display colour profile": "选择显示器色彩配置文件",
+  "Choose a watermark PNG (transparent)": "选择水印 PNG（透明）",
+  "Choosing one of these applies it to both panels right away and saves it as your default.": "选择后立即应用于两个面板，并保存为默认设置。",
+  "Clear": "清除",
+  "Clear Rating": "清除评分",
+  "Clear Rating on {n} Photo": {
+    "other": "清除 {n} 张照片的评分"
+  },
+  "Clear flag + reject": "清除标记与弃选",
+  "Clear rating": "清除评分",
+  "Clear rating on {n} photo?": {
+    "other": "清除 {n} 张照片的评分？"
+  },
+  "Clear re-applied on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已重新清除 {n} 张照片中 {applied} 张的评分（{missing} 张已不在此文件夹）"
+  },
+  "Clear re-applied on {n} photo": {
+    "other": "已重新清除 {n} 张照片的评分"
+  },
+  "Clear reverted on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已恢复 {n} 张照片中 {applied} 张的评分（{missing} 张已不在此文件夹）"
+  },
+  "Clear reverted on {n} photo": {
+    "other": "已恢复 {n} 张照片的评分"
+  },
+  "Clear selection": "清除选择",
+  "Clear selection ({n})": "清除选择（{n}）",
+  "Clear-rating question cancelled — the photo is unchanged": {
+    "other": "已取消清除评分，{n} 张照片未更改"
+  },
+  "Cleared the rating on {n} photo": {
+    "other": "已清除 {n} 张照片的评分"
+  },
+  "Click": "点击",
+  "Click a key to rebind, then press a new key.": "点击按键后按下新键，即可重新绑定。",
+  "Click the highlighted digit chip again to clear it.": "再次点击高亮的数字标签可清除筛选。",
+  "Close": "关闭",
+  "Close / exit fullscreen": "关闭 / 退出全屏",
+  "Close anyway": "仍然关闭",
+  "Cloud file — not downloaded. Falcon will retry; check {provider} if this persists.": "云端文件尚未下载。Falcon 将重试；若问题持续，请检查 {provider}。",
+  "Color space": "色彩空间",
+  "Color temp": "色温",
+  "Colour": "颜色",
+  "Colour space unavailable for this photo.": "无法读取此照片的色彩空间。",
+  "Colour-managed CMYK JPEGs": "对 CMYK JPEG 使用色彩管理",
+  "Colour: This display — {chip}": "色彩：此显示器 — {chip}",
+  "Colour: {name} — {chip}": "色彩：{name} — {chip}",
+  "Compare A | B": "A | B 对比",
+  "Compare A/B": "A/B 对比",
+  "Compare A/B — close the dialog first": "A/B 对比 — 请先关闭对话框",
+  "Compare A/B — needs 2 photos": "A/B 对比 — 至少需要 2 张照片",
+  "Compare A|B": "A|B 对比",
+  "Compare — send to A (left)": "对比 — 发送至 A（左侧）",
+  "Compare — send to B (right)": "对比 — 发送至 B（右侧）",
+  "Compare: pin active half": "对比：固定当前侧",
+  "Compare: swap active half": "对比：交换当前侧",
+  "Compare: swap · pin": "对比：交换 · 固定",
+  "Continuous browsing speed": "连续浏览速度",
+  "Converting {source} → {output} for display (your chosen output gamut). Make sure it matches your monitor's mode.": "显示时将 {source} 转换为 {output}（你选择的输出色域）。请确认它与显示器模式一致。",
+  "Copied {n} RAW(s) → ./Picks": {
+    "other": "已复制 {n} 个 RAW → ./Picks"
+  },
+  "Copied {n} file(s) → ./Picks": {
+    "other": "已复制 {n} 个文件 → ./Picks"
+  },
+  "Copied {n} image(s) → ./Picks": {
+    "other": "已复制 {n} 个图像 → ./Picks"
+  },
+  "Copy": "复制",
+  "Copy RAW": "复制 RAW",
+  "Copy both": "复制两者",
+  "Copy displayed": "复制当前显示的照片",
+  "Copy image": "复制图像",
+  "Copy images": "复制图像",
+  "Copy path": "复制路径",
+  "Copy picks": "复制已选照片",
+  "Copy rated": "复制已评分照片",
+  "Copy selected": "复制所选照片",
+  "Copy {format}": "复制 {format}",
+  "Copy {n} displayed photo to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.": {
+    "other": "将当前显示的 {n} 张照片复制到 Picks 子文件夹，仅复制 RAW。跳过已存在的文件及没有 RAW 的照片。"
+  },
+  "Copy {n} displayed photo to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.": {
+    "other": "将当前显示的 {n} 张照片复制到 Picks 子文件夹，仅复制图像。跳过已存在的文件及没有图像文件的照片。"
+  },
+  "Copy {n} displayed photo to the Picks subfolder — the RAW + image. Existing files are skipped.": {
+    "other": "将当前显示的 {n} 张照片复制到 Picks 子文件夹，包含 RAW 和图像。跳过已存在的文件。"
+  },
+  "Copy {n} pick to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.": {
+    "other": "将 {n} 张已选照片复制到 Picks 子文件夹，仅复制 RAW。跳过已存在的文件及没有 RAW 的照片。"
+  },
+  "Copy {n} pick to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.": {
+    "other": "将 {n} 张已选照片复制到 Picks 子文件夹，仅复制图像。跳过已存在的文件及没有图像文件的照片。"
+  },
+  "Copy {n} pick to the Picks subfolder — the RAW + image. Existing files are skipped.": {
+    "other": "将 {n} 张已选照片复制到 Picks 子文件夹，包含 RAW 和图像。跳过已存在的文件。"
+  },
+  "Copy {n} rated photo to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.": {
+    "other": "将 {n} 张已评分照片复制到 Picks 子文件夹，仅复制 RAW。跳过已存在的文件及没有 RAW 的照片。"
+  },
+  "Copy {n} rated photo to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.": {
+    "other": "将 {n} 张已评分照片复制到 Picks 子文件夹，仅复制图像。跳过已存在的文件及没有图像文件的照片。"
+  },
+  "Copy {n} rated photo to the Picks subfolder — the RAW + image. Existing files are skipped.": {
+    "other": "将 {n} 张已评分照片复制到 Picks 子文件夹，包含 RAW 和图像。跳过已存在的文件。"
+  },
+  "Copy {n} reject to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.": {
+    "other": "将 {n} 张已弃照片复制到 Picks 子文件夹，仅复制 RAW。跳过已存在的文件及没有 RAW 的照片。"
+  },
+  "Copy {n} reject to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.": {
+    "other": "将 {n} 张已弃照片复制到 Picks 子文件夹，仅复制图像。跳过已存在的文件及没有图像文件的照片。"
+  },
+  "Copy {n} reject to the Picks subfolder — the RAW + image. Existing files are skipped.": {
+    "other": "将 {n} 张已弃照片复制到 Picks 子文件夹，包含 RAW 和图像。跳过已存在的文件。"
+  },
+  "Copy {n} selected photo to the Picks subfolder — just the RAW. Existing files are skipped. Shots with no RAW are skipped.": {
+    "other": "将 {n} 张所选照片复制到 Picks 子文件夹，仅复制 RAW。跳过已存在的文件及没有 RAW 的照片。"
+  },
+  "Copy {n} selected photo to the Picks subfolder — just the image. Existing files are skipped. Shots with no image file are skipped.": {
+    "other": "将 {n} 张所选照片复制到 Picks 子文件夹，仅复制图像。跳过已存在的文件及没有图像文件的照片。"
+  },
+  "Copy {n} selected photo to the Picks subfolder — the RAW + image. Existing files are skipped.": {
+    "other": "将 {n} 张所选照片复制到 Picks 子文件夹，包含 RAW 和图像。跳过已存在的文件。"
+  },
+  "Copying picks…": "正在复制已选照片…",
+  "Corner controls stay visible": "保持角落控件可见",
+  "Couldn't check this GIF, so it wasn't rotated — an animated GIF can't be turned yet": "无法检查此 GIF，已跳过旋转。目前不支持旋转 GIF 动图",
+  "Couldn't check this GIF, so it wasn't rotated — an animated GIF can't be turned yet — {name}": "无法检查此 GIF，已跳过旋转。目前不支持旋转 GIF 动图 — {name}",
+  "Couldn't copy the filename": "无法复制文件名",
+  "Couldn't copy the path": "无法复制路径",
+  "Couldn't copy — the clipboard may be in use by another app": "无法复制，剪贴板可能正被其他应用占用",
+  "Couldn't decode this HEIC — the file may be corrupt or an unsupported variant": "无法解码此 HEIC — 文件可能已损坏或属于不支持的变体",
+  "Couldn't decode this file — it may be corrupt or unreadable": "无法解码此文件，它可能已损坏或无法读取",
+  "Couldn't decode — the HEVC/HEIF Image Extension may not be installed": "无法解码 — 可能尚未安装 HEVC/HEIF 图像扩展",
+  "Couldn't detect a monitor colour profile — use Load profile instead": "无法检测显示器色彩配置文件 — 请改用“载入配置文件”",
+  "Couldn't empty ./Rejected — the files are still there": "无法清空 ./Rejected，文件仍保留在原处",
+  "Couldn't empty ./Rejected — {error}": "无法清空 ./Rejected — {error}",
+  "Couldn't open the link: {error}": "无法打开链接：{error}",
+  "Couldn't read ./Rejected ({error})": "无法读取 ./Rejected（{error}）",
+  "Couldn't read that file — is the drive connected?": "无法读取该文件 — 驱动器是否已连接？",
+  "Couldn't read this folder": "无法读取此文件夹",
+  "Couldn't recover {name} — it's no longer in the {bin}": "无法恢复 {name}，它已不在{bin}中",
+  "Couldn't recover {name} — the {bin} is unavailable": "无法恢复 {name}，{bin}不可用",
+  "Couldn't restore the previous icons: {error}": "无法恢复原来的图标：{error}",
+  "Couldn't update the RAW icons: {error}": "无法更新 RAW 图标：{error}",
+  "Couldn't update the XMP sidecar for {photo} — it may be locked by another app. Ratings are safe in Falcon.": "无法更新 {photo} 的 XMP 附属文件，可能被其他应用锁定。评分已安全保存在 Falcon 中。",
+  "Couldn't update the file icons: {error}": "无法更新文件图标：{error}",
+  "Couldn't write the registration: {error}": "无法写入注册信息：{error}",
+  "Current folder": "当前文件夹",
+  "Custom": "自定义",
+  "Custom converts photos to your monitor's own ICC/ICM profile — a calibrated or native display profile — so colours are accurate on this screen. Matrix-based display profiles only (not printer/CMYK profiles).": "自定义模式将照片转换至显示器自身的 ICC/ICM 配置文件（校准或原生显示配置），以准确显示颜色。仅支持矩阵型显示配置文件，不支持打印机/CMYK 配置。",
+  "Custom: {profile}": "自定义：{profile}",
+  "Custom…": "自定义…",
+  "Cuts background loading to save power. While it's on, browsing is capped to the rate this machine can actually keep up with, browsing uses Faster preview, and large previews can sharpen a moment late. {0}": "减少后台加载以省电。启用时，浏览速度会限制在此电脑可持续处理的范围内，并使用“更快预览”；较大的预览可能稍后才变清晰。{0}",
+  "DCI-P3 is cinema (DCI white) — most “DCI-P3” monitors are Display P3.": "DCI-P3 用于电影（DCI 白点）— 大多数标称“DCI-P3”的显示器实际使用 Display P3。",
+  "DEVELOPER": "开发者",
+  "DISPLAY": "显示",
+  "Date": "日期",
+  "Date created": "创建日期",
+  "Date modified": "修改日期",
+  "Date taken": "拍摄日期",
+  "Decode pool: 18 workers (restart)": "解码线程池：18 个工作线程（需重启）",
+  "Default (system UI)": "默认（系统界面字体）",
+  "Default: system default": "默认：系统默认应用",
+  "Default: {app}": "默认：{app}",
+  "Del": "Delete",
+  "Delete (always confirms)": "删除（始终确认）",
+  "Delete did not complete — the files are still in the folder": "删除未完成，文件仍在文件夹中",
+  "Delete did not complete — {error}": "删除未完成 — {error}",
+  "Delete did not complete — {failed} of {n} file(s) couldn't be moved to the {bin}": {
+    "other": "删除未完成，{n} 个文件中有 {failed} 个无法移至{bin}"
+  },
+  "Delete needs a single photo — exit compare, or use the right-click menu on a thumbnail": "删除需要单张照片 — 请退出对比，或使用缩略图的右键菜单",
+  "Delete photo?": "删除照片？",
+  "Delete photo…": "删除照片…",
+  "Delete preset": "删除预设",
+  "Delete this photo…": "删除此照片…",
+  "Delete this preset?": "删除此预设？",
+  "Delete {n} Photo…": {
+    "other": "删除 {n} 张照片…"
+  },
+  "Delete {n} photo?": {
+    "other": "删除 {n} 张照片？"
+  },
+  "Delete {n} photo…": {
+    "other": "删除 {n} 张照片…"
+  },
+  "Deleted file was in another folder — recover it from the {bin}": "已删除的文件原本位于其他文件夹，请从{bin}恢复",
+  "Deleted — {photo}": "已删除 — {photo}",
+  "Delete…": "删除…",
+  "Descending": "降序",
+  "Deselect": "取消选择",
+  "Designed by Hancheng Wu": "设计：Hancheng Wu",
+  "Detail": "细节",
+  "Dev panel (HUD)": "开发者面板（HUD）",
+  "Develop RAW": "RAW 显影",
+  "Developing RAW…": "正在显影 RAW…",
+  "Diagnostic logging": "诊断日志",
+  "Dimensions": "尺寸",
+  "Direct bulk rating (no ask)": "直接批量评分（不询问）",
+  "Discard rotations": "取消旋转",
+  "Display": "显示器",
+  "Displayed": "当前显示",
+  "Distinct RAW-format icons": "区分 RAW 格式的图标",
+  "Done": "完成",
+  "Drag to position · scroll to resize": "拖动定位 · 滚动调整大小",
+  "Edit": "编辑",
+  "Efficiency mode": "节能模式",
+  "Efficiency mode is limiting browsing to {fps} fps right now. {reason}": "节能模式目前将浏览速度限制为 {fps} fps。{reason}",
+  "Efficiency mode is using Faster preview right now — your setting is kept.": "节能模式当前使用更快的预览 — 已保留你的设置。",
+  "Efficiency mode — background loading is reduced; your browsing speed is unchanged.": "节能模式 — 减少后台加载；浏览速度不变。",
+  "Efficiency mode — limiting browsing to {fps} fps right now. {reason}": "节能模式目前将浏览速度限制为 {fps} fps。{reason}",
+  "Empty to Bin": "清空至回收站",
+  "Empty to Trash": "清空至废纸篓",
+  "Empty → Bin": "清空 → 回收站",
+  "Empty → Trash": "清空 → 废纸篓",
+  "Emptying ./Rejected…": "正在清空 ./Rejected…",
+  "Encoding…": "正在编码…",
+  "End": "End",
+  "Engine levers — defaults are tuned for this machine. Changing them can degrade performance.": "引擎选项 — 默认值已针对设备调优，更改可能降低性能。",
+  "Enter Full Screen": "进入全屏",
+  "Events": "事件",
+  "Every HEIC finishes decoding once it starts, even after you have browsed past it. Turn this on if browsing a phone folder feels like it is lagging behind you.": "HEIC 开始解码后始终完成，即使已切换至其他照片。若浏览手机照片时感觉跟不上操作，可开启此选项。",
+  "Exit Full Screen": "退出全屏",
+  "Exit immersive": "退出沉浸模式",
+  "Expand info panel": "展开信息面板",
+  "Explorer": "资源管理器",
+  "Export": "导出",
+  "Export cancelled — {n} written before stopping": {
+    "other": "导出已取消，停止前已写入 {n} 个文件"
+  },
+  "Export displayed": "导出当前显示的照片",
+  "Export failed: ./export is not a real folder": "导出失败：./export 不是实际文件夹",
+  "Export failed: can't create ./export ({error})": "导出失败：无法创建 ./export（{error}）",
+  "Export picks": "导出已选照片",
+  "Export preset": "导出预设",
+  "Export rated": "导出已评分照片",
+  "Export selected": "导出所选照片",
+  "Exported {n} displayed photo → ./export": {
+    "other": "已导出当前显示的 {n} 张照片 → ./export"
+  },
+  "Exported {n} pick → ./export": {
+    "other": "已导出 {n} 张已选照片 → ./export"
+  },
+  "Exported {n} rated photo → ./export": {
+    "other": "已导出 {n} 张已评分照片 → ./export"
+  },
+  "Exported {n} reject → ./export": {
+    "other": "已导出 {n} 张已弃照片 → ./export"
+  },
+  "Exported {n} selected photo → ./export": {
+    "other": "已导出 {n} 张所选照片 → ./export"
+  },
+  "Exporting": "正在导出",
+  "Exporting {n} displayed photo": {
+    "other": "正在导出当前显示的 {n} 张照片"
+  },
+  "Exporting {n} pick": {
+    "other": "正在导出 {n} 张已选照片"
+  },
+  "Exporting {n} rated photo": {
+    "other": "正在导出 {n} 张已评分照片"
+  },
+  "Exporting {n} reject": {
+    "other": "正在导出 {n} 张已弃照片"
+  },
+  "Exporting {n} selected photo": {
+    "other": "正在导出 {n} 张所选照片"
+  },
+  "Exposure bias": "曝光补偿",
+  "Exposure program": "曝光程序",
+  "FALCON_HEIC_LANE_CAP={cap} is set in this process's environment and overrides this control for the whole run. The saved setting takes over on the next launch without it.": "此进程的环境变量设置了 FALCON_HEIC_LANE_CAP={cap}，本次运行将以此为准。下次未设置该变量时启动，才会使用保存的设置。",
+  "FILE ASSOCIATIONS": "文件关联",
+  "Faint": "极淡",
+  "Falcon Photo Viewer": "Falcon Photo Viewer",
+  "Falcon already outputs sRGB — nothing to change.": "Falcon 已输出 sRGB，无需更改。",
+  "Falcon can be the default app for your photos. You can change this anytime in Settings.": "Falcon 可设为照片的默认应用，之后可随时在设置中更改。",
+  "Falcon converts print-ready CMYK JPEGs itself: identical on every computer, and faster to browse. Turn this on if these files look heavier or more saturated here than in Photoshop.": "Falcon 自行转换用于印刷的 CMYK JPEG：各电脑显示一致，浏览更快。若这些文件比 Photoshop 中更浓重或饱和，可开启此选项。",
+  "Falcon couldn't read That display's connection — try Load profile… instead": "Falcon 无法读取该显示器的连接信息，请尝试“载入配置文件…”",
+  "Falcon couldn't read {name}'s connection — try Load profile… instead": "无法读取 {name} 的连接 — 请改用“载入配置文件…”",
+  "Falcon didn't export this folder — nothing to compare against": "Falcon 尚未导出过此文件夹 — 没有可供比较的记录",
+  "Falcon is compatible with JPEG, PNG, TIFF, HEIC/HEIF, WebP, GIF, BMP, JPEG XL and camera RAW.": "Falcon 支持 JPEG、PNG、TIFF、HEIC/HEIF、WebP、GIF、BMP、JPEG XL 及相机 RAW。",
+  "Falcon is in Finder's “Open With” menu for all supported formats. Make it the default app per format below — Reset restores the previous default. (Takes effect when running the installed Falcon.app.)": "Falcon 已列于 访达 对所有支持格式的“打开方式”菜单中。可在下方按格式设为默认应用；重置会恢复原默认应用。（使用已安装的 Falcon.app 时生效。）",
+  "Falcon is in Windows' “Open with” menu for the formats below. To make it the default, right-click a photo → Open with → Always, or use the Windows Settings button. If you move Falcon.exe, press Update.": "Falcon 已列于 Windows 对下方格式的“打开方式”菜单中。可右键照片 → 打开方式 → 始终，或使用 Windows 设置按钮将其设为默认。移动 Falcon.exe 后请点击“更新”。",
+  "Falcon v{0}": "Falcon v{0}",
+  "Falcon — graphics device lost": "Falcon — 图形设备连接已丢失",
+  "Fast View": "快速预览",
+  "Faster preview": "更快预览",
+  "Faster preview {sub_res}: {sub_fps} · Sharper preview {super_res}: {super_fps} · Full {full_res}: {full_fps} fps (browse-sustained)": "更快预览 {sub_res}：{sub_fps} · 更清晰预览 {super_res}：{super_fps} · 原分辨率 {full_res}：{full_fps} fps（持续浏览）",
+  "Faster preview {sub_res}: {sub_fps} · Sharper preview {super_res}: {super_fps} · Full {full_res}: {full_fps} fps (browse-sustained; decode {sub_decode}/{super_decode}, upload {sub_upload}/{super_upload})": "更快预览 {sub_res}：{sub_fps} · 更清晰预览 {super_res}：{super_fps} · 原分辨率 {full_res}：{full_fps} fps（持续浏览；解码 {sub_decode}/{super_decode}，上传 {sub_upload}/{super_upload}）",
+  "File": "文件",
+  "File associations": "文件关联",
+  "Filename copied — {name}": "已复制文件名 — {name}",
+  "Files": "文件",
+  "Files will be named {name}": "文件将命名为 {name}",
+  "Filmstrip": "缩略图条",
+  "Filmstrip drag-up tolerance": "缩略图条向上拖动容差",
+  "Finder": "访达",
+  "Finish the open dialog first — Falcon still has unapplied rotations to review.": "请先完成当前对话框 — Falcon 仍有未应用的旋转待检查。",
+  "Finishing the file operation — Falcon closes when it's done (close again to force)": "正在完成文件操作 — 完成后 Falcon 会关闭（再次关闭可强制退出）",
+  "First photo": "第一张照片",
+  "Fit": "适合窗口",
+  "Fixed keys — press Edit to rebind.": "固定按键 — 点击“编辑”可重新绑定。",
+  "Flag": "标记",
+  "Flag / pick photo": "标记 / 保留照片",
+  "Flag a keeper while browsing (bind a key in Settings → Controls).": "浏览时标记想保留的照片（可在设置 → 操作中绑定按键）。",
+  "Flag re-applied on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已重新标记 {n} 张照片中的 {applied} 张（{missing} 张已不在此文件夹）"
+  },
+  "Flag re-applied on {n} photo": {
+    "other": "已重新标记 {n} 张照片"
+  },
+  "Flag reverted on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已撤销 {n} 张照片中 {applied} 张的标记（{missing} 张已不在此文件夹）"
+  },
+  "Flag reverted on {n} photo": {
+    "other": "已撤销 {n} 张照片的标记"
+  },
+  "Flag {n}": "标记 {n} 张",
+  "Flag {n} Photo": {
+    "other": "标记 {n} 张照片"
+  },
+  "Flag · Reject · Unmark": "标记 · 弃选 · 清除标记",
+  "Flag, reject or rate a photo while browsing — bind the keys in Settings → Controls.": "浏览时标记、弃选或评分 — 可在设置 → 操作中绑定按键。",
+  "Flagged {n} photo": {
+    "other": "已标记 {n} 张照片"
+  },
+  "Flagged — {photo}": "已标记 — {photo}",
+  "Flash": "闪光灯",
+  "Floating panels": "浮动面板",
+  "Focal (35mm)": "等效焦距（35mm）",
+  "Focal length": "焦距",
+  "Focus 1:1": "1:1 对焦",
+  "Folder changed — delete cancelled": "文件夹已更改 — 已取消删除",
+  "Folder changed — nothing marked": "文件夹已更改 — 未标记任何照片",
+  "Folders you have already arranged reopen the way you left them, which wins over this.": "已调整过的文件夹会恢复原布局，其优先级高于此设置。",
+  "Folder…": "文件夹…",
+  "Following the current photo — click to pin": "正在跟随当前照片 — 点击固定",
+  "Font": "字体",
+  "For checking translations. Off keeps the standard layout.": "用于检查翻译。关闭时保持标准布局。",
+  "Forget display": "忘记显示器",
+  "Forget this display?": "忘记此显示器？",
+  "Format": "格式",
+  "Four EXIF panels are open — close one first.": "已打开四个 EXIF 面板，请先关闭一个。",
+  "Frees the decoder for the photo you are on: a HEIC you have already browsed past stops decoding instead of finishing. Photos you skipped re-decode if you come back to them.": "优先解码当前照片：已浏览过的 HEIC 会停止解码，而非继续完成。返回已跳过的照片时需要重新解码。",
+  "Frost from thumbnails": "使用缩略图生成磨砂模糊",
+  "Full": "完整",
+  "Full resolution for the zoomed-in area, and the whole image too when there's enough VRAM. Recommended.": "以全分辨率显示放大区域；显存充足时也加载整张图像。推荐使用。",
+  "Full size": "原尺寸",
+  "Full {full} px: the upload stage was measured at {probe} px — this machine's own detail-upload ceiling, and the largest frame Falcon ever stages here.": "原分辨率 {full} px：上传阶段以 {probe} px 测量，这是此电脑的细节上传上限，也是 Falcon 在此暂存的最大图像尺寸。",
+  "GIF · animated · {n} frames": {
+    "other": "GIF · 动图 · {n} 帧"
+  },
+  "GIF · {n} frames (too large to animate)": {
+    "other": "GIF · {n} 帧（过大，无法播放）"
+  },
+  "GPS": "GPS",
+  "GPU JPEG decode (nvJPEG)": "GPU JPEG 解码（nvJPEG）",
+  "GPU YUV convert unavailable — full-res frames use the standard upload path (same quality, slightly slower).": "GPU YUV 转换不可用 — 全分辨率画面将使用标准上传方式（画质相同，速度稍慢）。",
+  "GPU backend": "GPU 后端",
+  "Grid: row up / down": "网格：上一行 / 下一行",
+  "HDR": "HDR",
+  "HDR or Auto Colour Management": "HDR 或自动色彩管理",
+  "HEIC files step at their decode rate here — each zoomed step waits for the full frame.": "HEIC 按其解码速度切换 — 放大时每次切换均等待完整画面。",
+  "HEIC hardware lane: speculative decode cap": "HEIC 硬件解码：预加载并发上限",
+  "HEIC speed priority": "HEIC 速度优先",
+  "Hardware JPEG/HEIC decode (Image I/O)": "硬件 JPEG/HEIC 解码（Image I/O）",
+  "Held to ~10 fps while zoomed. Run a benchmark (Settings → Fast View) to use your device's real full-res rate.": "放大时限制为约 10 fps。运行性能测试（设置 → 快速预览）可使用设备实测的全分辨率速度。",
+  "Help": "帮助",
+  "Hidden": "隐藏",
+  "Hide filmstrip": "隐藏缩略图条",
+  "Hide photo grid": "隐藏照片网格",
+  "Home": "Home",
+  "Hover the photo's bottom-right corner and the \"i\" button appears for a few seconds, then fades if you leave it alone — click it to bring both panels back. Also on the photo's right-click menu, and on the View menu.": "将鼠标移到照片右下角，“i”按钮会显示几秒，随后在无操作时淡出。点击可重新显示两个面板，也可从照片右键菜单或“显示”菜单打开。",
+  "Hover the photo's bottom-right corner and the \"i\" button appears for a few seconds, then fades if you leave it alone — click it to bring both panels back. Also on the photo's right-click menu.": "将鼠标移到照片右下角，“i”按钮会显示几秒，随后在无操作时淡出。点击可重新显示两个面板，也可从照片右键菜单打开。",
+  "Hover to preview": "悬停预览",
+  "ICC / ICM colour profile": "ICC / ICM 色彩配置文件",
+  "INPUT": "输入",
+  "ISO": "ISO",
+  "ISO {iso}": "ISO {iso}",
+  "Image": "图像",
+  "Image only": "仅图像",
+  "Image only (non-RAW)": "仅图像（非 RAW）",
+  "Images": "图像",
+  "Image…": "图像…",
+  "Immersive (fullscreen)": "沉浸模式（全屏）",
+  "Immersive / fullscreen": "沉浸模式 / 全屏",
+  "Immersive full screen": "沉浸式全屏",
+  "In immersive mode this includes rating, flag and reject controls and the image/RAW panel. When panels are hidden in normal view, it includes the info button in the corner.": "沉浸模式下还包括评分、标记、弃选控件和图像/RAW 面板；普通视图中隐藏面板时，还包括角落的信息按钮。",
+  "Include {n} RAW-only photo?": {
+    "other": "包含 {n} 张仅有 RAW 的照片？"
+  },
+  "Include {n} rejected photo?": {
+    "other": "包含 {n} 张已弃照片？"
+  },
+  "Info panel view": "信息面板视图",
+  "Interface motion": "界面动效",
+  "Internal error — the display pipeline keeps failing. Your ratings are still being saved; please restart Falcon.": "内部错误 — 显示流程持续失败。评分仍在保存，请重启 Falcon。",
+  "Jump to next unrated": "跳至下一张未评分照片",
+  "Just now": "刚刚",
+  "Keep corner controls visible for {n} second after the pointer leaves with no new action.": {
+    "other": "鼠标离开且无新操作后，角落控件继续显示 {n} 秒。"
+  },
+  "LANGUAGE": "语言",
+  "Language": "语言",
+  "Large": "大",
+  "Last photo": "最后一张照片",
+  "Left": "左方向键",
+  "Legacy": "旧版",
+  "Legacy · {0} changed": "旧版 · 已更改 {0} 项",
+  "Lens": "镜头",
+  "Load profile…": "载入配置文件…",
+  "Loading…": "正在加载…",
+  "Loads the whole image up to the limit below — uses more GPU memory.": "加载整张图像，最高达到下方限制 — 占用更多显存。",
+  "MP": "百万像素",
+  "Mac candidate · Diagnostics": "Mac 候选版 · 诊断",
+  "Make default": "设为默认",
+  "Mark as rejected": "标为弃选",
+  "Max": "最大",
+  "Max (up to 120 fps)": "最大（最高 120 fps）",
+  "Measured: {0}": "测量结果：{0}",
+  "Medium": "中等",
+  "Metering": "测光",
+  "Minimise / expand info panel": "最小化 / 展开信息面板",
+  "Minimise info panel": "最小化信息面板",
+  "Minimised": "最小化",
+  "Minimize": "最小化",
+  "More than one screen? Each display keeps its own setting — set the others up in Settings → Output colour gamut.": "使用多个屏幕？每个显示器独立保存设置，可在设置 → 输出色域中配置其他显示器。",
+  "Mouse wheel changes photo": "滚轮切换照片",
+  "Move rejected": "移动已弃照片",
+  "Move rejects": "移动已弃照片",
+  "Move to Recycle Bin": "移至回收站",
+  "Move to Trash": "移至废纸篓",
+  "Moved {n} file(s) → ./Rejected": {
+    "other": "已移动 {n} 个文件 → ./Rejected"
+  },
+  "Moves the RAW + image out of the folder — reversible (they go to ./Rejected, not the bin).": "将 RAW 和图像移出当前文件夹 — 可撤销（移至 ./Rejected，而非回收站）。",
+  "Moving rejects…": "正在移动已弃照片…",
+  "Name": "名称",
+  "Never browse onto a blank photo": "浏览时等待照片预览",
+  "Next photo": "下一张照片",
+  "Next unrated found on {photo} — not shown while both halves are pinned": "在 {photo} 找到下一张未评分照片，两侧均固定时不切换显示",
+  "No": "否",
+  "No CUDA/nvJPEG GPU detected — decodes run on the CPU.": "未检测到 CUDA/nvJPEG GPU — 将使用 CPU 解码。",
+  "No Recent Folders": "无最近文件夹",
+  "No battery detected — Auto never activates on this computer.": "未检测到电池，此电脑不会自动启用节能模式。",
+  "No change — {n} photo already flagged": {
+    "other": "未更改，{n} 张照片已标记"
+  },
+  "No change — {n} photo already had that rating": {
+    "other": "未更改，{n} 张照片已有该评分"
+  },
+  "No change — {n} photo already rejected": {
+    "other": "未更改，{n} 张照片已弃选"
+  },
+  "No change — {n} photo already un-rejected": {
+    "other": "未更改，{n} 张照片已取消弃选"
+  },
+  "No change — {n} photo already unflagged": {
+    "other": "未更改，{n} 张照片已取消标记"
+  },
+  "No change — {n} photo already unmarked": {
+    "other": "未更改，{n} 张照片已无标记"
+  },
+  "No folder open": "未打开文件夹",
+  "No folder open — it benchmarks generated photos at this target size, then deletes them.": "未打开文件夹 — 将生成目标尺寸的照片用于测试，完成后删除。",
+  "No measured times yet — Auto tunes on the next normal launch.": "暂无实测时间 — 自动模式将在下次正常启动时调优。",
+  "No photo open — nothing to copy": "未打开照片 — 没有可复制的内容",
+  "No photos in this folder": "此文件夹没有照片",
+  "No picks yet.": "暂无已选照片。",
+  "No recent events.": "暂无最近事件。",
+  "No rejects.": "暂无已弃照片。",
+  "No rotations yet.": "暂无旋转记录。",
+  "No watermark — pick Image or Text in the sheet": "无水印 — 在面板中选择“图像”或“文字”",
+  "None": "无",
+  "None — just list Falcon in “Open With”": "不设为默认 — 仅列入“打开方式”",
+  "Not active — this setting is switched off.": "未启用，此设置已关闭。",
+  "Not applied — bulk editing is no longer armed": "未应用 — 批量编辑已停用",
+  "Not applied — the selection moved on": "未应用 — 选区已更改",
+  "Not sharp": "尚未清晰",
+  "Nothing matches the rating filter.": "没有符合评分筛选条件的照片。",
+  "Nothing new or edited in this folder": "此文件夹没有新增或编辑的照片",
+  "Nothing rated yet.": "暂无已评分照片。",
+  "Nothing reviewed yet.": "暂无已筛选照片。",
+  "Nothing rotated": "未旋转任何照片",
+  "Nothing selected.": "未选择照片。",
+  "Nothing to change — none of those photos are still in this folder": "没有可更改的内容 — 这些照片均已不在此文件夹",
+  "Nothing to clear on this {n} photo": {
+    "other": "这 {n} 张照片没有可清除的评分"
+  },
+  "Nothing to copy": "没有可复制的内容",
+  "Nothing to copy for these photos": "这些照片没有可复制的内容",
+  "Nothing to copy for this photo": "此照片没有可复制的内容",
+  "Nothing to delete — files already gone.": "没有可删除的内容 — 文件已不存在。",
+  "Nothing to delete — the selection is empty": "没有可删除的内容 — 选区为空",
+  "Nothing to delete — those photos have left this folder": "没有可删除的内容 — 这些照片已离开此文件夹",
+  "Nothing to empty — no ./Rejected folder.": "没有可清空的内容 — 不存在 ./Rejected 文件夹。",
+  "Nothing to export": "没有可导出的内容",
+  "Nothing to recover for {name}": "{name} 没有可恢复的文件",
+  "Notifications": "通知",
+  "Now: sRGB (fallback).": "当前：sRGB（备用）。",
+  "Now: sRGB — right for most laptops.": "当前：sRGB — 适合大多数笔记本电脑。",
+  "Now: {0}.": "当前：{0}。",
+  "OUTPUT": "输出",
+  "Off": "关闭",
+  "Off = wheel zooms. Trackpads: two-finger scroll browses when on.": "关闭时滚轮用于缩放。触控板：开启后双指滚动切换照片。",
+  "Off on macOS: one unified memory pool serves the GPU and the app, so a second CPU-side byte cache double-books it, and the decode pool is sized from that same budget. Set FALCON_CLASSIC_POOLS=1 to restore the Windows-style pools for a comparison run.": "macOS 上已关闭：GPU 和应用共用统一内存，额外的 CPU 字节缓存会重复占用，解码池也按同一内存预算分配。设置 FALCON_CLASSIC_POOLS=1 可恢复 Windows 式内存池，以便比较。",
+  "On": "开启",
+  "On battery — reducing background work.": "使用电池 — 减少后台工作。",
+  "Only star ratings sync to XMP — flags and rejects stay in Falcon.": "只有星级评分同步至 XMP — 标记和弃选状态仅保存在 Falcon 中。",
+  "Opacity": "不透明度",
+  "Open Folder…": "打开文件夹…",
+  "Open Image…": "打开图像…",
+  "Open Recent": "打开最近项目",
+  "Open Review": "打开筛选",
+  "Open Settings": "打开设置",
+  "Open a folder of photos": "打开照片文件夹",
+  "Open a folder to start culling.": "打开文件夹即可开始筛选。",
+  "Open a photo (or any photo in a folder)": "打开照片（或文件夹中的任意照片）",
+  "Open a photo, or any photo in a folder, to start culling.\nYou can also drag a photo or folder onto the window.": "打开一张照片或文件夹中的任意照片，即可开始筛选。\n也可以将照片或文件夹拖入窗口。",
+  "Open in viewer": "在查看器中打开",
+  "Open photo or folder…": "打开照片或文件夹…",
+  "Open photos with Falcon?": "用 Falcon 打开照片？",
+  "Opens the diagnostic log's folder. When logging is on, it records bulk review, copy, move and export activity.": "打开诊断日志所在文件夹。开启日志时会记录批量筛选、复制、移动及导出活动。",
+  "Open…": "打开…",
+  "Operation failed — the worker crashed mid-run (see log)": "操作失败 — 工作线程运行中崩溃（请查看日志）",
+  "Or load it again below.": "也可在下方重新载入。",
+  "Or run Auto-detect again above.": "也可在上方重新运行自动检测。",
+  "Or use Auto-detect above.": "也可使用上方的自动检测。",
+  "Output colour gamut": "输出色域",
+  "Overwrite": "覆盖",
+  "Overwrite re-renders those files and replaces them in place — the old versions are gone for good, not moved to the {bin} (each replacement is atomic, so a file is never left half-written). Skip existing leaves them untouched and exports the rest. To keep both versions, cancel and turn on “Append the preset name to filenames”.": "“覆盖”会重新渲染并替换这些文件，旧版本将永久消失，不会移至{bin}（每次替换均为原子操作，不会留下只写入一半的文件）。“跳过已有文件”会保留它们，仅导出其余文件。若要保留两个版本，请取消并开启“将预设名称附加到文件名”。",
+  "PERFORMANCE": "性能",
+  "PLACEMENT": "布局",
+  "PNG image": "PNG 图像",
+  "Panel, toast and full-screen transitions. Control animations are unaffected.": "面板、通知和全屏切换的过渡动效。控件动画不受影响。",
+  "Path copied — {path}": "路径已复制 — {path}",
+  "Photo": "照片",
+  "Photo Grid": "照片网格",
+  "Photos are converted to this gamut for display. Set it to match your display's gamut — macOS assigns each display's profile in System Settings → Displays (ColorSync). Interface colours follow this setting too, so the app matches colour-managed tools like Photoshop.": "显示时会将照片转换至此色域，请与显示器色域匹配。macOS 在系统设置 → 显示器中为每台显示器分配配置文件（ColorSync）。界面颜色也跟随此设置，以匹配 Photoshop 等支持色彩管理的软件。",
+  "Photos are converted to this gamut for display. Set it to match your monitor's gamut mode — and on a wide-gamut monitor turn OFF Windows Auto Colour Management and HDR. Interface colours follow this setting too, so the app matches colour-managed tools like Photoshop.": "显示时会将照片转换至此色域，请与显示器色域模式匹配。广色域显示器请关闭 Windows 自动色彩管理及 HDR。界面颜色也跟随此设置，以匹配 Photoshop 等支持色彩管理的软件。",
+  "Photos are judged in colour. Match Falcon to this display once — it applies to every photo and the interface itself.": "色彩影响照片判断。将 Falcon 与此显示器匹配一次，即可应用于所有照片及界面。",
+  "Pick a preset below — Export renders the displayed photo with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将当前显示的照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the displayed photos with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将当前显示的照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the pick with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将已选照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the picks with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将已选照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the rated photo with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将已评分照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the rated photos with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将已评分照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the reject with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将已弃照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the rejects with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将已弃照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the selected photo with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将所选照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Pick a preset below — Export renders the selected photos with it into the shoot's ./export folder, converted to {format} and sRGB for web & social.": "在下方选择预设，点击“导出”会将所选照片渲染至本次拍摄的 ./export 文件夹，转换为 {format} 和 sRGB，便于网页及社交平台使用。",
+  "Picks": "已选",
+  "Picks — open Review": "已选照片 — 打开筛选",
+  "Pin": "固定",
+  "Pinned to this photo — click to follow the current photo": "已固定此照片 — 点击跟随当前照片",
+  "Position": "位置",
+  "Position in folder — sorting": "文件夹中的位置 — 排序",
+  "Posture benchmark (dev)": "运行姿态测试（开发者）",
+  "Preset name…": "预设名称…",
+  "Press a key…": "请按下一个键…",
+  "Press current rating again to clear": "再次按下当前评分键以清除评分",
+  "Press {0} or hover the photo's bottom-right corner and the \"i\" button appears for a few seconds, then fades if you leave it alone — press {0} again (or click it) to bring both panels back. Also on the photo's right-click menu, and on the View menu.": "按 {0} 或将鼠标移到照片右下角，“i”按钮会显示几秒，随后在无操作时淡出。再次按 {0} 或点击按钮可重新显示两个面板，也可从照片右键菜单或“显示”菜单打开。",
+  "Press {0} or hover the photo's bottom-right corner and the \"i\" button appears for a few seconds, then fades if you leave it alone — press {0} again (or click it) to bring both panels back. Also on the photo's right-click menu.": "按 {0} 或将鼠标移到照片右下角，“i”按钮会显示几秒，随后在无操作时淡出。再次按 {0} 或点击按钮可重新显示两个面板，也可从照片右键菜单打开。",
+  "Press {keys} while browsing to rate.": "浏览时按 {keys} 评分。",
+  "Press {key} on a photo to flag a keeper.": "在照片上按 {key}，标记要保留的照片。",
+  "Press {key} on a photo to rotate it.": "在照片上按 {key} 旋转。",
+  "Press {key} to reject a photo.": "按 {key} 弃选照片。",
+  "Preview": "预览",
+  "Previous photo": "上一张照片",
+  "Print": "印刷",
+  "Print-ready CMYK JPEGs are decoded by Windows, through the same default print profile Photoshop assumes — so they look the way they do everywhere else on this PC. Slightly slower to browse, and the colours differ from a Mac's.": "由 Windows 解码用于印刷的 CMYK JPEG，并使用 Photoshop 默认采用的印刷配置文件 — 与此电脑上的其他软件显示一致。浏览稍慢，颜色与 Mac 上可能不同。",
+  "Quality": "质量",
+  "Quick benchmark": "快速性能测试",
+  "RAM frame cache (L2)": "内存帧缓存（L2）",
+  "RAW + image": "RAW 和图像",
+  "RAW only": "仅 RAW",
+  "RECOMMENDED FOR THIS MACHINE": "推荐用于此设备",
+  "REVIEW": "筛选",
+  "Rate": "评分",
+  "Rate a photo while browsing (bind the rating keys in Settings → Controls).": "浏览时为照片评分（可在设置 → 操作中绑定评分按键）。",
+  "Rate all {n} photo {stars}★?": {
+    "other": "将全部 {n} 张照片评为 {stars}★？"
+  },
+  "Rate {n}": "为 {n} 张照片评分",
+  "Rate {n} Photo {stars}": {
+    "other": "将 {n} 张照片评为 {stars}"
+  },
+  "Rate {stars}": "评为 {stars}",
+  "Rate — same key clears": "评分 — 再按同键可清除",
+  "Rate ★ 1": "评分 ★ 1",
+  "Rate ★ 2": "评分 ★ 2",
+  "Rate ★ 3": "评分 ★ 3",
+  "Rate ★ 4": "评分 ★ 4",
+  "Rate ★ 5": "评分 ★ 5",
+  "Rated": "已评分",
+  "Rated {n} photo {stars}★": {
+    "other": "已将 {n} 张照片评为 {stars}★"
+  },
+  "Rated {stars} — {photo}": "已评为 {stars} — {photo}",
+  "Rating": "评分",
+  "Rating cleared — {photo}": "评分已清除 — {photo}",
+  "Rating question cancelled — the photo is unchanged": {
+    "other": "已取消评分，{n} 张照片未更改"
+  },
+  "Rating re-applied on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已重新应用 {n} 张照片中 {applied} 张的评分（{missing} 张已不在此文件夹）"
+  },
+  "Rating re-applied on {n} photo": {
+    "other": "已重新应用 {n} 张照片的评分"
+  },
+  "Rating re-applied on {photo} — not shown while both halves are pinned": "已重新应用 {photo} 的评分，两侧均固定时不切换显示",
+  "Rating restored on {photo} — not shown while both halves are pinned": "已恢复 {photo} 的评分，两侧均固定时不切换显示",
+  "Rating reverted on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已撤销 {n} 张照片中 {applied} 张的评分更改（{missing} 张已不在此文件夹）"
+  },
+  "Rating reverted on {n} photo": {
+    "other": "已撤销 {n} 张照片的评分更改"
+  },
+  "Ratings saved.": "评分已保存。",
+  "Reading this photo's colour space…": "正在读取此照片的色彩空间…",
+  "Recommended": "推荐",
+  "Recover": "恢复",
+  "Recovered {name}": "已恢复 {name}",
+  "Recovered {recovered}/{n} file(s) for {name} — a file named {names} already exists": {
+    "other": "已恢复 {name} 的 {recovered}/{n} 个文件，名为 {names} 的文件已存在"
+  },
+  "Recovered {recovered}/{n} file(s) for {name} — see log": {
+    "other": "已恢复 {name} 的 {recovered}/{n} 个文件，详情见日志"
+  },
+  "Recycle Bin": "回收站",
+  "Redo": "重做",
+  "Redo last change": "重做上次更改",
+  "Reject": "弃选",
+  "Reject a photo while browsing (bind a key in Settings → Controls).": "浏览时弃选照片（可在设置 → 操作中绑定按键）。",
+  "Reject photo": "弃选照片",
+  "Reject re-applied on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已重新弃选 {n} 张照片中的 {applied} 张（{missing} 张已不在此文件夹）"
+  },
+  "Reject re-applied on {n} photo": {
+    "other": "已重新弃选 {n} 张照片"
+  },
+  "Reject reverted on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已撤销 {n} 张照片中 {applied} 张的弃选（{missing} 张已不在此文件夹）"
+  },
+  "Reject reverted on {n} photo": {
+    "other": "已撤销 {n} 张照片的弃选"
+  },
+  "Reject {n}": "弃选 {n} 张",
+  "Reject {n} Photo": {
+    "other": "弃选 {n} 张照片"
+  },
+  "Rejected {n} photo": {
+    "other": "已弃选 {n} 张照片"
+  },
+  "Rejected — {photo}": "已弃选 — {photo}",
+  "Rejects": "已弃",
+  "Rejects — open Review": "已弃照片 — 打开筛选",
+  "Remember sorting and panel layout": "记住排序与面板布局",
+  "Remember window size & position": "记住窗口大小与位置",
+  "Remembers each folder's sorting, Info view, and whether the info and image/RAW panels reopen minimised. Set to 0 to turn these memories off.": "记住各文件夹的排序、信息视图，以及信息和图像/RAW 面板是否最小化。设为 0 可关闭这些记忆。",
+  "Remove": "移除",
+  "Removes its remembered colour setting and monitor profile from Falcon. Your photos and the profile file itself are untouched — plug the display in again to set it up.": "移除 Falcon 记住的色彩设置和显示器配置。照片及配置文件本身不变；重新连接显示器即可再次设置。",
+  "Removes the manual rotations recorded for this folder — image files are untouched.": "移除此文件夹记录的手动旋转 — 图像文件不变。",
+  "Removes the saved preset only — your photos and last-used export settings are untouched.": "仅移除已保存的预设 — 照片和上次使用的导出设置不变。",
+  "Reopen anytime: Settings → “Show welcome”": "随时重开：设置 →“显示欢迎指南”",
+  "Requires the HEVC/HEIF Image Extensions from the Microsoft Store": "需要安装 Microsoft Store 中的 HEVC/HEIF 图像扩展",
+  "Reset": "重置",
+  "Reset to defaults": "恢复默认",
+  "Reset zoom": "还原缩放",
+  "Resolution limit": "分辨率上限",
+  "Rest the mouse on a Review thumbnail for a moment to see it larger beside the panel. A narrow window has no room for it.": "鼠标在筛选缩略图上停留片刻，可在面板旁查看大图。窗口较窄时不显示。",
+  "Restart Falcon to use the new language.": "重启 Falcon 后使用新语言。",
+  "Restore": "还原",
+  "Resume": "恢复",
+  "Resume position memory": "记住浏览位置",
+  "Reveal": "显示文件位置",
+  "Reveal in Explorer": "在资源管理器中显示",
+  "Reveal in Finder": "在访达中显示",
+  "Reveal {n} in {file_manager}": "在{file_manager}中显示 {n} 张照片",
+  "Review": "筛选",
+  "Review data FAILED to save for {folder} ({err}) — your latest changes may not be on disk": "无法保存 {folder} 的筛选数据（{err}）— 最新更改可能尚未写入磁盘",
+  "Review data was unreadable — couldn't preserve it; starting fresh": "无法读取筛选数据且无法保留原文件 — 已重新开始",
+  "Review data was unreadable — kept as {name} and starting fresh": "筛选数据无法读取，已保留为 {name} 并重新开始",
+  "Reviewed": "已筛选",
+  "Right": "右方向键",
+  "Right-click": "右键点击",
+  "Rotate 90° CCW": "逆时针旋转 90°",
+  "Rotate 90° CW": "顺时针旋转 90°",
+  "Rotate Left": "向左旋转",
+  "Rotate Right": "向右旋转",
+  "Rotate a photo while browsing (bind a key in Settings → Controls).": "浏览时旋转照片（可在设置 → 操作中绑定按键）。",
+  "Rotate left": "向左旋转",
+  "Rotate right": "向右旋转",
+  "Rotate {n} Photo Left": {
+    "other": "将 {n} 张照片向左旋转"
+  },
+  "Rotate {n} Photo Right": {
+    "other": "将 {n} 张照片向右旋转"
+  },
+  "Rotate {n} left": "向左旋转 {n} 张",
+  "Rotate {n} right": "向右旋转 {n} 张",
+  "Rotated": "已旋转",
+  "Rotated {n} photo": {
+    "other": "已旋转 {n} 张照片"
+  },
+  "Rotated {n} photo left": {
+    "other": "已向左旋转 {n} 张照片"
+  },
+  "Rotated {n} photo right": {
+    "other": "已向右旋转 {n} 张照片"
+  },
+  "Rotated — {photo}": "已旋转 — {photo}",
+  "Rotating an animated GIF isn't supported yet": "暂不支持旋转 GIF 动图",
+  "Rotating an animated GIF isn't supported yet — {name}": "暂不支持旋转 GIF 动图 — {name}",
+  "Rotation re-applied on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已重新应用 {n} 张照片中 {applied} 张的旋转（{missing} 张已不在此文件夹）"
+  },
+  "Rotation re-applied on {n} photo": {
+    "other": "已重新应用 {n} 张照片的旋转"
+  },
+  "Rotation re-applied on {photo} — not shown while both halves are pinned": "已重新应用 {photo} 的旋转，两侧均固定时不切换显示",
+  "Rotation restored on {photo} — not shown while both halves are pinned": "已恢复 {photo} 的旋转，两侧均固定时不切换显示",
+  "Rotation reverted on {applied} of {n} photos ({missing} no longer in this folder)": {
+    "other": "已撤销 {n} 张照片中 {applied} 张的旋转（{missing} 张已不在此文件夹）"
+  },
+  "Rotation reverted on {n} photo": {
+    "other": "已撤销 {n} 张照片的旋转"
+  },
+  "Rotations": "旋转",
+  "Rotations aren't in this view — see the Rotated filter above.": "此视图不显示旋转 — 请使用上方“已旋转”筛选。",
+  "Run": "运行",
+  "Run benchmark": "运行性能测试",
+  "Running…": "正在运行…",
+  "Save": "保存",
+  "Save FAILED for {path} ({err}) — your latest changes may not be on disk": "保存 {path} 失败（{err}），最新更改可能尚未写入磁盘",
+  "Save preset": "保存预设",
+  "Scanning folder…": "正在扫描文件夹…",
+  "Scanning {folder}…": "正在扫描 {folder}…",
+  "Scroll to current": "滚动至当前照片",
+  "Select": "选择",
+  "Select all": "全选",
+  "Select new / edited": "选择新增 / 已编辑照片",
+  "Select new / edited (no record)": "选择新增 / 已编辑照片（无记录）",
+  "Select new / edited (unreadable)": "选择新增 / 已编辑照片（无法读取）",
+  "Selected": "已选择",
+  "Selected {edited} edited (by size/date)": "已选中 {edited} 张已修改照片（按大小/日期判断）",
+  "Selected {new} new": "已选中 {new} 张新照片",
+  "Selected {new} new + {edited} edited (by size/date)": "已选中 {new} 张新照片和 {edited} 张已修改照片（按大小/日期判断）",
+  "Selected · {n}": "已选择 · {n}",
+  "Selection cleared ({n})": "已清除选择（{n}）",
+  "Selection restored ({applied} of {total} - the rest are no longer in this folder)": "已恢复选择（{applied}/{total} — 其余照片已不在此文件夹）",
+  "Selection restored ({applied})": "已恢复选择（{applied}）",
+  "Sends every file currently in ./Rejected to the OS {bin} — recoverable from there until you empty the bin. Photos NOT yet moved to ./Rejected are untouched.": "将 ./Rejected 中的所有文件移至系统{bin}，清空前可从中恢复。尚未移至 ./Rejected 的照片不受影响。",
+  "Sends every file currently in ./Rejected to the {bin} — recoverable from there until you empty the {bin}. Photos NOT yet moved to ./Rejected are untouched.": "将 ./Rejected 中的所有文件移至{bin}，清空{bin}前可从中恢复。尚未移至 ./Rejected 的照片不受影响。",
+  "Sent {n} file(s) from ./Rejected to the {bin}.": {
+    "other": "已将 ./Rejected 中的 {n} 个文件移至{bin}。"
+  },
+  "Sent {n} file(s) to the {bin}": {
+    "other": "已将 {n} 个文件移至{bin}"
+  },
+  "Sent {ok} of {n} file to the {bin} — {failed} did not go": {
+    "other": "已将 {n} 个文件中的 {ok} 个移至{bin}，{failed} 个未能移动"
+  },
+  "Settings": "设置",
+  "Settings file was unreadable — couldn't preserve it; reset to defaults": "无法读取设置文件且无法保留原文件 — 已恢复默认值",
+  "Settings file was unreadable — kept as {name} and reset to defaults (keybinds/presets)": "设置文件无法读取，已保留为 {name} 并恢复默认设置（快捷键/预设）",
+  "Settings → Fast View → “Benchmark with” is set to Target size, so this measures generated photos at that size, not this folder.": "设置 → 快速预览 →“测试素材”已设为“目标尺寸”，因此将测试该尺寸的生成照片，而非此文件夹。",
+  "Settings…": "设置…",
+  "Sharp · behind {behind_cached}/{behind_avail} · ahead {ahead_cached}/{ahead_avail}": "清晰缓存 · 后方 {behind_cached}/{behind_avail} · 前方 {ahead_cached}/{ahead_avail}",
+  "Sharper preview": "更清晰预览",
+  "Shortcuts in Settings…": "设置中的快捷键…",
+  "Show": "显示",
+  "Show Welcome Guide": "显示欢迎指南",
+  "Show filmstrip": "显示缩略图条",
+  "Show info panel": "显示信息面板",
+  "Show log file": "显示日志文件",
+  "Show panels": "显示面板",
+  "Show photo grid": "显示照片网格",
+  "Show welcome": "显示欢迎指南",
+  "Shutter": "快门",
+  "Simple": "简洁",
+  "Simulate VRAM (re-sizes the texture budget live)": "模拟显存（实时调整纹理预算）",
+  "Size": "尺寸",
+  "Skip": "跳过",
+  "Skip existing": "跳过已有文件",
+  "Skip for now": "暂时跳过",
+  "Small": "小",
+  "Social": "社交",
+  "Software": "软件",
+  "Solid": "实色",
+  "Sort": "排序",
+  "Space": "空格键",
+  "Speculative concurrency on a promoted (CHEAP) folder is UNCAPPED. The shipped default is 4 — on the 08-06 laptop pair, uncapped produced 30 five-second give-ups to WIC against 4 at cap 4, because one video engine time-slices the extra asks rather than serving them.": "低开销文件夹的预加载并发不受限制。默认值为 4 — 在两台测试笔记本上，不限制并发导致 30 次等待 5 秒后回退至 WIC；上限为 4 时仅 4 次，原因是视频引擎会轮流处理额外请求。",
+  "Speed": "速度优先",
+  "Speed limits aren't measured for this folder yet — the last benchmark used generated test images. Run it again with this folder open (Settings → Fast View).": "尚未测量此文件夹的速度上限 — 上次测试使用生成的图像。打开此文件夹后重新运行测试（设置 → 快速预览）。",
+  "Standard": "标准",
+  "Still loading — press again when the photo appears": "仍在加载 — 照片出现后请再按一次",
+  "Still loading — press again when this half appears": "仍在加载 — 此侧出现画面后请再按一次",
+  "Still loading — scroll again when the next photo appears": "仍在加载，下一张照片显示后请再次滚动",
+  "Stopping…": "正在停止…",
+  "Subtle": "淡",
+  "Swap": "交换",
+  "Sync ratings to XMP": "将评分同步至 XMP",
+  "System ({language})": "跟随系统（{language}）",
+  "Tab": "Tab",
+  "Takes effect at next launch — the backend is chosen once at startup.": "下次启动时生效 — 后端仅在启动时选择一次。",
+  "Tap to retry — the other photos are unaffected": "点击重试 — 其他照片不受影响",
+  "Target size": "目标尺寸",
+  "Text": "文字",
+  "That comes from this machine's benchmark, and follows the live rate as you browse.": "此值来自设备性能测试，并在浏览时跟随实时速度。",
+  "That display is connected again — set it back to sRGB to clear its saved colour setting": "该显示器已重新连接，将其设回 sRGB 可清除保存的色彩设置",
+  "That display is set to {chip} — adjust in Settings if needed.": "该显示器已设为 {chip}，如需调整请前往设置。",
+  "That display isn't connected — plug it in to read its profile": "该显示器未连接，请连接后读取配置文件",
+  "That is a reserved device name on some systems (CON, PRN, AUX, NUL, COM1-9, LPT1-9)": "这是某些系统的保留设备名称（CON、PRN、AUX、NUL、COM1-9、LPT1-9）",
+  "That is the default until this machine has been measured — run a benchmark (Settings → Fast View) for a rate fitted to it.": "设备尚未测量时使用此默认值 — 请运行性能测试（设置 → 快速预览）以匹配设备性能。",
+  "That is the rate this machine is keeping up with on battery.": "这是此电脑使用电池时可持续处理的速度。",
+  "That is the rate this machine is keeping up with while Battery saver is on.": "这是此电脑开启系统节电模式时可持续处理的速度。",
+  "That is the rate this machine is keeping up with.": "这是此电脑可持续处理的速度。",
+  "That is the slowest step Falcon will use — this machine is currently slower than {fps} fps.": "这是 Falcon 将使用的最慢环节，此电脑当前速度低于 {fps} fps。",
+  "That key can't be bound here": "此按键无法绑定",
+  "That key is reserved for BASIC SHORTCUTS — use a letter or a digit here.": "此按键保留给基本快捷键 — 请使用字母或数字。",
+  "That photo is no longer in this folder.": "此照片已不在当前文件夹中。",
+  "That profile isn't a supported display profile (needs a matrix/TRC ICC)": "不支持此显示器配置文件（需要矩阵/TRC 型 ICC）",
+  "That selection belonged to another folder": "该选区属于另一个文件夹",
+  "The fast preview shown while browsing matches your window size. Pick its detail tier: one step below your window (faster) or one above, downsampled (sharper).": "浏览时的快速预览匹配窗口大小。可选择低一级的细节（更快），或高一级再缩小（更清晰）。",
+  "The graphics device was lost (a GPU driver reset or update, or the GPU was disconnected).\n\nFalcon can't keep rendering and needs to be restarted. Your ratings and picks were saved.": "图形设备连接已丢失（驱动程序重置或更新，或 GPU 已断开）。\n\nFalcon 无法继续渲染，需要重启。评分和已选状态已保存。",
+  "The rate comes from a SIMULATED latency (a dev lever), not from this machine.": "速度来自模拟延迟（开发者选项），而非设备实测。",
+  "The taskbar's third of a second, or the instant the pointer lands — try both.": "停留约三分之一秒，或鼠标移入后立即显示 — 可分别尝试。",
+  "This animated GIF's rotation was reset — the viewer can't turn one": "此 GIF 动图的旋转已重置，查看器无法旋转动图",
+  "This display": "此显示器",
+  "This display can't be uniquely identified — settings apply this session only.": "无法唯一识别此显示器 — 设置仅在本次运行中生效。",
+  "This display is recognised by its position and size — its settings follow that arrangement.": "通过位置和尺寸识别此显示器 — 设置会跟随该布局。",
+  "This entry belongs to a different physical monitor of the same model — this screen is on sRGB until you set it, which replaces the setting saved here.": "此记录属于同型号的另一台显示器 — 当前屏幕使用 sRGB，直至重新设置并替换此记录。",
+  "This file type can't be previewed yet": "暂不支持预览此文件类型",
+  "This folder is open in another Falcon window — review edits (ratings, flags, rejects) are last-writer-wins between them": "此文件夹已在另一个 Falcon 窗口中打开 — 评分、标记及弃选状态以最后写入的窗口为准",
+  "This folder's review data is locked by another program — Falcon is reading it in place and will rename it when the folder is free.": "此文件夹的筛选数据被其他程序锁定 — Falcon 将直接读取，文件夹释放后再重命名。",
+  "This format is currently unsupported": "目前不支持此格式",
+  "This result is from a generated {mp} MP target-size test, not the current folder.": "此结果来自生成的 {mp} 百万像素目标尺寸测试图，并非当前文件夹。",
+  "This result is from the current folder's photos, not a generated target-size test.": "此结果来自当前文件夹中的照片，而非生成的测试图。",
+  "Those photos are no longer in this folder": "这些照片已不在此文件夹",
+  "Three quick set-ups — all optional, all changeable later in Settings.": "三项快速设置 — 均可跳过，也可稍后在设置中更改。",
+  "Toggle Review panel": "切换筛选面板",
+  "Trash": "废纸篓",
+  "Turn HDR off to use a display profile.": "关闭 HDR 后可使用显示器配置文件。",
+  "Turn HDR off to use the display's own profile: {profile}.": "关闭 HDR 后可使用显示器自身的配置文件：{profile}。",
+  "Turn it off (Settings → System → Display → Colour management) to use a display profile.": "关闭此选项（设置 → 系统 → 显示 → 颜色管理）后可使用显示器配置文件。",
+  "Turn it off (Settings → System → Display → Colour management) to use the display's own profile: {profile}.": "关闭此选项（设置 → 系统 → 显示 → 颜色管理）后可使用显示器自身的配置文件：{profile}。",
+  "Turn it off (Settings → System → Display) to use a display profile.": "关闭此选项（设置 → 系统 → 显示）后可使用显示器配置文件。",
+  "Turn it off (Settings → System → Display) to use the display's own profile: {profile}.": "关闭此选项（设置 → 系统 → 显示）后可使用显示器自身的配置文件：{profile}。",
+  "Turned off for this session by FALCON_EFFICIENCY=0 — the control resumes on the next launch without it.": "本次运行由 FALCON_EFFICIENCY=0 关闭；下次不设置此变量启动时将恢复此控件。",
+  "Type": "类型",
+  "Type your watermark text in the sheet": "在面板中输入水印文字",
+  "Un-reject {n}": "取消弃选 {n} 张",
+  "Un-reject {n} Photo": {
+    "other": "取消弃选 {n} 张照片"
+  },
+  "Un-rejected {n} photo": {
+    "other": "已取消 {n} 张照片的弃选"
+  },
+  "Un-rejected — {photo}": "已取消弃选 — {photo}",
+  "Uncapped": "不限制",
+  "Undid — restored {n} file(s) to the folder": {
+    "other": "已撤销，将 {n} 个文件恢复至文件夹"
+  },
+  "Undo": "撤销",
+  "Undo / redo the last change": "撤销 / 重做上次更改",
+  "Undo Delete": "撤销删除",
+  "Undo last change": "撤销上次更改",
+  "Undo move": "撤销移动",
+  "Undo · Redo": "撤销 · 重做",
+  "Undoing move…": "正在撤销移动…",
+  "Unflag {n}": "取消标记 {n} 张",
+  "Unflag {n} Photo": {
+    "other": "取消标记 {n} 张照片"
+  },
+  "Unflagged {n} photo": {
+    "other": "已取消 {n} 张照片的标记"
+  },
+  "Unflagged — {photo}": "已取消标记 — {photo}",
+  "Unmark": "清除标记",
+  "Unmark {n}": "清除 {n} 张照片的标记",
+  "Unmark {n} Photo": {
+    "other": "清除 {n} 张照片的标记"
+  },
+  "Unmarked {n} photo": {
+    "other": "已清除 {n} 张照片的标记"
+  },
+  "Unpinned A to show the next unrated photo": "已取消固定 A，以显示下一张未评分照片",
+  "Unpinned B to show the next unrated photo": "已取消固定 B，以显示下一张未评分照片",
+  "Update": "更新",
+  "Uses Falcon’s RAW development; colours may differ from the camera preview.": "使用 Falcon 的 RAW 显影，色彩可能与相机预览不同。",
+  "Uses each camera's built-in preview, not a developed RAW. Some cameras embed a small one, and it is never upscaled.": "使用相机内嵌预览，不进行 RAW 显影。有些相机的内嵌预览较小，程序不会放大它。",
+  "View": "显示",
+  "View EXIF": "查看 EXIF",
+  "View only": "仅查看",
+  "WATERMARK": "水印",
+  "Waiting for battery power.": "等待使用电池供电。",
+  "Watermark not ready — the logo PNG is missing or failed to load. Re-pick it. Nothing exported.": "水印未就绪 — 标志 PNG 缺失或加载失败，请重新选择。未导出任何照片。",
+  "Watermark not ready — the text didn't render (check the font/characters). Nothing exported.": "水印未就绪 — 文字未渲染（请检查字体/字符）。未导出任何照片。",
+  "Web": "网页",
+  "Welcome to Falcon": "欢迎使用 Falcon",
+  "When it runs": "启用条件",
+  "When zoomed": "放大时",
+  "While browsing: {flag} = flag · {rate} = rate.": "浏览时：{flag} = 标记 · {rate} = 评分。",
+  "While browsing: {flag} = flag · {reject} = reject · {rate} = rate.": "浏览时：{flag} = 标记 · {reject} = 弃选 · {rate} = 评分。",
+  "While browsing: {flag} = flag · {reject} = reject.": "浏览时：{flag} = 标记 · {reject} = 弃选。",
+  "While browsing: {flag} = flag.": "浏览时：{flag} = 标记。",
+  "While browsing: {rate} = rate.": "浏览时：{rate} = 评分。",
+  "While browsing: {reject} = reject · {rate} = rate.": "浏览时：{reject} = 弃选 · {rate} = 评分。",
+  "While browsing: {reject} = reject.": "浏览时：{reject} = 弃选。",
+  "While comparing, bring them back from this control. Also on a filmstrip thumbnail's right-click menu, and on the View menu.": "比较时可用此控件重新显示面板，也可从缩略图条的右键菜单或“显示”菜单打开。",
+  "While comparing, bring them back from this control. Also on a filmstrip thumbnail's right-click menu.": "比较时可用此控件重新显示面板，也可从缩略图条的右键菜单打开。",
+  "While the folder is loading": "文件夹加载期间",
+  "White balance": "白平衡",
+  "Wide-gamut or calibrated screen? Use Auto-detect.": "使用广色域或校准的屏幕？请自动检测。",
+  "Widen controls to fit text": "加宽控件以适应文字",
+  "Window": "窗口",
+  "Windows Auto Colour Management": "Windows 自动色彩管理",
+  "Windows Settings…": "Windows 设置…",
+  "Windows colour settings changed: {mode} is now OFF for this display.": "Windows 色彩设置已更改，此显示器的 {mode} 已关闭。",
+  "Windows colour settings changed: {mode} is now OFF for {display}.": "Windows 色彩设置已更改，{display} 的 {mode} 已关闭。",
+  "Windows colour settings changed: {mode} is now ON for this display.": "Windows 色彩设置已更改，此显示器的 {mode} 已开启。",
+  "Windows colour settings changed: {mode} is now ON for {display}.": "Windows 色彩设置已更改，{display} 的 {mode} 已开启。",
+  "Windows is managing colour, so Falcon's current output profile double-converts — switch to sRGB or run Auto-detect.": "Windows 正在管理色彩，Falcon 的当前输出配置会造成重复转换 — 请切换至 sRGB 或运行自动检测。",
+  "Windows no longer assigns a colour profile to this display — Falcon keeps its current output profile.": "Windows 不再为此显示器指定色彩配置文件，Falcon 保持当前输出配置。",
+  "Windows no longer assigns a colour profile to {display} — Falcon keeps its current output profile.": "Windows 不再为 {display} 指定色彩配置文件，Falcon 保持当前输出配置。",
+  "Windows now assigns {profile} to this display. Run Auto-detect to pick it up.": "Windows 现为此显示器指定了 {profile}，请运行自动检测以使用它。",
+  "Windows now assigns {profile} to {display}. Run Auto-detect to pick it up.": "Windows 现为 {display} 指定了 {profile}，请运行自动检测以使用它。",
+  "Write sidecars": "写入附属文件",
+  "Writes an .xmp sidecar beside each rated photo so Lightroom, Bridge and others can read the star rating. Existing sidecars are updated in place; unrated photos are skipped; the image files are never changed. Previously written ratings for now-unrated photos are cleared to 0. Turning sync off later leaves these sidecars untouched.": "在每张已评分照片旁写入 .xmp 附属文件，供 Lightroom、Bridge 等软件读取星级评分。已有附属文件会原位更新；未评分照片会跳过；图像文件不会更改。此前已写入但现已取消的评分会清零。之后关闭同步不会更改这些附属文件。",
+  "Writes the rotation into each photo's EXIF (JPGs) or an XMP sidecar (RAW) — pixels untouched, timestamps update.": "将旋转写入照片 EXIF（JPG）或 XMP 附属文件（RAW）— 像素不变，时间戳会更新。",
+  "XL": "超大",
+  "XMP sync": "同步 XMP",
+  "Yes": "是",
+  "You were at {photo} last time — resume?": "上次浏览到 {photo}，继续？",
+  "Your auto-detected monitor profile for {display} isn't available — showing sRGB for now. Falcon will try it again next launch.": "为 {display} 自动检测的显示器配置文件不可用，暂以 sRGB 显示。Falcon 将在下次启动时重试。",
+  "Your auto-detected monitor profile for {display} isn't available. Falcon will try it again next launch.": "为 {display} 自动检测的显示器配置文件不可用。Falcon 将在下次启动时重试。",
+  "Your auto-detected monitor profile isn't available — showing sRGB for now. Falcon will try it again next launch.": "自动检测的显示器配置文件不可用，暂以 sRGB 显示。Falcon 将在下次启动时重试。",
+  "Your auto-detected monitor profile isn't available. Falcon will try it again next launch.": "自动检测的显示器配置文件不可用。Falcon 将在下次启动时重试。",
+  "Your monitor profile “{file}” for {display} isn't available — showing sRGB for now. Falcon will try it again next launch.": "用于 {display} 的显示器配置文件“{file}”不可用，暂以 sRGB 显示。Falcon 将在下次启动时重试。",
+  "Your monitor profile “{file}” isn't available — showing sRGB for now. Falcon will try it again next launch.": "显示器配置文件“{file}”不可用，暂以 sRGB 显示。Falcon 将在下次启动时重试。",
+  "Your name or @handle…": "你的名字或 @账号…",
+  "Your saved monitor profile “{file}” for {display} isn't available. Falcon will try it again next launch.": "为 {display} 保存的显示器配置文件“{file}”不可用。Falcon 将在下次启动时重试。",
+  "Your saved monitor profile “{file}” isn't available. Falcon will try it again next launch.": "保存的显示器配置文件“{file}”不可用。Falcon 将在下次启动时重试。",
+  "Zoom": "缩放",
+  "Zoom 1:1": "缩放至 1:1",
+  "Zoom 1:1 at cursor / reset": "以光标为中心缩放至 1:1 / 还原",
+  "Zoom 1:1 — {0} resets": "缩放 1:1，按 {0} 重置",
+  "Zoom to 1:1": "缩放至 1:1",
+  "Zoom to Fit": "适合窗口",
+  "Zoom to fit": "适合窗口",
+  "Zoomed": "已放大",
+  "Zoomed browsing keeps full speed; detail sharpens moments after each landing.": "放大浏览时保持全速；每次切换后细节稍后变清晰。",
+  "Zoomed browsing shows only sharp full-res frames — no blur. It paces to your card's real decode+upload rate (benched ≈ {fps} fps on {engine} at this size), holding steady if a fast burst outruns it.": "放大浏览仅显示清晰的原分辨率画面。速度按显卡实际的解码和上传能力调整（此尺寸下在 {engine} 上测得约 {fps} fps），快速切图超出处理能力时保持当前画面。",
+  "Zoomed browsing shows only sharp full-res frames — no blur. It paces to your card's real decode+upload rate, holding steady if a fast burst outruns it. The last benchmark used generated test images, so there is no measured figure for this folder yet.": "放大浏览仅显示清晰的全分辨率画面，按显卡实际解码与上传速度控制节奏。上次测试使用生成的图像，因此暂无此文件夹的实测值。",
+  "a photo for everything else": "照片可进行其他操作",
+  "any image in, JPG out — smallest files": "任意图像转为 JPG，文件最小",
+  "any image in, PNG out — no compression loss": "任意图像转为 PNG，无压缩损失",
+  "balanced": "均衡",
+  "benchmarking…": "正在测试…",
+  "bottom": "底部",
+  "bottom-left": "左下角",
+  "bottom-right": "右下角",
+  "center": "居中",
+  "choose a PNG below to add a watermark": "在下方选择 PNG 添加水印",
+  "clearly visible": "清晰可见",
+  "converted for web & social": "转换用于网页与社交分享",
+  "crisp for Instagram & social": "清晰，适合 Instagram 与社交分享",
+  "crisp on most screens": "大多数屏幕上清晰显示",
+  "custom long edge": "自定义长边",
+  "detecting…": "正在检测…",
+  "device not yet tested": "尚未测试此设备",
+  "discreet corner mark": "低调的角落水印",
+  "displayed photo → copy to ./Picks": "张当前显示的照片 → 复制至 ./Picks",
+  "displayed photo → export copies → export folder": "张当前显示的照片 → 导出副本至导出文件夹",
+  "displayed photos → copy to ./Picks": "张当前显示的照片 → 复制至 ./Picks",
+  "displayed photos → export copies → export folder": "张当前显示的照片 → 导出副本至导出文件夹",
+  "dominant, ~⅓ of the frame": "醒目，约占画面的 ⅓",
+  "drag the logo to position": "拖动标志调整位置",
+  "drop on left half": "放到左半边",
+  "drop on right half": "放到右半边",
+  "fast, social-first": "快速，适合社交分享",
+  "file in ./Rejected → {bin}": "个文件：./Rejected → {bin}",
+  "files in ./Rejected → {bin}": "个文件：./Rejected → {bin}",
+  "fully opaque logo": "完全不透明的标志",
+  "generating test images…": "正在生成测试图像…",
+  "ghosted, barely there": "若隐若现",
+  "high detail for prints": "丰富细节，适合印刷",
+  "image": "图像",
+  "image mark": "图像水印",
+  "in the CONTROLS section": "位于“操作”部分",
+  "just now": "刚刚",
+  "last 10 folders": "最近 10 个文件夹",
+  "last 3 folders": "最近 3 个文件夹",
+  "left": "左",
+  "light but legible": "淡而可读",
+  "load failed — use an RGBA PNG": "加载失败 — 请使用 RGBA PNG",
+  "lots of detail": "丰富细节",
+  "manual rotation → discard": {
+    "other": "张照片的手动旋转 → 放弃"
+  },
+  "missing logo file": "标志文件缺失",
+  "mixed ({first} + {second})": "混合（{first} + {second}）",
+  "near-lossless, largest files": "接近无损，文件最大",
+  "no RAW for this shot": "此照片没有 RAW 文件",
+  "no logo chosen": "尚未选择标志",
+  "no mark": "无水印",
+  "no photos to benchmark": "没有可用于测试的照片",
+  "no previous default to restore": "没有可恢复的原默认应用",
+  "no system font found": "未找到系统字体",
+  "not used for PNG — larger files, no loss": "PNG 不使用此设置，文件较大，无压缩损失",
+  "not yet measured for this folder": "尚未测量此文件夹",
+  "of {n} file this export would write already exist in ./export": {
+    "other": "个文件已存在于 ./export（本次导出共 {n} 个文件）"
+  },
+  "of {n} file this export would write already exists in ./export": {
+    "other": "个文件已存在于 ./export（本次导出共 {n} 个文件）"
+  },
+  "off — every folder opens sorted by name": "关闭 — 每个文件夹均按名称排序打开",
+  "off — no resume prompt": "关闭 — 不提示恢复位置",
+  "open a folder and run it again": "打开文件夹后再运行",
+  "or pick the gamut yourself:": "或手动选择色域：",
+  "original resolution, no downscale": "原分辨率，不缩小",
+  "pick → copy to ./Picks": "张已选照片 → 复制至 ./Picks",
+  "pick → export copies → export folder": "张已选照片 → 导出副本至导出文件夹",
+  "picks → copy to ./Picks": "张已选照片 → 复制至 ./Picks",
+  "picks → export copies → export folder": "张已选照片 → 导出副本至导出文件夹",
+  "prominent": "醒目",
+  "px": "px",
+  "q{quality}": "质量 {quality}",
+  "rated photo → copy to ./Picks": "张已评分照片 → 复制至 ./Picks",
+  "rated photo → export copies → export folder": "张已评分照片 → 导出副本至导出文件夹",
+  "rated photo → write XMP sidecar": {
+    "other": "张已评分照片 → 写入 XMP 附属文件"
+  },
+  "rated photos → copy to ./Picks": "张已评分照片 → 复制至 ./Picks",
+  "rated photos → export copies → export folder": "张已评分照片 → 导出副本至导出文件夹",
+  "reject → copy to ./Picks": "张已弃照片 → 复制至 ./Picks",
+  "reject → export copies → export folder": "张已弃照片 → 导出副本至导出文件夹",
+  "rejects → copy to ./Picks": "张已弃照片 → 复制至 ./Picks",
+  "rejects → export copies → export folder": "张已弃照片 → 导出副本至导出文件夹",
+  "rejects → move to ./Rejected": {
+    "other": "张已弃照片 → 移至 ./Rejected"
+  },
+  "right": "右",
+  "rotation apply: {written} written": "应用旋转：已写入 {written} 个",
+  "rotation apply: {written} written, {failed} failed ({names})": "应用旋转：已写入 {written} 个，{failed} 个失败（{names}）",
+  "rotation → write to photos": {
+    "other": "张照片的旋转 → 写入照片"
+  },
+  "rotations not applied": {
+    "other": "张照片的旋转未应用"
+  },
+  "s": "秒",
+  "selected photo → copy to ./Picks": "张所选照片 → 复制至 ./Picks",
+  "selected photo → export copies → export folder": "张所选照片 → 导出副本至导出文件夹",
+  "selected photos → copy to ./Picks": "张所选照片 → 复制至 ./Picks",
+  "selected photos → export copies → export folder": "张所选照片 → 导出副本至导出文件夹",
+  "shown after the run": "运行后显示",
+  "smallest files for web pages": "最小文件，适用于网页",
+  "text mark": "文字水印",
+  "text render failed": "文字渲染失败",
+  "top": "顶部",
+  "top-left": "左上角",
+  "top-right": "右上角",
+  "type your watermark text below": "在下方输入水印文字",
+  "unavailable in test builds": "测试版本不可用",
+  "v{0}": "v{0}",
+  "{0}\nCopy path": "{0}\n复制路径",
+  "{0} GB": "{0} GB",
+  "{0} copies the highest-priority option available for the photo — or for every selected photo while a selection is active. Drag the ⠿ handle to reorder; tick which to include.": "按 {0} 可复制此照片可用的最高优先级内容；有选区时则复制每张所选照片的相应内容。拖动 ⠿ 调整顺序，勾选要包含的内容。",
+  "{0} px": "{0} px",
+  "{0} · {1}": "{0} · {1}",
+  "{0} — {1}": "{0} — {1}",
+  "{0}° each side of straight up sends the thumb to A/B compare — flatter drags scrub the strip.": "沿正上方左右各 {0}° 范围内拖动，将缩略图送入 A/B 比较；更平缓地横向拖动则浏览缩略图条。",
+  "{body} (its XMP sidecar goes too)": {
+    "other": "{body}（同时移动 {n} 个 XMP 附属文件）"
+  },
+  "{chip} applied to this display — adjust in Settings if needed.": "已将 {chip} 应用于此显示器，如需调整请前往设置。",
+  "{chip} applied to {name} — adjust in Settings if needed.": "已将 {chip} 应用于 {name} — 可在设置中调整。",
+  "{copied} — {skipped_clause}": "{copied} — {skipped_clause}",
+  "{first} {second}": "{first}{second}",
+  "{format} is currently unsupported": "目前不支持 {format}",
+  "{fps} fps": "{fps} fps",
+  "{gesture} photos on the filmstrip or grid to build a selection.": "在缩略图条或网格中{gesture}照片以建立选区。",
+  "{kelvin} K": "{kelvin} K",
+  "{kelvin}K": "{kelvin}K",
+  "{keys} are reserved for BASIC SHORTCUTS — use a letter or a digit here.": "{keys} 已保留给“基本快捷键”，请在此使用字母或数字。",
+  "{key} is also “{holder}” — rebind that under BASIC SHORTCUTS": "{key} 同时用于“{holder}”，请在“基本快捷键”中重新绑定",
+  "{key} is reserved for BASIC SHORTCUTS — use a letter or a digit here.": "{key} 已保留给“基本快捷键”，请在此使用字母或数字。",
+  "{key} is taken by “{holder}”": "{key} 已被“{holder}”占用",
+  "{label} ({n})": "{label}（{n}）",
+  "{leaf} · {readout}": "{leaf} · {readout}",
+  "{list} and {key}": "{list} 和 {key}",
+  "{list}, {key}": "{list}、{key}",
+  "{mode} is ON for this display — Windows manages colour itself, so Falcon now outputs sRGB.": "此显示器已开启 {mode}，Windows 会自行管理色彩，因此 Falcon 现输出 sRGB。",
+  "{mode} is ON for this display — Windows manages colour itself, so Falcon will output sRGB on it.": "此显示器已开启 {mode}，Windows 会自行管理色彩，因此 Falcon 将在此显示器上输出 sRGB。",
+  "{mode} is ON for this display.": "此显示器已开启 {mode}。",
+  "{mode} is ON for {display} — Windows manages colour itself, so Falcon now outputs sRGB.": "{display} 已开启 {mode}，Windows 会自行管理色彩，因此 Falcon 现输出 sRGB。",
+  "{mode} is ON for {display} — Windows manages colour itself, so Falcon will output sRGB on it.": "{display} 已开启 {mode}，Windows 会自行管理色彩，因此 Falcon 将在此显示器上输出 sRGB。",
+  "{mode} is ON for {display}.": "{display} 已开启 {mode}。",
+  "{modifier}click": "{modifier}点击",
+  "{name} is connected again — set it back to sRGB to clear its saved colour setting": "{name} 已重新连接 — 将其设回 sRGB 可清除已保存的色彩设置",
+  "{name} is set to {chip} — adjust in Settings if needed.": "{name} 已设为 {chip} — 可在设置中调整。",
+  "{name} isn't connected — plug it in to read its profile": "{name} 未连接 — 请接入后读取配置文件",
+  "{name} — RAW + image pair, both files go to the {bin}": "{name} — RAW 与图像配对，两个文件均移至{bin}",
+  "{name} — {setting}": "{name} — {setting}",
+  "{n} GIF couldn't be checked": {
+    "other": "无法检查 {n} 个 GIF"
+  },
+  "{n} animated GIF skipped": {
+    "other": "已跳过 {n} 个 GIF 动图"
+  },
+  "{n} cloud-only file will be downloaded by this operation.": {
+    "other": "此操作将下载 {n} 个仅存于云端的文件。"
+  },
+  "{n} folder remembered": {
+    "other": "已记住 {n} 个文件夹"
+  },
+  "{n} has no RAW": {
+    "other": "{n} 张没有 RAW"
+  },
+  "{n} has no files": {
+    "other": "{n} 张没有文件"
+  },
+  "{n} has no image": {
+    "other": "{n} 张没有图像文件"
+  },
+  "{n} image": {
+    "other": "{n} 个图像"
+  },
+  "{n} moved photo(s) have unapplied rotations — Apply rotations first if you want them upright elsewhere": {
+    "other": "移动的 {n} 张照片有未应用的旋转。若希望在其他应用中保持朝向，请先应用旋转"
+  },
+  "{n} photo copied to clipboard ({files} file)": {
+    "other": "已将 {n} 张照片复制到剪贴板（{files} 个文件）"
+  },
+  "{n} photo copied to clipboard ({files} files)": {
+    "other": "已将 {n} 张照片复制到剪贴板（{files} 个文件）"
+  },
+  "{n} photo has unapplied rotation — Apply rotations first if you want it to travel.": {
+    "other": "{n} 张照片有未应用的旋转，若希望一并保留，请先应用旋转。"
+  },
+  "{n} photos": {
+    "other": "{n} 张照片"
+  },
+  "{n} pick(s) have unapplied rotations — Apply rotations first if you want them upright elsewhere": {
+    "other": "{n} 张已选照片有未应用的旋转。若希望在其他应用中保持朝向，请先应用旋转"
+  },
+  "{n} selected photo — {files} file go to the {bin}.": {
+    "other": "已选中 {n} 张照片，将 {files} 个文件移至{bin}。"
+  },
+  "{n} selected photo — {files} files go to the {bin}.": {
+    "other": "已选中 {n} 张照片，将 {files} 个文件移至{bin}。"
+  },
+  "{n}h ago": {
+    "other": "{n} 小时前"
+  },
+  "{n}m ago": {
+    "other": "{n} 分钟前"
+  },
+  "{n}s ago": {
+    "other": "{n} 秒前"
+  },
+  "{photos_and_files}{sidecar_note} Recoverable from there, and Recover restores the whole batch.": "{photos_and_files}{sidecar_note} 可从中恢复，点击“恢复”可还原整批文件。",
+  "{photo} RAW + {format} copied to clipboard": "已将 {photo} 的 RAW 和 {format} 复制到剪贴板",
+  "{photo} RAW copied to clipboard": "已将 {photo} 的 RAW 复制到剪贴板",
+  "{photo} {format} copied to clipboard": "已将 {photo} 的 {format} 复制到剪贴板",
+  "{result} — folder re-checked": "{result} — 已重新检查文件夹",
+  "{rotated} — {gifs}": "{rotated} — {gifs}",
+  "{size} px": "{size} px",
+  "{size} · {quality} · {mark}": "{size} · {quality} · {mark}",
+  "{size} · {quality} · {mark} · {placement}": "{size} · {quality} · {mark} · {placement}",
+  "{skipped}, {unchecked}": "{skipped}，{unchecked}",
+  "{source} — shown directly (matches your output gamut).": "{source} — 直接显示（与输出色域一致）。",
+  "{title} ({key})": "{title}（{key}）",
+  "{title}…": "{title}…",
+  "~30 s on your own photos. Finds this machine's honest speed limit and the sharpest preview it can hold.": "使用你的照片测试约 30 秒，测量此设备的持续速度上限，以及能维持的最清晰预览。",
+  "~30 s. Finds this machine's honest speed limit and the sharpest preview it can hold.": "约 30 秒，测量此设备的持续速度上限，以及能维持的最清晰预览。",
+  "· not connected": "· 未连接",
+  "· this screen": "· 当前屏幕",
+  "“{family}” isn't installed on this machine — the watermark exports in a substitute typeface.": "此电脑未安装“{family}”，导出水印时将使用替代字体。",
+  "“{text}”": "“{text}”",
+  "⚠ Full-res unavailable — tap to retry": "⚠ 无法加载全分辨率 — 点击重试",
+  "⚠ Ratings not saved — {error}": "⚠ 评分未保存 — {error}",
+  "⚠ {0}": "⚠ {0}",
+  "＋  New custom preset": "＋  新建自定义预设"
+}
