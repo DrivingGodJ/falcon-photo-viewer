@@ -1,7 +1,6 @@
 //! Quick rotation's filesystem checks run off the UI thread. A result belongs to one
 //! folder generation and photo; a slow network drive cannot enable a different photo.
 use std::{
-    fs::OpenOptions,
     path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, SyncSender},
     time::{Duration, Instant},
@@ -60,75 +59,18 @@ pub(crate) enum Capability {
     Unsupported,
 }
 
-/// Opening for write checks effective permissions/ACLs and locks without changing bytes.
-fn file_writable(path: &Path) -> bool {
-    std::fs::metadata(path).is_ok_and(|m| m.is_file() && !m.permissions().readonly())
-        && OpenOptions::new().read(true).write(true).open(path).is_ok()
-}
-
-#[cfg(unix)]
-fn folder_writable(path: &Path) -> bool {
-    use std::{ffi::CString, os::unix::ffi::OsStrExt};
-    unsafe extern "C" {
-        fn access(path: *const std::ffi::c_char, mode: std::ffi::c_int) -> std::ffi::c_int;
-    }
-    if !std::fs::metadata(path).is_ok_and(|m| m.is_dir() && !m.permissions().readonly()) {
-        return false;
-    }
-    let Ok(path) = CString::new(path.as_os_str().as_bytes()) else {
-        return false;
-    };
-    // POSIX W_OK | X_OK: creating a sidecar needs write AND search access. access also
-    // rejects read-only mounts. No probe files are created on Mac/Linux/network shares.
-    unsafe { access(path.as_ptr(), 2 | 1) == 0 }
-}
-
-#[cfg(not(unix))]
-fn folder_writable(path: &Path) -> bool {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static SERIAL: AtomicU64 = AtomicU64::new(0);
-    if !std::fs::metadata(path).is_ok_and(|m| m.is_dir()) {
-        return false;
-    }
-    // A Windows directory's READONLY attribute isn't its ACL. Test actual creation,
-    // off-thread, using a unique empty file; never truncate any existing file.
-    let probe = path.join(format!(
-        ".falcon-rotate-probe-{}-{}",
-        std::process::id(),
-        SERIAL.fetch_add(1, Ordering::Relaxed)
-    ));
-    let Ok(file) = OpenOptions::new().write(true).create_new(true).open(&probe) else {
-        return false;
-    };
-    drop(file);
-    std::fs::remove_file(probe).is_ok()
-}
-
 pub(crate) fn check(target: &Target) -> Capability {
-    if !folder_writable(&target.folder) {
-        return Capability::ReadOnly;
-    }
-    let mut sources = 0;
-    for (path, raw) in [
-        (target.finished.as_ref(), false),
-        (target.raw.as_ref(), true),
-    ] {
-        let Some(path) = path else {
-            continue;
-        };
-        sources += 1;
-        if !file_writable(path) || !path.parent().is_some_and(folder_writable) {
-            return Capability::ReadOnly;
-        }
-        let sidecar = falcon_decode::sidecar_path_for(path, raw);
-        match std::fs::symlink_metadata(&sidecar) {
-            Ok(_) if !file_writable(&sidecar) => return Capability::ReadOnly,
-            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Capability::ReadOnly,
-            _ => {}
-        }
-    }
-    if sources == 0 {
+    if target.finished.is_none() && target.raw.is_none() {
         return Capability::Unsupported;
+    }
+    if falcon_decode::check_rotation_write_access(
+        Some(&target.folder),
+        target.finished.as_deref(),
+        target.raw.as_deref(),
+    )
+    .is_err()
+    {
+        return Capability::ReadOnly;
     }
     if target.gif
         && !target

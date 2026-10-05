@@ -5151,6 +5151,8 @@ Rotating a photo changes how Falcon shows it. The file on disk changes only when
 
 `compose_turns(auto, base, delta)` in `support.rs` adds them: the base (or 0 when Auto-orient is off) plus the manual turns, modulo 4.
 
+Every save through `falcon_decode::apply_rotation`, including the original Review/bulk workflow, checks write access to all source files, their parent folders and existing matching XMP sidecars before changing either half of a shot. The toolbar uses the same check on its background worker. Read-only or unavailable targets return a failed report with the old base, so the pending rotation remains available for retry. Preview rotation still works without write permission; it does not save orientation to the source or sidecar. These preflight checks do not make paired writes transactional if permissions or I/O conditions change during the writes.
+
 The diagram shows where the two kinds of turns come from and where they are applied.
 
 ```mermaid

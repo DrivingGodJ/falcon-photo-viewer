@@ -23,6 +23,135 @@ fn tmp_dir() -> PathBuf {
     d
 }
 
+fn rotation_test_readonly(path: &Path, readonly: bool) {
+    let mut permissions = std::fs::metadata(path).unwrap().permissions();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        permissions.set_mode(if readonly { 0o444 } else { 0o644 });
+    }
+    #[cfg(not(unix))]
+    permissions.set_readonly(readonly);
+    std::fs::set_permissions(path, permissions).unwrap();
+}
+
+fn assert_rotation_access_refused(plan: &RotApplyPlan, report: &RotApplyReport) {
+    assert!(!report.ok, "permission failure must retain the pending rotation");
+    assert_eq!(report.new_base_turns, plan.base_turns & 3);
+    if plan.finished.is_some() { assert!(matches!(report.finished_action, SideAction::Failed(_))); }
+    if plan.raw.is_some() { assert!(matches!(report.raw_action, SideAction::Failed(_))); }
+}
+
+#[test]
+fn rotation_permissions_readonly_sources_never_patch_or_create_sidecars() {
+    for kind in ["jpg", "png", "CR3"] {
+        let dir = tmp_dir();
+        let bytes = portrait_jpeg(Endian::Little, 1).0;
+        let photo = write_tmp(&dir, &format!("readonly.{kind}"), &bytes);
+        let raw = kind == "CR3";
+        let plan = RotApplyPlan {
+            finished: (!raw).then(|| photo.clone()), finished_is_jpeg: kind == "jpg",
+            raw: raw.then(|| photo.clone()), base_turns: 0, delta: 1,
+        };
+        rotation_test_readonly(&photo, true);
+        let report = apply_rotation(&plan);
+        rotation_test_readonly(&photo, false);
+        assert_rotation_access_refused(&plan, &report);
+        assert_eq!(std::fs::read(&photo).unwrap(), bytes);
+        assert!(!sidecar_path_for(&photo, raw).exists());
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn rotation_permissions_readonly_folder_blocks_in_place_jpeg_and_recovers() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tmp_dir();
+    let bytes = portrait_jpeg(Endian::Little, 1).0;
+    let photo = write_tmp(&dir, "folder.jpg", &bytes);
+    let plan = RotApplyPlan { finished: Some(photo.clone()), finished_is_jpeg: true, raw: None, base_turns: 0, delta: 1 };
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let report = apply_rotation(&plan);
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_rotation_access_refused(&plan, &report);
+    assert_eq!(std::fs::read(&photo).unwrap(), bytes);
+    assert!(apply_rotation(&plan).ok);
+    assert_eq!(exif_orientation(&photo), Some(6));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn rotation_permissions_readonly_raw_blocks_both_halves_of_pair() {
+    let dir = tmp_dir();
+    let bytes = portrait_jpeg(Endian::Little, 1).0;
+    let jpg = write_tmp(&dir, "pair.jpg", &bytes);
+    let raw = write_tmp(&dir, "pair.CR3", b"synthetic RAW");
+    let plan = RotApplyPlan { finished: Some(jpg.clone()), finished_is_jpeg: true, raw: Some(raw.clone()), base_turns: 0, delta: 1 };
+    rotation_test_readonly(&raw, true);
+    let report = apply_rotation(&plan);
+    rotation_test_readonly(&raw, false);
+    assert_rotation_access_refused(&plan, &report);
+    assert_eq!(std::fs::read(&jpg).unwrap(), bytes);
+    assert_eq!(std::fs::read(&raw).unwrap(), b"synthetic RAW");
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 2);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn rotation_permissions_readonly_sidecars_cannot_be_replaced_even_in_writable_folder() {
+    for raw_side in [false, true] {
+        let dir = tmp_dir();
+        let bytes = portrait_jpeg(Endian::Little, 1).0;
+        let jpg = write_tmp(&dir, "sidecar.jpg", &bytes);
+        let raw = write_tmp(&dir, "sidecar.CR3", b"synthetic RAW");
+        let original = b"<rdf:Description xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\" tiff:Orientation=\"1\"/>";
+        let sidecar = sidecar_path_for(if raw_side { &raw } else { &jpg }, raw_side);
+        std::fs::write(&sidecar, original).unwrap();
+        let plan = RotApplyPlan { finished: Some(jpg.clone()), finished_is_jpeg: true, raw: Some(raw.clone()), base_turns: 0, delta: 1 };
+        rotation_test_readonly(&sidecar, true);
+        let report = apply_rotation(&plan);
+        rotation_test_readonly(&sidecar, false);
+        assert_rotation_access_refused(&plan, &report);
+        assert_eq!(std::fs::read(&jpg).unwrap(), bytes);
+        assert_eq!(std::fs::read(&sidecar).unwrap(), original);
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 3);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[test]
+fn rotation_permissions_missing_pair_member_never_changes_writable_jpeg() {
+    let dir = tmp_dir();
+    let bytes = portrait_jpeg(Endian::Little, 1).0;
+    let jpg = write_tmp(&dir, "missing.jpg", &bytes);
+    let raw = dir.join("missing.CR3");
+    let plan = RotApplyPlan { finished: Some(jpg.clone()), finished_is_jpeg: true, raw: Some(raw), base_turns: 0, delta: 1 };
+    let report = apply_rotation(&plan);
+    assert_rotation_access_refused(&plan, &report);
+    assert_eq!(std::fs::read(&jpg).unwrap(), bytes);
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn rotation_permissions_recheck_after_preview_and_allow_retry_when_restored() {
+    let dir = tmp_dir();
+    let bytes = portrait_jpeg(Endian::Little, 1).0;
+    let jpg = write_tmp(&dir, "revoked.jpg", &bytes);
+    let plan = RotApplyPlan { finished: Some(jpg.clone()), finished_is_jpeg: true, raw: None, base_turns: 0, delta: 1 };
+    assert!(check_rotation_write_access(Some(&dir), Some(&jpg), None).is_ok());
+    rotation_test_readonly(&jpg, true);
+    let report = apply_rotation(&plan);
+    rotation_test_readonly(&jpg, false);
+    assert_rotation_access_refused(&plan, &report);
+    assert_eq!(std::fs::read(&jpg).unwrap(), bytes);
+    assert!(apply_rotation(&plan).ok);
+    assert_eq!(exif_orientation(&jpg), Some(6));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 fn u16b(en: Endian, v: u16) -> [u8; 2] {
     if en == Endian::Little {
         v.to_le_bytes()

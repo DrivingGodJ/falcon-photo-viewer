@@ -47,6 +47,9 @@ use std::path::{Path, PathBuf};
 
 use crate::exif_orientation; // the bounded (4 MB-capped) kamadak reader — used for the read-back verify
 
+mod permissions;
+pub use permissions::check_rotation_write_access;
+
 // ───────────────────────────── the orientation ALGEBRA (pure, 32-cell table) ─────────────────────────────
 
 /// EXIF `Orientation` value (1..=8) → clockwise quarter-turns (0..=3), the SAME mapping the display
@@ -1055,6 +1058,18 @@ pub struct RotApplyReport {
 pub fn apply_rotation(plan: &RotApplyPlan) -> RotApplyReport {
     let delta = plan.delta & 3;
     let mut new_base_turns = plan.base_turns & 3;
+    // Shared by the original Review/bulk apply and the confirmed toolbar shortcut.
+    // Check BOTH sides before writing either: a read-only RAW/sidecar must not
+    // leave its paired JPEG already rotated while the shot remains pending.
+    if let Err(error) = check_rotation_write_access(None, plan.finished.as_deref(), plan.raw.as_deref()) {
+        let failed = || SideAction::Failed(format!("rotation write access: {error}"));
+        return RotApplyReport {
+            ok: false,
+            new_base_turns,
+            finished_action: if plan.finished.is_some() { failed() } else { SideAction::Skipped },
+            raw_action: if plan.raw.is_some() { failed() } else { SideAction::Skipped },
+        };
+    }
     // FILE-ABSOLUTE turns → RESIDUAL turns (the units `base_turns`/`new_base_turns` are in).
     //
     // v0.8.103 (V1): `consumed` is DERIVED, never probed. `cur` is the absolute orientation the arm
