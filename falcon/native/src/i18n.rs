@@ -395,6 +395,62 @@ pub(crate) fn select_for_slint() {
     let _ = slint::select_bundled_translation(running_code());
 }
 
+// ── Fonts for Chinese characters ───────────────────────────────────────────────────────────────
+
+/// The system's own Simplified Chinese UI fonts, in order of preference, while a Simplified Chinese
+/// pack is active; empty for every other language. Inter has no Chinese characters, and Slint gives
+/// the text shaper no language, so the system picks a font for Han characters by itself. On Windows
+/// that can be a Japanese font without the Simplified forms, which then draw as empty boxes.
+pub(crate) fn han_fallback_families(code: &str) -> &'static [&'static str] {
+    let simplified = matches!(code, "zh-CN" | "zh-SG") || code.starts_with("zh-Hans");
+    if !simplified {
+        return &[];
+    }
+    if cfg!(windows) {
+        &["Microsoft YaHei UI", "Microsoft YaHei", "DengXian", "SimHei"]
+    } else if cfg!(target_os = "macos") {
+        &["PingFang SC", "Hiragino Sans GB", "Heiti SC"]
+    } else {
+        &["Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei"]
+    }
+}
+
+/// Whose fonts draw Han characters, as a language code for [`han_fallback_families`]: the running
+/// language when it is Chinese. Otherwise Simplified Chinese — the only pack in Han characters, and
+/// Settings → Language always shows its name — unless the computer's own languages put Japanese,
+/// Korean or Traditional Chinese first, whose system fonts already suit (empty: keep the system's).
+pub(crate) fn han_font_code(running: &str, system: &[String]) -> &'static str {
+    if !han_fallback_families(running).is_empty() {
+        return "zh-CN";
+    }
+    for tag in system.iter().map(|t| normalise(t)) {
+        let tag = tag.to_ascii_lowercase();
+        let lang = tag.split('-').next().unwrap_or("");
+        if lang == "ja" || lang == "ko" {
+            return "";
+        }
+        if lang == "zh" {
+            let traditional = !tag.contains("-hans")
+                && (tag.contains("-hant") || ["-tw", "-hk", "-mo"].iter().any(|r| tag.ends_with(r)));
+            return if traditional { "" } else { "zh-CN" };
+        }
+    }
+    "zh-CN"
+}
+
+/// Points the Han script's fallback in `fonts` at [`han_fallback_families`] for `code`, using only the
+/// families installed. Latin text keeps Inter. Returns the families used (empty: nothing changed).
+pub(crate) fn apply_han_fallback(fonts: &mut slint::fontique_010::fontique::Collection, code: &str) -> Vec<&'static str> {
+    use slint::fontique_010::fontique::{FallbackKey, Script};
+    let found: Vec<_> =
+        han_fallback_families(code).iter().filter_map(|&name| fonts.family_id(name).map(|id| (name, id))).collect();
+    if !found.is_empty() {
+        // The key the shaper asks with: the Han script and no language.
+        fonts.set_fallbacks(FallbackKey::new(Script::from_bytes(*b"Hani"), None), found.iter().map(|&(_, id)| id));
+    }
+    found.into_iter().map(|(name, _)| name).collect()
+}
+
 // ── The Settings picker ────────────────────────────────────────────────────────────────────────
 
 /// "System (<language>)", "English", then each pack in its own name.
@@ -566,6 +622,62 @@ mod tests {
         use_english();
         assert_eq!(tr("Open"), "Open");
         assert_eq!(running_code(), "en");
+    }
+
+    /// The 1.0.13 release check drew Chinese as empty boxes on Windows: with no language given, the
+    /// system's Han fallback was a Japanese font without the Simplified forms. With the zh-CN pack
+    /// active, Han characters fall back to the system's Simplified Chinese font; other languages
+    /// leave the system's choice alone. Uses the real system fonts, in its own collection.
+    /// FALSIFIER: make `han_fallback_families` return `&[]` for zh-CN (or set the fallback on another
+    /// key) and the zh-CN half fails wherever one of the fonts is installed.
+    #[test]
+    fn chinese_characters_fall_back_to_the_systems_simplified_chinese_font() {
+        use slint::fontique_010::fontique::{Collection, CollectionOptions, FallbackKey, Script};
+        assert!(han_fallback_families("en").is_empty() && han_fallback_families("zh-TW").is_empty());
+        let mut fonts = Collection::new(CollectionOptions { shared: false, system_fonts: true });
+        // The test's own list (not the function's), so a broken list fails rather than skips.
+        let expected: &[&str] = if cfg!(windows) {
+            &["Microsoft YaHei UI", "Microsoft YaHei", "DengXian", "SimHei"]
+        } else if cfg!(target_os = "macos") {
+            &["PingFang SC", "Hiragino Sans GB", "Heiti SC"]
+        } else {
+            &["Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei"]
+        };
+        let installed: Vec<&str> = expected.iter().copied().filter(|name| fonts.family_id(name).is_some()).collect();
+        if installed.is_empty() {
+            eprintln!("skipped: no Simplified Chinese system font on this machine");
+            return;
+        }
+        assert_eq!(apply_han_fallback(&mut fonts, "zh-CN"), installed, "every installed family is used, in order");
+        let first = fonts.fallback_families(FallbackKey::new(Script::from_bytes(*b"Hani"), None)).next();
+        assert_eq!(first, fonts.family_id(installed[0]), "the shaper's Han key now resolves to that font");
+        let mut keep = Collection::new(CollectionOptions { shared: false, system_fonts: true });
+        assert!(apply_han_fallback(&mut keep, "").is_empty(), "an empty code keeps the system's choice");
+    }
+
+    /// Review of the font fix (R1): Settings → Language shows "简体中文" in every language, so Han
+    /// characters use the Simplified Chinese fonts unless the computer's own languages call for
+    /// another Han font (Japanese, Korean, Traditional Chinese first).
+    /// FALSIFIERS: return "" for a running language that is not Chinese and the English rows fail;
+    /// drop the Japanese/Korean or the Traditional check and its rows fail.
+    #[test]
+    fn han_characters_follow_the_running_language_or_the_computers() {
+        let s = |tags: &[&str]| tags.iter().map(|t| t.to_string()).collect::<Vec<_>>();
+        for (running, system, want) in [
+            ("zh-CN", s(&["ja-JP"]), "zh-CN"),
+            ("en", s(&["en-US"]), "zh-CN"),
+            ("en", s(&[]), "zh-CN"),
+            ("en", s(&["en-GB", "zh-Hans-CN"]), "zh-CN"),
+            ("en", s(&["zh_CN.UTF-8"]), "zh-CN"),
+            ("en", s(&["zh-Hans-HK"]), "zh-CN"),
+            ("en", s(&["fr-FR", "ja"]), ""),
+            ("en", s(&["ko-KR", "zh-CN"]), ""),
+            ("en", s(&["zh-TW"]), ""),
+            ("en", s(&["zh-Hant-HK"]), ""),
+            ("en", s(&["zh-HK"]), ""),
+        ] {
+            assert_eq!(han_font_code(running, &system), want, "{running} on {system:?}");
+        }
     }
 
     /// The compile-time placeholder check behind both macros (round-1 review R2 and R4).

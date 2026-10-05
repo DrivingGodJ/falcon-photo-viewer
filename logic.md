@@ -6983,6 +6983,15 @@ contributor guide is [docs/development/translations.md](docs/development/transla
     `TopMenu::title()` is translated.
   - `scripts/mac-bundle.sh` writes `CFBundleLocalizations` (English plus each listed pack) so macOS
     draws its own panels in the app's languages.
+- **Fonts for Chinese characters.** Inter has none, and Slint gives the shaper no language, so
+  fontique asks the system for a Han fallback with no locale; on Windows that can be a Japanese font
+  without the Simplified forms (found in the 1.0.13 release check). At start-up
+  `i18n::apply_han_fallback` sets the Han-script fallback key (`Hani`, no locale) in Slint's shared
+  collection to the installed system fonts from `han_fallback_families` (the first installed of
+  Microsoft YaHei UI, … on Windows; PingFang SC, … on macOS). `han_font_code` decides whose fonts:
+  Simplified Chinese when it runs, and also in other languages (the picker always shows "简体中文"),
+  unless the system's languages put Japanese, Korean or Traditional Chinese first, which keeps the
+  system's own Han font. Latin text keeps Inter.
 - **Selecting a language also sets Slint's decimal separator.** No Slint code formats decimals
   today.
 

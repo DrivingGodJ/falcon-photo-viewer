@@ -6094,6 +6094,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             let blob = slint::fontique_010::fontique::Blob::new(std::sync::Arc::new(face.to_vec()));
             let _ = fonts.register_fonts(blob, None);
         }
+        // Language packs: Chinese characters use the system's Simplified Chinese font, not whichever
+        // Han font the system would guess, unless the computer's languages call for another Han
+        // font (i18n::han_font_code). Settings → Language shows "简体中文" in every language.
+        let han_code = i18n::han_font_code(i18n::running_code(), &system_languages);
+        let han = i18n::apply_han_fallback(&mut fonts, han_code);
+        if !han.is_empty() {
+            log_event(&format!("boot: Han characters fall back to {han:?}"));
+        } else if !han_code.is_empty() {
+            log_event("boot: no Simplified Chinese system font found; Han characters use the system's choice");
+        }
     }
 
     // Boot an empty model; argv uses the SAME asynchronous open path as a drop.
