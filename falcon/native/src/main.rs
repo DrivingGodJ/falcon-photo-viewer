@@ -1920,6 +1920,7 @@ mod pool_gov; // v0.9.23 (one-pool): the macOS elastic decode-pool governor — 
 mod posture; // v0.9.9 (P6): TEMPORARY dev "posture benchmark" — the battery/posture measurement instrument (pure core; log-only)
 mod roi; // v0.8.31 (§64): the ROI/zoom decode-tier subsystem (owns the swap/develop-cleared ROI state) — unit-tested
 mod raw_export;
+mod quick_rotate;
 mod support;
 mod file_icons;
 mod about;
@@ -6614,6 +6615,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // maps (EMPTY in stage 1a; the manual-rotate UI is 1b) and the auto_orient mirror. Every
     // upload-enqueue composes `effective = (auto ? base : 0) + delta mod 4` through this.
     let rot: Rc<RotState> = Rc::new(RotState::new(boot.auto_orient));
+    let quick_rotate_probe = Rc::new(RefCell::new(quick_rotate::Probe::new()));
     // Monotonic thumbnail-ARRIVAL generation: `drain_thumbs` bumps it for every landing of the
     // current folder (a decoded thumb OR a failure marker). The filmstrip/Selection rebuild keys
     // watch THIS instead of the thumb-cache SIZE — on a >THUMB_CACHE_MAX folder the cache pins at the
@@ -17739,6 +17741,74 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
     }
     {
+        let probe = quick_rotate_probe.clone();
+        let shots = shots.clone();
+        let current = current.clone();
+        let cur_dir = cur_dir.clone();
+        let generation = generation.clone();
+        let rot = rot.clone();
+        let undo_stack = undo_stack.clone();
+        let act_seq = act_seq.clone();
+        let invalidate = rot_invalidate.clone();
+        let meta = meta.clone();
+        let sel_gen = sel_gen.clone();
+        let start = start_op.clone();
+        let busy = sel_busy.clone();
+        let slot = sel_status_slot.clone();
+        let weak = app.as_weak();
+        app.on_quick_rotate(move || {
+            let Some(a) = weak.upgrade() else { return; };
+            if !a.get_quick_rotate_ready() || a.get_modal_open() || a.get_compare()
+                || a.get_opening_photo() || a.get_sel_busy() { return; }
+            let index = *current.borrow();
+            let Some(shot) = shots.lock().unwrap_or_else(|e| e.into_inner()).get(index).cloned() else { return; };
+            let gen = generation.load(Ordering::Relaxed);
+            let Some(target) = quick_rotate::Target::for_shot(gen, index, Path::new(&*cur_dir.borrow()), &shot) else { return; };
+            if !probe.borrow().ready_for(&target) { return; }
+            if !start(i18n::tr("Applying rotations…")) { return; }
+            // One photo, irrespective of selection. Keep the ordinary undo/pending
+            // state until a successful write is rebased by the existing apply drain.
+            let (old, _) = rot.rotate(&shot.name, index, 1);
+            push_undo_rot(&undo_stack, next_act_seq(&act_seq), &shot.name, index, old);
+            invalidate(index);
+            meta.exif_built.set(None);
+            sel_gen.set(sel_gen.get().wrapping_add(1));
+            let plan = falcon_decode::RotApplyPlan {
+                finished: target.finished.clone(), finished_is_jpeg: shot.has_jpg && shot.is_jpeg_source(),
+                raw: target.raw.clone(),
+                base_turns: rot.base.borrow().get(&index).copied()
+                    .or_else(|| rot.base_raw.borrow().get(&index).copied()).unwrap_or(0),
+                delta: rot.delta_of(index),
+            };
+            probe.borrow_mut().invalidate();
+            a.set_quick_rotate_ready(false);
+            let auto_orient = a.get_auto_orient();
+            let (busy, slot, applied) = (busy.clone(), slot.clone(), rot.apply_slot.clone());
+            std::thread::spawn(move || {
+                let _guard = OpGuard { busy, slot: slot.clone(), kind: -1, origin: None };
+                let outcome = quick_rotate::apply_one(&target, &plan);
+                let (msg, failed) = match outcome {
+                    Ok(report) if report.ok => {
+                        support::publish_applied(&applied, gen,
+                            (index, target.name.clone(), report.new_base_turns, plan.delta & 3));
+                        let msg = if auto_orient {
+                            tr_format!("Saved rotation for {name}", name = target.name)
+                        } else {
+                            tr_format!("Saved rotation for {name} — auto-orient is off", name = target.name)
+                        };
+                        (msg, false)
+                    }
+                    Ok(report) => {
+                        log_event(&format!("quick rotate {}: finished={:?}, raw={:?}", target.name, report.finished_action, report.raw_action));
+                        (tr_format!("Could not save rotation for {name} — the turn is still pending", name = target.name), true)
+                    }
+                    Err(_) => (tr_format!("Could not save rotation for {name} — check write permissions", name = target.name), true),
+                };
+                *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some((msg, OpSeverity::from_err(failed), -1, None));
+            });
+        });
+    }
+    {
         // "Close anyway" from the unapplied-rotations reminder → acknowledge + quit.
         let rot = rot.clone(); // v0.9.4 (§66/P4a): rot_acked re-baseline via rot.rot_acked
         let awz = app.as_weak();
@@ -20963,6 +21033,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let apply_scan_t = apply_scan.clone();
     let apply_slot_t = rot.apply_slot.clone(); // v0.8.0 S2 / v0.9.4: drain applied rotations (rot.apply_slot)
     let apply_rot_apply_t = apply_rot_apply.clone();
+    let quick_rotate_probe_t = quick_rotate_probe.clone();
     // v0.8.32 (§64): ONE film-tier handle into the tick (was 4: thumb_cache_t, thumb_pending_t, frost_map_t,
     // thumb_failed_t). Steps read `&film_t.thumbs` / `.pending` / `.frost` / `.failed`, or take `&film_t`
     // (drain_thumbs, step_frost_feed, step_filmstrip, step_selection). thumb_gen_t (the monotonic arrival
@@ -22644,6 +22715,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
         let len = shots_now.len();
         len_t.store(len, Ordering::Relaxed);
+
+        // No filesystem calls on the tick: only queue a bounded permission request
+        // and accept a reply for the live photo/generation. Recheck at write time too.
+        let rotate_index = *cur_t.borrow();
+        let rotate_target = shots_now.get(rotate_index).and_then(|shot|
+            quick_rotate::Target::for_shot(gen_now, rotate_index, Path::new(&*cur_dir_t.borrow()), shot));
+        let capability = quick_rotate_probe_t.borrow_mut().update(rotate_target, now);
+        let has_base = rot_t.base.borrow().contains_key(&rotate_index) || rot_t.base_raw.borrow().contains_key(&rotate_index);
+        app.set_quick_rotate_ready(capability == quick_rotate::Capability::Writable && has_base
+            && !app.get_sel_busy() && !app.get_opening_photo() && !app.get_compare() && !app.get_modal_open());
+        let tip = if len == 0 { i18n::tr("Rotate photo right and save — open a photo first") }
+            else if app.get_sel_busy() { i18n::tr("Rotate photo right and save — wait for the current operation") }
+            else if app.get_compare() { i18n::tr("Rotate photo right and save — leave Compare first") }
+            else if app.get_modal_open() { i18n::tr("Rotate photo right and save — close the dialog first") }
+            else { match capability {
+                quick_rotate::Capability::Writable if has_base => i18n::tr("Rotate photo right 90° and save its orientation"),
+                quick_rotate::Capability::ReadOnly => i18n::tr("Rotate photo right and save — photo or folder is read-only"),
+                quick_rotate::Capability::Unsupported => i18n::tr("Rotate photo right and save — this photo cannot be rotated"),
+                _ => i18n::tr("Rotate photo right and save — checking write permissions"),
+            }};
+        app.set_quick_rotate_tip(tip.into());
 
         // P1 (v0.7.5): a folder swap clears the sustained full-res landing EWMA so the previous folder's
         // (possibly CPU-fallback-throttled) pacing cap can't poison the new folder's always-sharp

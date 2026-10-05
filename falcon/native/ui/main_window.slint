@@ -203,6 +203,8 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
             path-dir: root.path-dir,
             path-mid: root.path-mid,
             path-text: root.path-text,
+            quick-rotate-ready: root.quick-rotate-ready && !root.modal-open,
+            quick-rotate-tip: root.quick-rotate-tip,
             sel-open: root.sel-open,
             settings-open: root.settings-open,
             titlebar-h: root.titlebar-h,
@@ -211,6 +213,9 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
         in-out property <length> cache-meter-cy: 47px;
         in-out property <length> sort-menu-y: 3px;
         callback toolbar-action(string, length, length);
+        in property <bool> quick-rotate-ready: false;
+        in property <string> quick-rotate-tip: @tr("falcon" => "Rotate photo right and save");
+        callback quick-rotate();
         toolbar-action(action, x, y) => {
             if root.immersive { return; }
             // Recheck live state after cross-window dispatch; native snapshots may be a frame old.
@@ -229,6 +234,10 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
                         }
             else if action == "review" { root.close-bar-menus(); root.welcome-open = false; root.toggle-sel-panel(); }
             else if action == "compare" { root.close-bar-menus(); root.toggle-compare(); }
+            else if action == "quick-rotate" {
+                if !root.quick-rotate-ready || root.modal-open || root.compare || root.opening-photo || root.sel-busy { return; }
+                root.close-bar-menus(); root.quick-rotate();
+            }
             else if action == "notifications" { root.close-bar-menus(); root.welcome-open = false; root.toggle-notif(); }
             else if action == "minimize" { root.close-bar-menus(); root.minimize-requested(); }
             else if action == "maximize" { root.close-bar-menus(); root.maximize-requested(); }
@@ -5468,6 +5477,8 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
             path-dir: root.path-dir;
             path-mid: root.path-mid;
             path-text: root.path-text;
+            quick-rotate-ready: root.quick-rotate-ready && !root.modal-open;
+            quick-rotate-tip: root.quick-rotate-tip;
             sel-open: root.sel-open;
             settings-open: root.settings-open;
             titlebar-h: root.titlebar-h;
