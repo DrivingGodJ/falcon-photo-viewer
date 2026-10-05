@@ -12617,8 +12617,9 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
             .map(|p| p.join("Falcon"))
     }
 }
-/// Durable, crash-safe write: write to a UNIQUE temp sibling, **fsync it** (`sync_all` — the bytes hit
-/// the platter, not just the page cache), then atomically rename over the target. v0.8.36 hardened this:
+/// Write a unique sibling temp, synchronize it, then atomically replace the target.
+/// macOS SMB uses ordinary fsync only when full sync is unsupported; see `file_io`.
+/// v0.8.36 hardened this:
 /// the old path did `fs::write` + rename with NO fsync AND a FIXED `.tmp` name, so a power-cut after the
 /// rename but before the OS flushed could leave a zero-byte/truncated file where a session's ratings
 /// lived, and a crash between write and rename left a stable `<name>.tmp` as junk in the shoot folder.
@@ -12643,22 +12644,7 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
 /// goes through `enqueue_write` / `enqueue_review_data` / `enqueue_xmp_rating` and pays no fsync on
 /// the caller at all.
 pub(crate) fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
-    static TMP_CTR: AtomicU64 = AtomicU64::new(0);
-    let n = TMP_CTR.fetch_add(1, Ordering::Relaxed);
-    let dir = path.parent().unwrap_or_else(|| Path::new("."));
-    let base = path.file_name().and_then(|s| s.to_str()).unwrap_or("falcon");
-    let tmp = dir.join(format!("{base}.{}.{n}.falcontmp", std::process::id()));
-    {
-        let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(&tmp)?;
-        f.write_all(data)?;
-        f.sync_all()?; // durability barrier: the temp's bytes are on disk BEFORE we rename it in
-    }
-    if let Err(e) = std::fs::rename(&tmp, path) {
-        let _ = std::fs::remove_file(&tmp); // don't leave the temp as junk on a rename failure (read-only/locked target)
-        return Err(e);
-    }
-    Ok(())
+    falcon_decode::file_io::write_atomic(path, data)
 }
 
 // ─── v0.8.128 (J10 / A1.2): THE SHUTDOWN ORDER, AS A DECIDABLE OBJECT ──────────────────────────
@@ -12800,7 +12786,7 @@ pub(crate) enum WriteMsg {
     /// it, or the reverse), and the multi-instance divergence where two Falcons disagree about
     /// which name a folder has. Whatever happened to the folder in between, the bytes land on the
     /// file the folder actually has.
-    ReviewData { dir: PathBuf, data: Vec<u8> },
+    ReviewData { dir: PathBuf, data: Vec<u8>, ticket: u64 },
     /// v0.8.69 (E/H2): a surgical `xmp:Rating` sidecar write — the read-modify-write runs ON the writer
     /// thread (never the UI thread), preserving all foreign sidecar content. Rides the SAME FIFO as the
     /// JSON writes, so the existing durability barriers (Apply / delete / exit) flush pending rating
@@ -12859,9 +12845,9 @@ fn writer_loop(
     mut log_sink: impl FnMut(&Path, &str, u64),
 ) {
     while let Ok(msg) = rx.recv() {
-        let (target, data) = match msg {
-            WriteMsg::Write { target, data } => (target, data),
-            WriteMsg::ReviewData { dir, data } => (resolve_review(&dir), data),
+        let (target, data, review) = match msg {
+            WriteMsg::Write { target, data } => (target, data, None),
+            WriteMsg::ReviewData { dir, data, ticket } => (resolve_review(&dir), data, Some((dir, ticket))),
             WriteMsg::Log { target, line, ticket } => {
                 log_sink(&target, &line, ticket);
                 continue;
@@ -12880,11 +12866,13 @@ fn writer_loop(
                 continue;
             }
         };
-        // A panic/failure of a write must NOT lose the payload silently: retry once, then surface.
-        if let Err(_first) = sink(&target, &data) {
-            if let Err(e) = sink(&target, &data) {
-                on_fail(&target, e, false);
-            }
+        // Complete only the newest ticket for a folder. An old failure must not
+        // overwrite the state of a newer queued/successful save.
+        let result = sink(&target, &data).or_else(|_| sink(&target, &data));
+        let notify = review.map_or(true, |(dir, ticket)| review_save_complete(&dir, ticket, result.is_ok()));
+        if let Err(e) = result {
+            if notify { on_fail(&target, e, false); }
+            else { log_event(&format!("writer: review save retry failed for {} — {e}", target.display())); }
         }
     }
 }
@@ -12971,19 +12959,48 @@ pub(crate) fn enqueue_write(target: &Path, data: Vec<u8>) {
 /// v0.8.131 (F-P3 rule 6): enqueue a folder's review data WITHOUT naming its file. The writer
 /// resolves the target when it writes; the inline fallbacks (writer gone / never started) resolve
 /// it at the same moment they write, so every route asks the same question at the same time.
-pub(crate) fn enqueue_review_data(dir: &Path, data: Vec<u8>) {
-    match WRITER.get() {
-        Some(h) => {
-            if let Err(std::sync::mpsc::SendError(WriteMsg::ReviewData { dir, data })) =
-                h.tx.send(WriteMsg::ReviewData { dir: dir.to_path_buf(), data })
-            {
-                let _ = write_atomic(&review_write_target(&dir), &data);
-            }
-        }
-        None => {
-            let _ = write_atomic(&review_write_target(dir), &data);
-        }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReviewSaveStatus { Pending, Saved, Failed }
+#[derive(Clone, Copy)]
+struct ReviewSaveRecord { ticket: u64, status: ReviewSaveStatus, failure_reported: bool }
+impl ReviewSaveRecord {
+    fn complete(&mut self, ticket: u64, ok: bool) -> bool {
+        if self.ticket != ticket { return false; }
+        self.status = if ok { ReviewSaveStatus::Saved } else { ReviewSaveStatus::Failed };
+        if ok { self.failure_reported = false; return false; }
+        !std::mem::replace(&mut self.failure_reported, true)
     }
+}
+static REVIEW_SAVES: std::sync::LazyLock<Mutex<HashMap<PathBuf, ReviewSaveRecord>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+static REVIEW_TICKET: AtomicU64 = AtomicU64::new(1);
+fn review_save_complete(dir: &Path, ticket: u64, ok: bool) -> bool {
+    if ticket == 0 { return true; } // untracked queue fixtures
+    REVIEW_SAVES.lock().unwrap_or_else(|e| e.into_inner()).get_mut(dir)
+        .is_some_and(|record| record.complete(ticket, ok))
+}
+pub(crate) fn review_save_status(dir: &Path) -> Option<ReviewSaveStatus> {
+    REVIEW_SAVES.lock().unwrap_or_else(|e| e.into_inner()).get(dir).map(|r| r.status)
+}
+
+pub(crate) fn enqueue_review_data(dir: &Path, data: Vec<u8>) -> std::io::Result<()> {
+    let msg = {
+        // Publish the ticket and send under the same lock: concurrent callers
+        // must agree on which snapshot is last in the writer FIFO.
+        let mut saves = REVIEW_SAVES.lock().unwrap_or_else(|e| e.into_inner());
+        let ticket = REVIEW_TICKET.fetch_add(1, Ordering::Relaxed);
+        let failure_reported = saves.get(dir).is_some_and(|r| r.failure_reported);
+        saves.insert(dir.to_owned(), ReviewSaveRecord { ticket, status: ReviewSaveStatus::Pending, failure_reported });
+        let msg = WriteMsg::ReviewData { dir: dir.to_path_buf(), data, ticket };
+        match WRITER.get() {
+            Some(h) => match h.tx.send(msg) { Ok(()) => return Ok(()), Err(e) => e.0 },
+            None => msg,
+        }
+    };
+    let WriteMsg::ReviewData { dir, data, ticket } = msg else { unreachable!() };
+    let result = write_atomic(&review_write_target(&dir), &data);
+    review_save_complete(&dir, ticket, result.is_ok());
+    result
 }
 
 // ───────────── XMP rating sync (v0.8.69, E/H2 — the OUTPUT contract) ─────────────
@@ -32719,7 +32736,7 @@ pub(crate) fn save_selection(
     // queued (or, if the writer isn't up — early boot / a unit test — synchronously durably written).
     // v0.8.131 (F-P3 rule 6): addressed by FOLDER — the writer thread picks the file name from
     // on-disk facts at write time (see `WriteMsg::ReviewData`).
-    enqueue_review_data(dir, json.into_bytes());
+    enqueue_review_data(dir, json.into_bytes()).map_err(|e| e.to_string())?;
     Ok(map.len())
 }
 /// v0.8.36 (ITEM 2): a corrupt-settings warning stashed at load (before the events centre exists) and
@@ -44055,7 +44072,7 @@ mod writer_tests {
         let (tx, rx) = channel::<WriteMsg>();
         tx.send(WriteMsg::Log { target: "falcon.log".into(), line: "discard".into(), ticket: 1 }).unwrap();
         tx.send(WriteMsg::Write { target: "settings.json".into(), data: vec![7] }).unwrap();
-        tx.send(WriteMsg::ReviewData { dir: "photos".into(), data: vec![8] }).unwrap();
+        tx.send(WriteMsg::ReviewData { dir: "photos".into(), data: vec![8], ticket: 0 }).unwrap();
         tx.send(WriteMsg::XmpRating { sidecar: "photo.xmp".into(), rating: 5 }).unwrap();
         let (ack, done) = channel();
         tx.send(WriteMsg::Barrier(ack)).unwrap();
@@ -46629,8 +46646,8 @@ mod writer_tests {
         // message, converted by the time the second is written.
         let converted = Rc::new(Cell::new(false));
         let conv = converted.clone();
-        tx.send(WriteMsg::ReviewData { dir: PathBuf::from("/f"), data: vec![1] }).unwrap();
-        tx.send(WriteMsg::ReviewData { dir: PathBuf::from("/f"), data: vec![2] }).unwrap();
+        tx.send(WriteMsg::ReviewData { dir: PathBuf::from("/f"), data: vec![1], ticket: 0 }).unwrap();
+        tx.send(WriteMsg::ReviewData { dir: PathBuf::from("/f"), data: vec![2], ticket: 0 }).unwrap();
         drop(tx);
         writer_loop(
             rx,
@@ -50275,5 +50292,38 @@ mod r35_export {
         let j = fs::read(base.join("export").join("IMG_0001.jpg")).expect("the JPG deliverable");
         assert!(j.starts_with(&[0xFF, 0xD8]), "the JPG stop still writes a JPEG");
         let _ = fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
+mod review_save_recovery_tests {
+    use super::*;
+    #[test]
+    fn stale_acknowledgements_cannot_clean_or_fail_a_newer_snapshot() {
+        let mut r = ReviewSaveRecord { ticket: 2, status: ReviewSaveStatus::Pending, failure_reported: false };
+        r.complete(1, false); assert_eq!(r.status, ReviewSaveStatus::Pending);
+        r.complete(1, true); assert_eq!(r.status, ReviewSaveStatus::Pending);
+        assert!(r.complete(2, false)); assert_eq!(r.status, ReviewSaveStatus::Failed);
+        assert!(!r.complete(2, false), "repeated failures do not repeat the warning");
+        r = ReviewSaveRecord { ticket: 3, status: ReviewSaveStatus::Pending, failure_reported: r.failure_reported };
+        r.complete(2, false); assert_eq!(r.status, ReviewSaveStatus::Pending);
+        r.complete(3, true); assert_eq!(r.status, ReviewSaveStatus::Saved);
+        assert!(!r.failure_reported, "recovery re-arms the next failure warning");
+        r.complete(2, false); assert_eq!(r.status, ReviewSaveStatus::Saved);
+    }
+    #[test]
+    fn failed_inline_review_save_is_an_error_and_keeps_old_bytes() {
+        let dir = std::env::temp_dir().join(format!("falcon-review-fail-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir); std::fs::create_dir(&dir).unwrap();
+        let target = dir.join(SELECTION_FILE); std::fs::create_dir(&target).unwrap();
+        // Renaming a file onto a directory must fail, even when the directory is writable.
+        assert!(enqueue_review_data(&dir, b"data".to_vec()).is_err());
+        assert_eq!(review_save_status(&dir), Some(ReviewSaveStatus::Failed));
+        assert!(target.is_dir()); assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        std::fs::remove_dir(&target).unwrap();
+        enqueue_review_data(&dir, b"recovered".to_vec()).unwrap();
+        assert_eq!(review_save_status(&dir), Some(ReviewSaveStatus::Saved));
+        assert_eq!(std::fs::read(&target).unwrap(), b"recovered");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

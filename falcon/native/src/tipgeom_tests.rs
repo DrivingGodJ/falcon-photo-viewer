@@ -368,8 +368,8 @@ fn the_title_bar_chip_tips_clear_on_their_unmount_seams_under_the_pseudo_languag
     };
     // Band = W − 466: at W 800 (band 334) every chip mounts; W 760 (band 294) crosses only the
     // count chips' T2 seam, W 500 (band 34) the section chips' T3 seam.
-    for (ty, narrow, n) in [("HudChip", 800.0, 3), ("SectionChip", 540.0, 2)] {
-        resize(&app, 840.0);
+    for (ty, narrow, n) in [("HudChip", 760.0, 3), ("SectionChip", 500.0, 2)] {
+        resize(&app, 800.0);
         hover(&app, 100.0, 300.0);
         let chips: Vec<(f32, f32)> = E::find_by_element_type_name(&app, ty)
             .map(|c| {
@@ -379,7 +379,7 @@ fn the_title_bar_chip_tips_clear_on_their_unmount_seams_under_the_pseudo_languag
             .collect();
         assert_eq!(chips.len(), n, "band 334: every {ty} mounts");
         for (cx, cy) in chips {
-            resize(&app, 840.0);
+            resize(&app, 800.0);
             hover(&app, 100.0, 300.0);
             hover(&app, cx, cy);
             let t = tip(&app);
@@ -388,7 +388,7 @@ fn the_title_bar_chip_tips_clear_on_their_unmount_seams_under_the_pseudo_languag
             assert_eq!(E::find_by_element_type_name(&app, ty).count(), 0, "the {ty} seam was crossed");
             assert_eq!(tip(&app), "", "{t:?} clears when its {ty} unmounts under the pointer");
         }
-        resize(&app, 840.0);
+        resize(&app, 800.0);
         hover(&app, 100.0, 300.0);
         app.global::<ui::Tip>().set_text("⟦Settings⟧".into());
         resize(&app, narrow);
@@ -2461,7 +2461,7 @@ fn pill_unmount_clears_stranded_tip() {
         "the pill latches its own composed tip on hover"
     );
     // narrow past the T1 seam only (band 334: pill-show false, chips-show still true)
-    app.window().set_size(slint::LogicalSize::new(840.0, 800.0));
+    app.window().set_size(slint::LogicalSize::new(800.0, 800.0));
     hover(&app, 100.0, 300.0);
     assert_eq!(huds(&app), 3, "band 334 keeps the count chips — only the pill seam was crossed");
     assert_eq!(
@@ -2473,7 +2473,7 @@ fn pill_unmount_clears_stranded_tip() {
     app.window().set_size(slint::LogicalSize::new(1200.0, 800.0));
     hover(&app, 600.0, 300.0);
     app.global::<ui::Tip>().set_text("Settings".into());
-    app.window().set_size(slint::LogicalSize::new(840.0, 800.0));
+    app.window().set_size(slint::LogicalSize::new(800.0, 800.0));
     hover(&app, 100.0, 300.0);
     assert_eq!(
         app.global::<ui::Tip>().get_text(),
@@ -2567,7 +2567,7 @@ fn count_chips_unmount_clears_stranded_tip() {
     // open. So the strings come off the running chips now: hover each real HudChip, read whatever
     // it publishes, hover away, push THAT back, and cross the seam. A rename can no longer walk
     // past this row, because the row no longer knows what the names are.
-    app.window().set_size(slint::LogicalSize::new(840.0, 800.0));
+    app.window().set_size(slint::LogicalSize::new(800.0, 800.0));
     hover(&app, 100.0, 300.0);
     assert_eq!(huds(&app), 3, "band 334: the three count chips mount");
     let centres: Vec<(f32, f32)> =
@@ -2594,12 +2594,12 @@ fn count_chips_unmount_clears_stranded_tip() {
     for tip in &captured {
         let tip = tip.as_str();
         // above the T2 seam (band 334): the three count chips mount (pill already unmounted)
-        app.window().set_size(slint::LogicalSize::new(840.0, 800.0));
+        app.window().set_size(slint::LogicalSize::new(800.0, 800.0));
         hover(&app, 100.0, 300.0);
         assert_eq!(huds(&app), 3, "band 334: the three count chips mount");
         app.global::<ui::Tip>().set_text(tip.into());
         // narrow past the T2 seam (band 294: chips-show false, ctrl-show still true)
-        app.window().set_size(slint::LogicalSize::new(800.0, 800.0));
+        app.window().set_size(slint::LogicalSize::new(760.0, 800.0));
         hover(&app, 100.0, 300.0);
         assert_eq!(huds(&app), 0, "band 294: the count chips unmount");
         assert_eq!(
@@ -2609,10 +2609,10 @@ fn count_chips_unmount_clears_stranded_tip() {
         );
     }
     // ownership guard: a foreign tip survives the T2 seam
-    app.window().set_size(slint::LogicalSize::new(840.0, 800.0));
+    app.window().set_size(slint::LogicalSize::new(800.0, 800.0));
     hover(&app, 100.0, 300.0);
     app.global::<ui::Tip>().set_text("Settings".into());
-    app.window().set_size(slint::LogicalSize::new(800.0, 800.0));
+    app.window().set_size(slint::LogicalSize::new(760.0, 800.0));
     hover(&app, 100.0, 300.0);
     assert_eq!(
         app.global::<ui::Tip>().get_text(),
@@ -3011,7 +3011,7 @@ fn hud_group_centres_on_the_window_under_native_controls() {
     // change to the row's preferred width now moves the expectation with it instead of reddening this
     // row for a reason that has nothing to do with centring. The snap's own bound — the thing a
     // reader actually wants to know — is the second assert.
-    let band_x = 264.0 + 80.0;
+    let band_x = 224.0 + 80.0;
     let ideal = (1600.0 - w) / 2.0 - band_x;
     let expected = band_x + (ideal / 2.0).round() * 2.0 + w / 2.0;
     assert!(
@@ -3041,8 +3041,8 @@ fn hud_group_centres_on_the_window_under_native_controls() {
     // centres the row in the BAND (its own parent), the mac arm centres it on the WINDOW and clamps
     // into the band. Same snap, two ideals — so this expectation is built from the band width and
     // the one above is built from the window width.
-    let band_x = 326.0;
-    let band_w = 1600.0 - 326.0 - 180.0;
+    let band_x = 286.0;
+    let band_w = 1600.0 - 286.0 - 180.0;
     let ideal = (band_w - w) / 2.0;
     let expected = band_x + (ideal / 2.0).round() * 2.0 + w / 2.0;
     assert!(
@@ -3050,9 +3050,9 @@ fn hud_group_centres_on_the_window_under_native_controls() {
         "windows: HUD centre {centre} != the snapped band centre {expected} (row x {x}, w {w})"
     );
     assert!(
-        (centre - 873.0).abs() <= 1.0,
-        "windows: the band centre is 873 = W/2 + 73 and the snap may cost at most 1 px, not {}",
-        (centre - 873.0).abs()
+        (centre - 853.0).abs() <= 1.0,
+        "windows: the band centre is 853 = W/2 + 53 and the snap may cost at most 1 px, not {}",
+        (centre - 853.0).abs()
     );
     assert_eq!(x % 2.0, 0.0, "windows: the row origin {x} is off the even grid");
 }
@@ -3069,8 +3069,8 @@ fn hud_group_clamps_into_the_band_at_narrow_widths() {
         let app = hud_app(w, true);
         let (x, gw) = hud_row(&app);
         // Band geometry under native controls: left 224 + 80 inset, right 110.
-        let band_x = 264.0 + 80.0;
-        let band_w = (w - 264.0 - 80.0 - 110.0).max(0.0);
+        let band_x = 224.0 + 80.0;
+        let band_w = (w - 224.0 - 80.0 - 110.0).max(0.0);
         assert!(
             x >= band_x - 0.5,
             "w={w}: the group's left edge {x} escaped the band's left edge {band_x}"
@@ -3127,8 +3127,8 @@ fn cache_meter_anchors_left_of_the_bell_on_mac_and_stays_left_on_windows() {
     let (n, x, w) = meter(&app);
     assert_eq!(n, 1, "exactly one meter instance mounts");
     // v1.0 MERGE (F1-1): 220 was 5 × 44. Trunk's v0.8.180 owner ruling made the bar cells 40 px
-    // wide and added a 2 px window-edge lead-in, so the meter now starts at 2 + 6×40 = 242.
-    assert!((x - 242.0).abs() < 0.5, "windows: meter x {x} != 2 + 6×40 = 242");
+    // wide and added a 2 px window-edge lead-in, so the meter now starts at 2 + 5×40 = 202.
+    assert!((x - 202.0).abs() < 0.5, "windows: meter x {x} != 2 + 5×40 = 202");
     assert!((w - 62.0).abs() < 0.5);
 }
 
@@ -3140,7 +3140,7 @@ fn cache_meter_anchors_left_of_the_bell_on_mac_and_stays_left_on_windows() {
 /// `left-reserve` — the band grows 62px and the width assert reddens (and, on the real bar, the
 /// meter would sit under the group).
 #[test]
-fn toolbar_band_reserves_the_quick_rotate_cell_and_meter() {
+fn mac_band_width_survives_the_meter_move() {
     let band = |app: &ui::MainWindow| -> (f32, f32) {
         let e = i_slint_backend_testing::ElementHandle::find_by_element_id(app, "MainToolbar::hudclip")
             .next()
@@ -3151,17 +3151,17 @@ fn toolbar_band_reserves_the_quick_rotate_cell_and_meter() {
     // pre-S4b 286/inset/48 arithmetic produced.
     let app = hud_app(1600.0, true);
     let (x, w) = band(&app);
-    assert!((x - 344.0).abs() < 0.5, "mac: band x {x} != 264 + 80");
-    assert!((w - (1600.0 - 454.0)).abs() < 0.5, "mac: band width {w} != W − 454");
+    assert!((x - 304.0).abs() < 0.5, "mac: band x {x} != 224 + 80");
+    assert!((w - (1600.0 - 414.0)).abs() < 0.5, "mac: band width {w} != W − 414");
     assert!(
-        (w - (1600.0 - 326.0 - 80.0 - 48.0)).abs() < 0.5,
+        (w - (1600.0 - 286.0 - 80.0 - 48.0)).abs() < 0.5,
         "the pre-move arithmetic gives the SAME width — that is why the tier seams stand"
     );
     // Windows: the v0.7.2 contract, byte-identical — 286 left, 180 right.
     let app = hud_app(1600.0, false);
     let (x, w) = band(&app);
-    assert!((x - 326.0).abs() < 0.5, "windows: band x {x} != 326");
-    assert!((w - (1600.0 - 506.0)).abs() < 0.5, "windows: band width {w} != W − 326 − 180");
+    assert!((x - 286.0).abs() < 0.5, "windows: band x {x} != 286");
+    assert!((w - (1600.0 - 466.0)).abs() < 0.5, "windows: band width {w} != W − 286 − 180");
 }
 
 // ── v1.0 MERGE [A-4] / owner default L3: THREE ROWS RETIRED WITH THE LEAF THEY PINNED. ────
@@ -3651,10 +3651,10 @@ fn hud_four_tier_flip_points() {
                 .count(),
         )
     };
-    assert_eq!(at(&app, 1200.0), (3, 2, 1), "1200 wide (band 694): T1 FULL");
-    assert_eq!(at(&app, 960.0), (3, 2, 1), "960 Windows half-screen (band 454): T1 FULL");
-    assert_eq!(at(&app, 891.0), (3, 2, 1), "891 (band 385): T1");
-    assert_eq!(at(&app, 890.0), (3, 2, 1), "890 (band 384): the exact T1 seam — the pill mounts HERE");
+    assert_eq!(at(&app, 1200.0), (3, 2, 1), "1200 wide (band 734): T1 FULL");
+    assert_eq!(at(&app, 960.0), (3, 2, 1), "960 Windows half-screen (band 494): T1 FULL");
+    assert_eq!(at(&app, 851.0), (3, 2, 1), "851 (band 385): T1");
+    assert_eq!(at(&app, 850.0), (3, 2, 1), "850 (band 384): the exact T1 seam — the pill mounts HERE");
     let pill_w: Vec<f32> =
         i_slint_backend_testing::ElementHandle::find_by_element_id(&app, "MainToolbar::pathtxt")
             .map(|e| e.size().width)
@@ -3664,34 +3664,34 @@ fn hud_four_tier_flip_points() {
         vec![60.0],
         "at the T1 seam (band 384) the 324 cap bottoms the pill at exactly its 60px min tier"
     );
-    assert_eq!(at(&app, 889.0), (3, 2, 0), "889 (band 383): T2 — ONLY the pill differs across the T1 seam");
-    assert_eq!(at(&app, 823.0), (3, 2, 0), "823 (band 317): T2");
-    assert_eq!(at(&app, 822.0), (3, 2, 0), "822 (band 316): the exact T2 seam — the count chips mount HERE");
-    assert_eq!(at(&app, 821.0), (0, 2, 0), "821 (band 315): T3 — ONLY the three count chips differ across the T2 seam");
+    assert_eq!(at(&app, 849.0), (3, 2, 0), "849 (band 383): T2 — ONLY the pill differs across the T1 seam");
+    assert_eq!(at(&app, 783.0), (3, 2, 0), "783 (band 317): T2");
+    assert_eq!(at(&app, 782.0), (3, 2, 0), "782 (band 316): the exact T2 seam — the count chips mount HERE");
+    assert_eq!(at(&app, 781.0), (0, 2, 0), "781 (band 315): T3 — ONLY the three count chips differ across the T2 seam");
     assert_eq!(
         at(&app, 756.0),
         (0, 2, 0),
-        "756 (band 250): T3 on WINDOWS margins — Mac also hides the count chips at 756 (band 302)"
+        "756 (band 290): T3 on WINDOWS margins — the Mac 756 half-screen lands T2 (band 342; branch test)"
     );
     assert_eq!(
         at(&app, 560.0),
-        (0, 0, 0),
-        "560 window minimum (band 54): T4 — the new rotation action stays visible; HUD toggles hide"
+        (0, 2, 0),
+        "560 window minimum (band 94): T3 — the toggles survive to the smallest window"
     );
-    assert_eq!(at(&app, 583.0), (0, 2, 0), "583 (band 77): T3");
-    assert_eq!(at(&app, 582.0), (0, 2, 0), "582 (band 76): the exact T3 floor");
+    assert_eq!(at(&app, 543.0), (0, 2, 0), "543 (band 77): T3");
+    assert_eq!(at(&app, 542.0), (0, 2, 0), "542 (band 76): the exact T3 floor");
     assert_eq!(
-        at(&app, 581.0),
+        at(&app, 541.0),
         (0, 0, 0),
-        "581 (band 75): T4 — below the toggles floor (reachable at the 560px minimum)"
+        "541 (band 75): T4 — below the toggles floor (unreachable live: window min-width 560)"
     );
     // v0.8.139 HOTFIX, kept as a live row: the RETIRED T3 floor really is inside T4 now. The chips
     // are 4px wider, so a band of 72 no longer holds them and 538 is no longer a seam. Without this
     // a revert to 32px chips would leave the three rows above green at the wrong widths.
     assert_eq!(
-        at(&app, 578.0),
+        at(&app, 538.0),
         (0, 0, 0),
-        "578 (band 72): the RETIRED T3 floor, now T4 — the 34px chips need 76"
+        "538 (band 72): the RETIRED T3 floor, now T4 — the 34px chips need 76"
     );
 }
 
@@ -3737,10 +3737,10 @@ fn mac_native_controls_band_four_tiers() {
                 .count(),
         )
     };
-    assert_eq!(at(&app, 1200.0), (3, 2, 1), "Mac 1200 wide (band 746): T1 FULL");
-    assert_eq!(at(&app, 960.0), (3, 2, 1), "Mac 960 (band 506): T1 FULL");
-    assert_eq!(at(&app, 839.0), (3, 2, 1), "Mac 839 (band 385): T1");
-    assert_eq!(at(&app, 838.0), (3, 2, 1), "Mac 838 (band 384): the exact T1 seam — the pill mounts HERE");
+    assert_eq!(at(&app, 1200.0), (3, 2, 1), "Mac 1200 wide (band 786): T1 FULL");
+    assert_eq!(at(&app, 960.0), (3, 2, 1), "Mac 960 (band 546): T1 FULL");
+    assert_eq!(at(&app, 799.0), (3, 2, 1), "Mac 799 (band 385): T1");
+    assert_eq!(at(&app, 798.0), (3, 2, 1), "Mac 798 (band 384): the exact T1 seam — the pill mounts HERE");
     let pill_w: Vec<f32> =
         i_slint_backend_testing::ElementHandle::find_by_element_id(&app, "MainToolbar::pathtxt")
             .map(|e| e.size().width)
@@ -3750,25 +3750,25 @@ fn mac_native_controls_band_four_tiers() {
         vec![60.0],
         "at the Mac T1 seam (band 384) the 324 cap bottoms the pill at exactly its 60px min tier"
     );
-    assert_eq!(at(&app, 837.0), (3, 2, 0), "Mac 837 (band 383): T2 — ONLY the pill differs across the T1 seam");
+    assert_eq!(at(&app, 797.0), (3, 2, 0), "Mac 797 (band 383): T2 — ONLY the pill differs across the T1 seam");
     assert_eq!(
         at(&app, 756.0),
-        (0, 2, 0),
-        "Mac 756 half-screen (band 302): T3 — count chips hide to leave room for rotation"
+        (3, 2, 0),
+        "Mac 756 half-screen (band 342): T2 — the tester's count chips are BACK, the pill honestly waits for T1"
     );
-    assert_eq!(at(&app, 771.0), (3, 2, 0), "Mac 771 (band 317): T2");
-    assert_eq!(at(&app, 770.0), (3, 2, 0), "Mac 770 (band 316): the exact T2 seam — the count chips mount HERE");
-    assert_eq!(at(&app, 769.0), (0, 2, 0), "Mac 769 (band 315): T3 — ONLY the three count chips differ across the T2 seam");
+    assert_eq!(at(&app, 731.0), (3, 2, 0), "Mac 731 (band 317): T2");
+    assert_eq!(at(&app, 730.0), (3, 2, 0), "Mac 730 (band 316): the exact T2 seam — the count chips mount HERE");
+    assert_eq!(at(&app, 729.0), (0, 2, 0), "Mac 729 (band 315): T3 — ONLY the three count chips differ across the T2 seam");
     assert_eq!(
         at(&app, 560.0),
         (0, 2, 0),
-        "Mac 560 window minimum (band 106): T3 — the toggles survive to the smallest window"
+        "Mac 560 window minimum (band 146): T3 — the toggles survive to the smallest window"
     );
-    assert_eq!(at(&app, 530.0), (0, 2, 0), "Mac 530 (band 76): the exact T3 floor");
+    assert_eq!(at(&app, 490.0), (0, 2, 0), "Mac 490 (band 76): the exact T3 floor");
     assert_eq!(
-        at(&app, 529.0),
+        at(&app, 489.0),
         (0, 0, 0),
-        "Mac 529 (band 75): T4 — below the toggles floor (unreachable live: window min-width 560)"
+        "Mac 489 (band 75): T4 — below the toggles floor (unreachable live: window min-width 560)"
     );
 }
 
@@ -8981,7 +8981,7 @@ fn pill_text(app: &ui::MainWindow) -> String {
 /// assertion in the sweep below therefore passed identically whether the chosen tier fitted or was
 /// clipped to "D:\…\2026Sh…", which is why v0.8.116's FOLDER-band defect (the narrowest tier taken
 /// without ever measuring it) and its FULL→MIDDLE seam collapse both shipped green. The load-bearing
-/// claims — the 324px cluster reservation, `cap = max(60, W − 830)`, the 72px ladder and the 4px
+/// claims — the 324px cluster reservation, `cap = max(60, W − 790)`, the 72px ladder and the 4px
 /// slack — had no row that could flip. This reads the width the compositor solved, so they do now.
 fn pill_w(app: &ui::MainWindow) -> f32 {
     i_slint_backend_testing::ElementHandle::find_by_element_id(app, "MainToolbar::pathtxt")
@@ -9058,7 +9058,7 @@ fn the_path_pill_keeps_the_filename_through_a_middle_tier() {
         hover(&app, w / 2.0, 300.0);
         (pill_text(&app), pill_w(&app))
     };
-    let widths: Vec<f32> = (0..=100).map(|i| 1690.0 - 8.0 * i as f32).collect();
+    let widths: Vec<f32> = (0..=100).map(|i| 1650.0 - 8.0 * i as f32).collect();
     let sampled: Vec<(f32, String, f32)> = widths
         .iter()
         .map(|&w| {
@@ -9087,9 +9087,9 @@ fn the_path_pill_keeps_the_filename_through_a_middle_tier() {
     let last = |t: &str| seen.iter().rev().find(|(_, s)| s == t).map(|(w, _)| *w);
     // v0.8.117: the caps are printed too — a seam at window W means the tier's own measured width is
     // cap(W) − 4 to within the 8px sample step, so this line IS the round's width table.
-    let cap_at = |w: Option<f32>| w.map(|w| (w - 830.0).max(60.0));
+    let cap_at = |w: Option<f32>| w.map(|w| (w - 790.0).max(60.0));
     eprintln!(
-        "pill tiers (Windows margins, cap = max(60, W − 830)): full {:?}..{:?} / mid {:?}..{:?} / \
+        "pill tiers (Windows margins, cap = max(60, W − 790)): full {:?}..{:?} / mid {:?}..{:?} / \
          dir {:?}..{:?}  |  caps: full-last {:?}, mid-first {:?}, mid-last {:?}",
         first(full),
         last(full),
@@ -9121,7 +9121,7 @@ fn the_path_pill_keeps_the_filename_through_a_middle_tier() {
     // name nothing new. The FOLDER arm survives for the paths where it genuinely renders clean (a
     // short folder beside a long filename), which the grammar row in main.rs composes.
     assert_eq!(
-        at(890.0),
+        at(850.0),
         mid,
         "at the T1 seam (band 384, cap 60) the folder does not fit either — the pill keeps the name"
     );
@@ -22881,7 +22881,7 @@ fn the_film_line_is_the_aa_hairline_the_owner_chose() {
         "the film line's slot is 22 × 1 — the box the owner approved"
     );
     let sp = slot.absolute_position();
-    assert_eq!((sp.x, sp.y), (572.0, 26.0), "the slot's absolute origin at W 1440");
+    assert_eq!((sp.x, sp.y), (552.0, 26.0), "the slot's absolute origin at W 1440");
     assert_eq!(sp.y * OWNER_SF, 39.0, "…device row 39.0, unchanged from the cell he judged");
     // ── THE CHILD, WHICH IS THE FIX. It over-hangs the slot by bw/2 on the LONG axis only.
     let h = hairline_h(&app, &slot);
@@ -22904,8 +22904,8 @@ fn the_film_line_is_the_aa_hairline_the_owner_chose() {
     // …and in DEVICE pixels at the owner's 150%, which is where he saw it.
     assert_eq!(
         ((cut_r - cut_l) * OWNER_SF, cut_l * OWNER_SF),
-        (33.0, 858.0),
-        "the walk covers 33 device columns from 858.0 — the three frames' own span"
+        (33.0, 828.0),
+        "the walk covers 33 device columns from 828.0 — the three frames' own span"
     );
     // THE RETIRED GEOMETRY, AS A NUMBER. v0.8.189's child WAS the slot, so both cuts landed 0.75
     // device inside: 31.5 columns of 33. Without this the row above could pass on a coincidence.
@@ -23382,10 +23382,10 @@ fn the_grid_rule_is_the_film_lines_walk_transposed() {
             .collect();
     let chip_dots = dots.iter().find(|d| d.absolute_position().y < 44.0).expect("the chip's dots");
     let pill_dots = dots.iter().find(|d| d.absolute_position().y >= 44.0).expect("the pill's dots");
-    assert_eq!(chip.absolute_position().x, 618.0, "the chip's rule x");
-    assert_eq!(chip.absolute_position().x * OWNER_SF, 927.0, "…device 927.0");
-    assert_eq!(chip_dots.absolute_position().x, 622.0, "the chip's dots x");
-    assert_eq!(chip_dots.absolute_position().x * OWNER_SF, 933.0, "…device 933.0");
+    assert_eq!(chip.absolute_position().x, 598.0, "the chip's rule x");
+    assert_eq!(chip.absolute_position().x * OWNER_SF, 897.0, "…device 897.0");
+    assert_eq!(chip_dots.absolute_position().x, 602.0, "the chip's dots x");
+    assert_eq!(chip_dots.absolute_position().x * OWNER_SF, 903.0, "…device 903.0");
     assert_eq!(pill.absolute_position().x, 20.0, "the pill's rule x");
     assert_eq!(pill.absolute_position().x * OWNER_SF, 30.0, "…device 30.0");
     assert_eq!(pill_dots.absolute_position().x, 24.0, "the pill's dots x");
@@ -24011,7 +24011,7 @@ fn the_minus_mark_is_the_shared_hairline_at_the_owners_weight() {
     let slot = film_line(&app);
     let sp = slot.absolute_position();
     assert_eq!((slot.size().width, slot.size().height), (22.0, 1.0), "the film line is still 22 × 1");
-    assert_eq!((sp.x, sp.y), (572.0, 26.0), "…at the origin after reserving the rotation cell");
+    assert_eq!((sp.x, sp.y), (552.0, 26.0), "…at the v0.8.190 origin");
     let fh = hairline_h(&app, &slot);
     assert_eq!(
         (fh.size().width, fh.size().height),
@@ -31284,7 +31284,7 @@ fn full_mac_toolbar_geometry_matches_the_inline_shared_bar() {
             bar.set_host_width(width);
             bar.window().dispatch_event(slint::platform::WindowEvent::PointerMoved { position: slint::LogicalPosition::new(width-1., 43.) });
             i_slint_core::properties::ChangeTracker::run_change_handlers();
-            for name in ["hudclip", "hudrow", "pathtxt", "astpath", "barrule", "quickrotate"] {
+            for name in ["hudclip", "hudrow", "pathtxt", "astpath", "barrule"] {
                 let id = format!("MainToolbar::{name}");
                 let a = E::find_by_element_id(&app, &id).next().unwrap();
                 let b = E::find_by_element_id(&bar, &id).next().unwrap();
@@ -31319,12 +31319,12 @@ fn mac_title_bar_toolbar_fits_the_measured_title_bar() {
         bar.set_host_height(h);
         i_slint_core::properties::ChangeTracker::run_change_handlers();
         let cells: Vec<_> = E::find_by_element_type_name(&bar, "IconBtn").collect();
-        assert_eq!(cells.len(), 7, "six left buttons and the bell at h={h}");
+        assert_eq!(cells.len(), 6, "five left buttons and the bell at h={h}");
         for c in &cells {
             assert_eq!(c.size(), slint::LogicalSize::new(cell, h), "bar button cell at h={h}");
         }
         let washes: Vec<_> = E::find_by_element_id(&bar, "IconBtn::barwash").collect();
-        assert_eq!(washes.len(), 7, "every bar button has its hover square at h={h}");
+        assert_eq!(washes.len(), 6, "every bar button has its hover square at h={h}");
         for w in &washes {
             assert_eq!(w.size(), slint::LogicalSize::new(side, side), "the hover square stays square at h={h}");
             assert_eq!(w.absolute_position().y + side / 2., h / 2., "the hover square is centred on the bar at h={h}");
@@ -32358,110 +32358,4 @@ fn a_compare_browse_survives_two_steps_after_a_grid_scroll() {
     land(&mut queue);
     assert_eq!(notch(), (2, 502), "its thumbnail lands and the browse goes on");
     app.set_compare(false);
-}
-
-
-#[test]
-fn quick_rotate_button_routes_current_photo_and_refuses_unavailable_states() {
-    use i_slint_backend_testing::ElementHandle as E;
-    let app = boot();
-    app.window().set_size(slint::LogicalSize::new(1280., 800.));
-    app.set_count_all(8);
-    app.set_count_selected(3);
-    app.set_cur_idx(4);
-    let calls = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let captured = calls.clone();
-    let weak = app.as_weak();
-    app.on_quick_rotate(move || captured.borrow_mut().push(weak.upgrade().unwrap().get_cur_idx()));
-    app.on_bulk_rotate(|_| panic!("quick rotation must not target the selection"));
-    app.set_quick_rotate_ready(true);
-    let button = E::find_by_element_id(&app, "MainToolbar::quickrotate").next().unwrap();
-    assert_eq!(button.accessible_label().unwrap(), "Rotate photo right and confirm save");
-    let p = button.absolute_position(); let s = button.size();
-    click(&app, p.x + s.width / 2., p.y + s.height / 2., i_slint_core::items::PointerEventButton::Left);
-    assert_eq!(*calls.borrow(), vec![4]);
-    app.set_quick_rotate_ready(false);
-    click(&app, p.x + s.width / 2., p.y + s.height / 2., i_slint_core::items::PointerEventButton::Left);
-    app.invoke_toolbar_action("quick-rotate".into(), 0., 44.);
-    assert_eq!(calls.borrow().len(), 1, "read-only/checking states refuse pointer and stale native dispatch");
-    app.set_quick_rotate_ready(true);
-    for gate in 0..4 {
-        app.set_compare(gate == 0);
-        app.set_settings_open(gate == 1);
-        app.set_opening_photo(gate == 2);
-        app.set_sel_busy(gate == 3);
-        app.invoke_toolbar_action("quick-rotate".into(), 0., 44.);
-        assert_eq!(calls.borrow().len(), 1, "Compare, dialog, photo opening and operation gates are live");
-    }
-}
-
-#[test]
-fn quick_rotate_state_and_cell_fit_both_toolbar_hosts() {
-    use i_slint_backend_testing::ElementHandle as E;
-    for width in [560., 800., 1280.] {
-        let app = hud_app(width, true);
-        for ready in [false, true] {
-            app.set_quick_rotate_ready(ready);
-            app.set_quick_rotate_tip("photo or folder is read-only".into());
-            let bar = ui::MacToolbarWindow::new().unwrap();
-            bar.set_state(app.get_toolbar_state());
-            bar.set_host_width(width);
-            bar.set_host_height(38.);
-            let button = E::find_by_element_id(&bar, "MainToolbar::quickrotate").next().unwrap();
-            let p = button.absolute_position(); let s = button.size();
-            assert!(p.x >= 80. && p.x + s.width <= width);
-            assert_eq!(s.height, 38.); assert_eq!(s.width, 34.);
-            let band = E::find_by_element_id(&bar, "MainToolbar::hudclip").next().unwrap();
-            assert!(p.x + s.width <= band.absolute_position().x, "rotate never overlaps the path/status HUD");
-            assert_eq!(bar.get_state().quick_rotate_ready, ready);
-            assert_eq!(bar.get_state().quick_rotate_tip.as_str(), "photo or folder is read-only");
-        }
-    }
-}
-
-
-#[test]
-fn quick_rotation_uses_apply_confirmation_and_dismissal_never_writes() {
-    use i_slint_backend_testing::ElementHandle as E;
-    let app = boot();
-    app.set_motion_ui(false);
-    app.set_count_rotated(3); // two other photos must not be included in this confirmation
-    let calls = std::rc::Rc::new(std::cell::Cell::new(0));
-    let written = calls.clone();
-    let weak = app.as_weak();
-    app.on_apply_rotations(move || {
-        let app = weak.upgrade().unwrap();
-        assert!(app.get_quick_rotate_confirm());
-        assert_eq!(app.get_rotation_confirm_count(), 1);
-        written.set(written.get() + 1);
-        app.set_confirm_kind(0);
-    });
-    for dismiss in 0..4 {
-        app.set_quick_rotate_name("one-photo.jpg".into());
-        app.set_quick_rotate_confirm(true);
-        app.set_confirm_kind(5);
-        hover(&app, 600., 300.);
-        assert_eq!(app.get_rotation_confirm_count(), 1);
-        assert_eq!(E::find_by_accessible_label(&app, "rotation → write to photos").count(), 1);
-        assert_eq!(E::find_by_accessible_label(&app, "one-photo.jpg").count(), 1);
-        match dismiss {
-            0 | 3 => {
-                let id = if dismiss == 0 { "MainWindow::cfcancel" } else { "MainWindow::cfprimary" };
-                let button = E::find_by_element_id(&app, id).next().unwrap();
-                let p = button.absolute_position(); let s = button.size();
-                click(&app, p.x + s.width / 2., p.y + s.height / 2., i_slint_core::items::PointerEventButton::Left);
-            }
-            1 => key(&app, slint::platform::Key::Escape),
-            _ => key(&app, slint::platform::Key::Return),
-        }
-        hover(&app, 600., 300.);
-        assert_eq!(app.get_confirm_kind(), 0);
-        assert!(!app.get_quick_rotate_confirm(), "closed confirmation cannot scope a later Review apply");
-        assert_eq!(calls.get(), if dismiss == 3 { 1 } else { 0 });
-        assert_eq!(app.get_count_rotated(), 3, "dismissal must not discard pending previews");
-    }
-    app.set_confirm_kind(5); // the original Review confirmation still counts the whole folder
-    hover(&app, 600., 300.);
-    assert_eq!(app.get_rotation_confirm_count(), 3);
-    assert_eq!(E::find_by_accessible_label(&app, "rotations → write to photos").count(), 1);
 }

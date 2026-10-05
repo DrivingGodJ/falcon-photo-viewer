@@ -1339,14 +1339,5 @@
   "⚠ Full-res unavailable — tap to retry": "⚠ 无法加载全分辨率 — 点击重试",
   "⚠ Ratings not saved — {error}": "⚠ 评分未保存 — {error}",
   "⚠ {0}": "⚠ {0}",
-  "＋  New custom preset": "＋  新建自定义预设",
-  "Rotate photo right and confirm save": "向右旋转照片并确认保存",
-  "Rotate photo right and confirm save — open a photo first": "向右旋转照片并确认保存 — 请先打开照片",
-  "Rotate photo right and confirm save — wait for the current operation": "向右旋转照片并确认保存 — 请等待当前操作完成",
-  "Rotate photo right and confirm save — leave Compare first": "向右旋转照片并确认保存 — 请先退出对比",
-  "Rotate photo right and confirm save — close the dialog first": "向右旋转照片并确认保存 — 请先关闭对话框",
-  "Rotate photo right 90° and confirm saving its orientation": "向右旋转照片 90°，确认后保存方向",
-  "Rotate photo right and confirm save — photo or folder is read-only": "向右旋转照片并确认保存 — 照片或文件夹为只读",
-  "Rotate photo right and confirm save — this photo cannot be rotated": "向右旋转照片并确认保存 — 此照片无法旋转",
-  "Rotate photo right and confirm save — checking write permissions": "向右旋转照片并确认保存 — 正在检查写入权限"
+  "＋  New custom preset": "＋  新建自定义预设"
 }

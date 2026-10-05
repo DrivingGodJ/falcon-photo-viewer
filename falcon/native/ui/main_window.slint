@@ -203,8 +203,6 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
             path-dir: root.path-dir,
             path-mid: root.path-mid,
             path-text: root.path-text,
-            quick-rotate-ready: root.quick-rotate-ready && !root.modal-open,
-            quick-rotate-tip: root.quick-rotate-tip,
             sel-open: root.sel-open,
             settings-open: root.settings-open,
             titlebar-h: root.titlebar-h,
@@ -213,12 +211,6 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
         in-out property <length> cache-meter-cy: 47px;
         in-out property <length> sort-menu-y: 3px;
         callback toolbar-action(string, length, length);
-        in property <bool> quick-rotate-ready: false;
-        in property <string> quick-rotate-tip: @tr("falcon" => "Rotate photo right and confirm save");
-        in-out property <bool> quick-rotate-confirm: false;
-        in property <string> quick-rotate-name;
-        out property <int> rotation-confirm-count: root.quick-rotate-confirm ? 1 : root.count-rotated;
-        callback quick-rotate();
         toolbar-action(action, x, y) => {
             if root.immersive { return; }
             // Recheck live state after cross-window dispatch; native snapshots may be a frame old.
@@ -237,10 +229,6 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
                         }
             else if action == "review" { root.close-bar-menus(); root.welcome-open = false; root.toggle-sel-panel(); }
             else if action == "compare" { root.close-bar-menus(); root.toggle-compare(); }
-            else if action == "quick-rotate" {
-                if !root.quick-rotate-ready || root.modal-open || root.compare || root.opening-photo || root.sel-busy { return; }
-                root.close-bar-menus(); root.quick-rotate();
-            }
             else if action == "notifications" { root.close-bar-menus(); root.welcome-open = false; root.toggle-notif(); }
             else if action == "minimize" { root.close-bar-menus(); root.minimize-requested(); }
             else if action == "maximize" { root.close-bar-menus(); root.maximize-requested(); }
@@ -3330,10 +3318,7 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
         // grow callers. The property's OWNER carries the observer (the house rule), which is what
         // makes the pair total. The counts do not lurch at the open: while both surfaces are closed
         // the tick already publishes under this SAME default (support::include_rejects_effective).
-        changed confirm-kind => {
-            if (root.confirm-kind == 1) { root.include-rejects = root.include-rejects-default; }
-            if (root.confirm-kind != 5) { root.quick-rotate-confirm = false; }
-        }
+        changed confirm-kind => { if (root.confirm-kind == 1) { root.include-rejects = root.include-rejects-default; } }
         // v0.8.120 (design-sweep Y47): the editor subtree unmounts on Cancel AND on the Rust save
         // path WITHOUT closing the sheet, so `changed export-open` fired for neither — a focused
         // preset-name TextInput was destroyed and focus went nowhere: Esc dead, arrow-scrub dead,
@@ -5483,8 +5468,6 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
             path-dir: root.path-dir;
             path-mid: root.path-mid;
             path-text: root.path-text;
-            quick-rotate-ready: root.quick-rotate-ready && !root.modal-open;
-            quick-rotate-tip: root.quick-rotate-tip;
             sel-open: root.sel-open;
             settings-open: root.settings-open;
             titlebar-h: root.titlebar-h;
@@ -8596,7 +8579,7 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
                         ActionBtn {
                             label: @tr("falcon" => "Apply rotations"); variant: 2; rim: 1; // blue — the destination the rotations travel to
                             enabled: root.count-rotated > 0 && !root.sel-busy;
-                            clicked => { root.quick-rotate-confirm = false; root.confirm-kind = 5; }
+                            clicked => { root.confirm-kind = 5; }
                         }
                         ActionBtn {
                             label: @tr("falcon" => "Discard rotations"); variant: 2; rim: 2; // red — the same rim "Move rejected" wears, for the same reason
@@ -9339,7 +9322,7 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
                         // Danger-coloured like its kind-2 sibling. Kind 6 keeps no count: delete-body
                         // names the exact file(s), so its magnitude is already explicit.
                         if root.confirm-kind != 6 : Text {
-                               text: root.confirm-kind == 8 ? root.web-collide-count : (root.confirm-kind == 2 ? root.count-rejects : (root.confirm-kind == 3 ? root.count-bin : (root.confirm-kind == 7 ? root.count-rated : (root.confirm-kind == 5 ? root.rotation-confirm-count : (root.confirm-kind == 4 ? root.count-rotated : root.count-out-col1))))); // v0.8.130 (W2-1): kind 1 leads with the REAL target count, not the whole folder's picks
+                               text: root.confirm-kind == 8 ? root.web-collide-count : (root.confirm-kind == 2 ? root.count-rejects : (root.confirm-kind == 3 ? root.count-bin : (root.confirm-kind == 7 ? root.count-rated : ((root.confirm-kind == 4 || root.confirm-kind == 5) ? root.count-rotated : root.count-out-col1)))); // v0.8.130 (W2-1): kind 1 leads with the REAL target count, not the whole folder's picks
                                // v0.8.187 (W1 ii): kind 8 is WARN, not danger and not accent — the
                                // number is neither a destruction nor a deliverable, it is a
                                // condition the user did not ask for (the same reading the
@@ -9352,15 +9335,11 @@ import { MacExperimentPopup, MacExperimentStatus } from "mac_experiment.slint";
                                    : root.confirm-kind == 6 ? root.delete-title
                                    : root.confirm-kind == 7 ? @tr("falcon" => "rated photo → write XMP sidecar" | "rated photos → write XMP sidecars" % root.count-rated)
                                    : root.confirm-kind == 4 ? @tr("falcon" => "manual rotation → discard" | "manual rotations → discard" % root.count-rotated)
-                                   : root.confirm-kind == 5 ? @tr("falcon" => "rotation → write to photos" | "rotations → write to photos" % root.rotation-confirm-count)
+                                   : root.confirm-kind == 5 ? @tr("falcon" => "rotation → write to photos" | "rotations → write to photos" % root.count-rotated)
                                    // Language packs (round 2): English keeps "rejects" for every count.
                                    : @tr("falcon" => "rejects → move to ./Rejected" | "rejects → move to ./Rejected" % root.count-rejects);
                                color: Theme.text; font-size: Theme.font-lg; font-weight: 600;
                                vertical-alignment: center; horizontal-stretch: 1; wrap: word-wrap; }
-                    }
-                    if root.confirm-kind == 5 && root.quick-rotate-confirm : Text {
-                        text: root.quick-rotate-name;
-                        color: Theme.text; font-size: Theme.font-body; wrap: word-wrap;
                     }
                     confirmbody := Text {
                         // v0.8.187 (X8): the SAFETY sentence states what the user stands to lose, not

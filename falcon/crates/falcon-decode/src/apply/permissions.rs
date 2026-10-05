@@ -1,4 +1,4 @@
-//! Shared preflight for the toolbar and every rotation apply entry point.
+//! Shared preflight for every rotation apply entry point.
 use std::{fs::OpenOptions, io, path::Path};
 
 fn denied(path: &Path) -> io::Error {

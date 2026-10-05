@@ -1920,7 +1920,6 @@ mod pool_gov; // v0.9.23 (one-pool): the macOS elastic decode-pool governor — 
 mod posture; // v0.9.9 (P6): TEMPORARY dev "posture benchmark" — the battery/posture measurement instrument (pure core; log-only)
 mod roi; // v0.8.31 (§64): the ROI/zoom decode-tier subsystem (owns the swap/develop-cleared ROI state) — unit-tested
 mod raw_export;
-mod quick_rotate;
 mod support;
 mod file_icons;
 mod about;
@@ -6615,8 +6614,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // maps (EMPTY in stage 1a; the manual-rotate UI is 1b) and the auto_orient mirror. Every
     // upload-enqueue composes `effective = (auto ? base : 0) + delta mod 4` through this.
     let rot: Rc<RotState> = Rc::new(RotState::new(boot.auto_orient));
-    let quick_rotate_probe = Rc::new(RefCell::new(quick_rotate::Probe::new()));
-    let quick_rotate_confirm: Rc<RefCell<Option<quick_rotate::Target>>> = Rc::new(RefCell::new(None));
     // Monotonic thumbnail-ARRIVAL generation: `drain_thumbs` bumps it for every landing of the
     // current folder (a decoded thumb OR a failure marker). The filmstrip/Selection rebuild keys
     // watch THIS instead of the thumb-cache SIZE — on a >THUMB_CACHE_MAX folder the cache pins at the
@@ -17635,7 +17632,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         let start = start_op.clone();
         let awz = app.as_weak();
         let photo_gate = app.as_weak();
-        let quick_confirm = quick_rotate_confirm.clone();
         app.on_apply_rotations(move || {
             if photo_gate.upgrade().is_some_and(|a| a.get_opening_photo()) { return; }
             let dir = cur_dir.borrow().clone();
@@ -17643,15 +17639,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Pin the folder generation with the plan snapshot — the drain drops the batch if a folder
             // swap bumps this before it lands (finding #5).
             let apply_gen = generation.load(Ordering::Relaxed);
-            // The toolbar confirms one captured photo; Review still applies all pending photos.
-            let quick_target = if awz.upgrade().is_some_and(|a| a.get_quick_rotate_confirm()) {
-                let target = quick_confirm.borrow().clone();
-                if !target.as_ref().is_some_and(|t| t.matches(apply_gen, Path::new(&dir), &snap)) {
-                    if let Some(a) = awz.upgrade() { a.set_confirm_kind(0); }
-                    return;
-                }
-                target
-            } else { None };
             // v0.8.103 (V1): the plan is three fields and no shot. v0.8.102 carried the whole `Shot`
             // so the worker could re-probe `decoder_consumed_turns` (three file opens per rotated
             // shot, one of them a COM decoder open for a HEIC) — and a probe that failed degraded
@@ -17663,7 +17650,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let di = rot.delta_idx.borrow();
                 let base = rot.base.borrow();
                 for (&idx, &t) in di.iter() {
-                    if t & 3 == 0 || quick_target.as_ref().is_some_and(|target| target.index != idx) {
+                    if t & 3 == 0 {
                         continue;
                     }
                     let Some(shot) = snap.get(idx) else { continue };
@@ -17709,16 +17696,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // platform decoder already consumed from `base_turns` and the absolute value it
                     // composes on, so nothing is probed here and the "Apply is a visual no-op under
                     // auto-orient" invariant holds for HEIC without a per-shot file read.
-                    let rep = if let Some(target) = &quick_target {
-                        match quick_rotate::apply_one(target, plan) {
-                            Ok(report) => report,
-                            Err(permission) => {
-                                log_event(&format!("rotation apply {name}: permission changed ({permission:?})"));
-                                failed.push(name.clone());
-                                continue;
-                            }
-                        }
-                    } else { falcon_decode::apply_rotation(plan) };
+                    let rep = falcon_decode::apply_rotation(plan);
                     log_event(&format!(
                         "rotation apply {name}: finished={:?} raw={:?} ok={}",
                         rep.finished_action, rep.raw_action, rep.ok
@@ -17758,38 +17736,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 };
                 *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some((msg, OpSeverity::from_err(f > 0), -1, None));
             });
-        });
-    }
-    {
-        let probe = quick_rotate_probe.clone();
-        let confirmed = quick_rotate_confirm.clone();
-        let shots = shots.clone();
-        let current = current.clone();
-        let cur_dir = cur_dir.clone();
-        let generation = generation.clone();
-        let rot = rot.clone();
-        let weak = app.as_weak();
-        app.on_quick_rotate(move || {
-            let Some(a) = weak.upgrade() else { return; };
-            if !a.get_quick_rotate_ready() || a.get_modal_open() || a.get_compare()
-                || a.get_opening_photo() || a.get_sel_busy() { return; }
-            let index = *current.borrow();
-            let Some(shot) = shots.lock().unwrap_or_else(|e| e.into_inner()).get(index).cloned() else { return; };
-            let gen = generation.load(Ordering::Relaxed);
-            let Some(target) = quick_rotate::Target::for_shot(gen, index, Path::new(&*cur_dir.borrow()), &shot) else { return; };
-            if !probe.borrow().ready_for(&target) { return; }
-            // Use the author's preview/undo path and the same Apply confirmation/worker.
-            // Cancel keeps the preview pending, exactly like Review -> Apply rotations.
-            let before = rot.delta_of(index);
-            a.invoke_rotate_shot(index as i32, 1);
-            let after = rot.delta_of(index);
-            if after == before || after == 0 { return; } // refused, or a fourth turn needs no write
-            probe.borrow_mut().invalidate();
-            a.set_quick_rotate_ready(false);
-            a.set_quick_rotate_name(target.name.clone().into());
-            *confirmed.borrow_mut() = Some(target);
-            a.set_quick_rotate_confirm(true);
-            a.set_confirm_kind(5);
         });
     }
     {
@@ -21017,7 +20963,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let apply_scan_t = apply_scan.clone();
     let apply_slot_t = rot.apply_slot.clone(); // v0.8.0 S2 / v0.9.4: drain applied rotations (rot.apply_slot)
     let apply_rot_apply_t = apply_rot_apply.clone();
-    let quick_rotate_probe_t = quick_rotate_probe.clone();
     // v0.8.32 (§64): ONE film-tier handle into the tick (was 4: thumb_cache_t, thumb_pending_t, frost_map_t,
     // thumb_failed_t). Steps read `&film_t.thumbs` / `.pending` / `.frost` / `.failed`, or take `&film_t`
     // (drain_thumbs, step_frost_feed, step_filmstrip, step_selection). thumb_gen_t (the monotonic arrival
@@ -21228,7 +21173,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let gpu_lost_t = gpu_lost.clone(); // M1 (v0.8.73): device-loss latch — the tick halts the GPU pumps + exits
     // Set once when a selection (ratings/flags) save fails (read-only/locked card, disk full) so the
     // warning banner + log aren't re-spammed every retry; cleared on the next successful save.
-    let save_warned = Cell::new(false);
+    let save_warned = RefCell::new(std::collections::HashSet::<String>::new());
     // N9: consecutive tick-panic counter. One caught panic degrades one frame (fine); ~0.5 s of
     // them means a DETERMINISTIC failure that silently kills everything downstream of the panicking
     // step — including the autosave. Past the threshold we surface a banner + rescue-flush the
@@ -22699,27 +22644,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
         let len = shots_now.len();
         len_t.store(len, Ordering::Relaxed);
-
-        // No filesystem calls on the tick: only queue a bounded permission request
-        // and accept a reply for the live photo/generation. Recheck at write time too.
-        let rotate_index = *cur_t.borrow();
-        let rotate_target = shots_now.get(rotate_index).and_then(|shot|
-            quick_rotate::Target::for_shot(gen_now, rotate_index, Path::new(&*cur_dir_t.borrow()), shot));
-        let capability = quick_rotate_probe_t.borrow_mut().update(rotate_target, now);
-        let has_base = rot_t.base.borrow().contains_key(&rotate_index) || rot_t.base_raw.borrow().contains_key(&rotate_index);
-        app.set_quick_rotate_ready(capability == quick_rotate::Capability::Writable && has_base
-            && !app.get_sel_busy() && !app.get_opening_photo() && !app.get_compare() && !app.get_modal_open());
-        let tip = if len == 0 { i18n::tr("Rotate photo right and confirm save — open a photo first") }
-            else if app.get_sel_busy() { i18n::tr("Rotate photo right and confirm save — wait for the current operation") }
-            else if app.get_compare() { i18n::tr("Rotate photo right and confirm save — leave Compare first") }
-            else if app.get_modal_open() { i18n::tr("Rotate photo right and confirm save — close the dialog first") }
-            else { match capability {
-                quick_rotate::Capability::Writable if has_base => i18n::tr("Rotate photo right 90° and confirm saving its orientation"),
-                quick_rotate::Capability::ReadOnly => i18n::tr("Rotate photo right and confirm save — photo or folder is read-only"),
-                quick_rotate::Capability::Unsupported => i18n::tr("Rotate photo right and confirm save — this photo cannot be rotated"),
-                _ => i18n::tr("Rotate photo right and confirm save — checking write permissions"),
-            }};
-        app.set_quick_rotate_tip(tip.into());
 
         // P1 (v0.7.5): a folder swap clears the sustained full-res landing EWMA so the previous folder's
         // (possibly CPU-fallback-throttled) pacing cap can't poison the new folder's always-sharp

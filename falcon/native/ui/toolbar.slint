@@ -2,7 +2,7 @@
 // All actions execute against the owning MainWindow; this component holds no review/settings state.
 import { Theme, Tip } from "theme.slint";
 import { IconBtn } from "controls.slint";
-import { AaHairline, FlagGlyph, RotateGlyph } from "glyphs.slint";
+import { AaHairline, FlagGlyph } from "glyphs.slint";
 import { CacheMeter, SectionChip, HudChip } from "hud.slint";
 
 export struct ToolbarState {
@@ -36,8 +36,6 @@ export struct ToolbarState {
     path-dir: string,
     path-mid: string,
     path-text: string,
-    quick-rotate-ready: bool,
-    quick-rotate-tip: string,
     sel-open: bool,
     settings-open: bool,
     titlebar-h: length,
@@ -75,8 +73,6 @@ export component MainToolbar inherits Rectangle {
     in property <string> path-dir;
     in property <string> path-mid;
     in property <string> path-text;
-    in property <bool> quick-rotate-ready;
-    in property <string> quick-rotate-tip;
     in property <bool> sel-open;
     in property <bool> settings-open;
     in property <length> titlebar-h;
@@ -338,24 +334,6 @@ export component MainToolbar inherits Rectangle {
                             MoveTo { x: 2.5; y: 3.5; } LineTo { x: 13.5; y: 3.5; } LineTo { x: 13.5; y: 12.5; }
                             LineTo { x: 2.5; y: 12.5; } LineTo { x: 2.5; y: 3.5; }
                             MoveTo { x: 8; y: 3.5; } LineTo { x: 8; y: 12.5; }
-                        }
-                    }
-                    quickrotate := IconBtn {
-                        width: root.bar-cell-w; radius: 0; bar: true;
-                        hit: !root.immersive;
-                        enabled: root.quick-rotate-ready && !root.modal-blocking && !root.compare;
-                        tip: root.quick-rotate-tip;
-                        accessible-role: button;
-                        accessible-label: @tr("falcon" => "Rotate photo right and confirm save");
-                        accessible-description: root.quick-rotate-tip;
-                        accessible-enabled: self.enabled && !root.immersive;
-                        accessible-action-default => {
-                            if self.enabled && !root.immersive { root.action("quick-rotate", 0, root.height / 1px); }
-                        }
-                        clicked => { root.action("quick-rotate", 0, root.height / 1px); }
-                        RotateGlyph {
-                            x: (parent.width - 16px) / 2; y: (parent.height - 16px) / 2;
-                            width: 16px; height: 16px; tint: Theme.text-dim;
                         }
                     }
                     // Cache-status meter — one fixed-width bar split into a BEHIND (left) and AHEAD
@@ -690,8 +668,7 @@ export component MainToolbar inherits Rectangle {
                     // meter's own unchanged 62 px — which is why the live posture costs this
                     // reservation nothing at all, on either platform, and why `right-reserve` is a
                     // plain two-arm ternary again rather than a three-way on a latched bool.
-                    // The sixth action needs one cell beyond the original five-button reservation.
-                    property <length> left-reserve: (root.native-window-controls ? 224px : 286px) + root.bar-cell-w;
+                    property <length> left-reserve: root.native-window-controls ? 224px : 286px;
                     property <length> right-reserve: root.native-window-controls
                         ? 110px : 180px;
                     x: self.left-reserve + root.titlebar-leading-inset;
@@ -776,8 +753,8 @@ export component MainToolbar inherits Rectangle {
                     // THE ARITHMETIC: the pill's cap is the band minus the 324 px cluster
                     // reservation, floored at the 60 px min tier, so a candidate is chosen when
                     // `measured + 4px ≤ cap` — the same 4 px slack the width ladder below adds. On
-                    // Windows the band is W − 506, so cap = max(60, W − 830): the FULL tier survives
-                    // to a window of (full width + 834) px, the MIDDLE to (mid width + 834) px, and
+                    // Windows the band is W − 466, so cap = max(60, W − 790): the FULL tier survives
+                    // to a window of (full width + 794) px, the MIDDLE to (mid width + 794) px, and
                     // below that the folder alone — WHEN THE FOLDER ITSELF FITS.
                     // v0.8.117 (F1/F3): the three tiers are ordered by INFORMATION, not by width, and
                     // for a typical shoot layout the FOLDER tier is WIDER than the MIDDLE one
