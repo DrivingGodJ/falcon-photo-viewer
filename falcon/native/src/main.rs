@@ -6616,6 +6616,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // upload-enqueue composes `effective = (auto ? base : 0) + delta mod 4` through this.
     let rot: Rc<RotState> = Rc::new(RotState::new(boot.auto_orient));
     let quick_rotate_probe = Rc::new(RefCell::new(quick_rotate::Probe::new()));
+    let quick_rotate_confirm: Rc<RefCell<Option<quick_rotate::Target>>> = Rc::new(RefCell::new(None));
     // Monotonic thumbnail-ARRIVAL generation: `drain_thumbs` bumps it for every landing of the
     // current folder (a decoded thumb OR a failure marker). The filmstrip/Selection rebuild keys
     // watch THIS instead of the thumb-cache SIZE — on a >THUMB_CACHE_MAX folder the cache pins at the
@@ -17634,6 +17635,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let start = start_op.clone();
         let awz = app.as_weak();
         let photo_gate = app.as_weak();
+        let quick_confirm = quick_rotate_confirm.clone();
         app.on_apply_rotations(move || {
             if photo_gate.upgrade().is_some_and(|a| a.get_opening_photo()) { return; }
             let dir = cur_dir.borrow().clone();
@@ -17641,6 +17643,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Pin the folder generation with the plan snapshot — the drain drops the batch if a folder
             // swap bumps this before it lands (finding #5).
             let apply_gen = generation.load(Ordering::Relaxed);
+            // The toolbar confirms one captured photo; Review still applies all pending photos.
+            let quick_target = if awz.upgrade().is_some_and(|a| a.get_quick_rotate_confirm()) {
+                let target = quick_confirm.borrow().clone();
+                if !target.as_ref().is_some_and(|t| t.matches(apply_gen, Path::new(&dir), &snap)) {
+                    if let Some(a) = awz.upgrade() { a.set_confirm_kind(0); }
+                    return;
+                }
+                target
+            } else { None };
             // v0.8.103 (V1): the plan is three fields and no shot. v0.8.102 carried the whole `Shot`
             // so the worker could re-probe `decoder_consumed_turns` (three file opens per rotated
             // shot, one of them a COM decoder open for a HEIC) — and a probe that failed degraded
@@ -17652,7 +17663,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let di = rot.delta_idx.borrow();
                 let base = rot.base.borrow();
                 for (&idx, &t) in di.iter() {
-                    if t & 3 == 0 {
+                    if t & 3 == 0 || quick_target.as_ref().is_some_and(|target| target.index != idx) {
                         continue;
                     }
                     let Some(shot) = snap.get(idx) else { continue };
@@ -17698,7 +17709,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // platform decoder already consumed from `base_turns` and the absolute value it
                     // composes on, so nothing is probed here and the "Apply is a visual no-op under
                     // auto-orient" invariant holds for HEIC without a per-shot file read.
-                    let rep = falcon_decode::apply_rotation(plan);
+                    let rep = if let Some(target) = &quick_target {
+                        match quick_rotate::apply_one(target, plan) {
+                            Ok(report) => report,
+                            Err(permission) => {
+                                log_event(&format!("rotation apply {name}: permission changed ({permission:?})"));
+                                failed.push(name.clone());
+                                continue;
+                            }
+                        }
+                    } else { falcon_decode::apply_rotation(plan) };
                     log_event(&format!(
                         "rotation apply {name}: finished={:?} raw={:?} ok={}",
                         rep.finished_action, rep.raw_action, rep.ok
@@ -17742,19 +17762,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     {
         let probe = quick_rotate_probe.clone();
+        let confirmed = quick_rotate_confirm.clone();
         let shots = shots.clone();
         let current = current.clone();
         let cur_dir = cur_dir.clone();
         let generation = generation.clone();
         let rot = rot.clone();
-        let undo_stack = undo_stack.clone();
-        let act_seq = act_seq.clone();
-        let invalidate = rot_invalidate.clone();
-        let meta = meta.clone();
-        let sel_gen = sel_gen.clone();
-        let start = start_op.clone();
-        let busy = sel_busy.clone();
-        let slot = sel_status_slot.clone();
         let weak = app.as_weak();
         app.on_quick_rotate(move || {
             let Some(a) = weak.upgrade() else { return; };
@@ -17765,47 +17778,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             let gen = generation.load(Ordering::Relaxed);
             let Some(target) = quick_rotate::Target::for_shot(gen, index, Path::new(&*cur_dir.borrow()), &shot) else { return; };
             if !probe.borrow().ready_for(&target) { return; }
-            if !start(i18n::tr("Applying rotations…")) { return; }
-            // One photo, irrespective of selection. Keep the ordinary undo/pending
-            // state until a successful write is rebased by the existing apply drain.
-            let (old, _) = rot.rotate(&shot.name, index, 1);
-            push_undo_rot(&undo_stack, next_act_seq(&act_seq), &shot.name, index, old);
-            invalidate(index);
-            meta.exif_built.set(None);
-            sel_gen.set(sel_gen.get().wrapping_add(1));
-            let plan = falcon_decode::RotApplyPlan {
-                finished: target.finished.clone(), finished_is_jpeg: shot.has_jpg && shot.is_jpeg_source(),
-                raw: target.raw.clone(),
-                base_turns: rot.base.borrow().get(&index).copied()
-                    .or_else(|| rot.base_raw.borrow().get(&index).copied()).unwrap_or(0),
-                delta: rot.delta_of(index),
-            };
+            // Use the author's preview/undo path and the same Apply confirmation/worker.
+            // Cancel keeps the preview pending, exactly like Review -> Apply rotations.
+            let before = rot.delta_of(index);
+            a.invoke_rotate_shot(index as i32, 1);
+            let after = rot.delta_of(index);
+            if after == before || after == 0 { return; } // refused, or a fourth turn needs no write
             probe.borrow_mut().invalidate();
             a.set_quick_rotate_ready(false);
-            let auto_orient = a.get_auto_orient();
-            let (busy, slot, applied) = (busy.clone(), slot.clone(), rot.apply_slot.clone());
-            std::thread::spawn(move || {
-                let _guard = OpGuard { busy, slot: slot.clone(), kind: -1, origin: None };
-                let outcome = quick_rotate::apply_one(&target, &plan);
-                let (msg, failed) = match outcome {
-                    Ok(report) if report.ok => {
-                        support::publish_applied(&applied, gen,
-                            (index, target.name.clone(), report.new_base_turns, plan.delta & 3));
-                        let msg = if auto_orient {
-                            tr_format!("Saved rotation for {name}", name = target.name)
-                        } else {
-                            tr_format!("Saved rotation for {name} — auto-orient is off", name = target.name)
-                        };
-                        (msg, false)
-                    }
-                    Ok(report) => {
-                        log_event(&format!("quick rotate {}: finished={:?}, raw={:?}", target.name, report.finished_action, report.raw_action));
-                        (tr_format!("Could not save rotation for {name} — the turn is still pending", name = target.name), true)
-                    }
-                    Err(_) => (tr_format!("Could not save rotation for {name} — check write permissions", name = target.name), true),
-                };
-                *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some((msg, OpSeverity::from_err(failed), -1, None));
-            });
+            a.set_quick_rotate_name(target.name.clone().into());
+            *confirmed.borrow_mut() = Some(target);
+            a.set_quick_rotate_confirm(true);
+            a.set_confirm_kind(5);
         });
     }
     {
@@ -22725,15 +22709,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         let has_base = rot_t.base.borrow().contains_key(&rotate_index) || rot_t.base_raw.borrow().contains_key(&rotate_index);
         app.set_quick_rotate_ready(capability == quick_rotate::Capability::Writable && has_base
             && !app.get_sel_busy() && !app.get_opening_photo() && !app.get_compare() && !app.get_modal_open());
-        let tip = if len == 0 { i18n::tr("Rotate photo right and save — open a photo first") }
-            else if app.get_sel_busy() { i18n::tr("Rotate photo right and save — wait for the current operation") }
-            else if app.get_compare() { i18n::tr("Rotate photo right and save — leave Compare first") }
-            else if app.get_modal_open() { i18n::tr("Rotate photo right and save — close the dialog first") }
+        let tip = if len == 0 { i18n::tr("Rotate photo right and confirm save — open a photo first") }
+            else if app.get_sel_busy() { i18n::tr("Rotate photo right and confirm save — wait for the current operation") }
+            else if app.get_compare() { i18n::tr("Rotate photo right and confirm save — leave Compare first") }
+            else if app.get_modal_open() { i18n::tr("Rotate photo right and confirm save — close the dialog first") }
             else { match capability {
-                quick_rotate::Capability::Writable if has_base => i18n::tr("Rotate photo right 90° and save its orientation"),
-                quick_rotate::Capability::ReadOnly => i18n::tr("Rotate photo right and save — photo or folder is read-only"),
-                quick_rotate::Capability::Unsupported => i18n::tr("Rotate photo right and save — this photo cannot be rotated"),
-                _ => i18n::tr("Rotate photo right and save — checking write permissions"),
+                quick_rotate::Capability::Writable if has_base => i18n::tr("Rotate photo right 90° and confirm saving its orientation"),
+                quick_rotate::Capability::ReadOnly => i18n::tr("Rotate photo right and confirm save — photo or folder is read-only"),
+                quick_rotate::Capability::Unsupported => i18n::tr("Rotate photo right and confirm save — this photo cannot be rotated"),
+                _ => i18n::tr("Rotate photo right and confirm save — checking write permissions"),
             }};
         app.set_quick_rotate_tip(tip.into());
 

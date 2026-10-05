@@ -346,7 +346,7 @@ export component MainToolbar inherits Rectangle {
                         enabled: root.quick-rotate-ready && !root.modal-blocking && !root.compare;
                         tip: root.quick-rotate-tip;
                         accessible-role: button;
-                        accessible-label: @tr("falcon" => "Rotate photo right and save");
+                        accessible-label: @tr("falcon" => "Rotate photo right and confirm save");
                         accessible-description: root.quick-rotate-tip;
                         accessible-enabled: self.enabled && !root.immersive;
                         accessible-action-default => {

@@ -19,6 +19,15 @@ pub(crate) struct Target {
 }
 
 impl Target {
+    /// A confirmation belongs to the captured photo, not a later folder/scan index.
+    pub fn matches(&self, generation: u64, folder: &Path, shots: &[falcon_decode::Shot]) -> bool {
+        shots
+            .get(self.index)
+            .and_then(|shot| Self::for_shot(generation, self.index, folder, shot))
+            .as_ref()
+            == Some(self)
+    }
+
     pub fn for_shot(
         generation: u64,
         index: usize,
@@ -265,6 +274,30 @@ mod tests {
         p.set_readonly(yes);
         std::fs::set_permissions(path, p).unwrap();
     }
+    #[test]
+    fn confirmation_rejects_a_replaced_photo_folder_or_generation() {
+        let f = Fixture::new();
+        let target = f.target();
+        let shot = falcon_decode::Shot {
+            name: target.name.clone(),
+            jpg: target.finished.clone(),
+            has_jpg: true,
+            kind: falcon_decode::SrcKind::Png,
+            id: 0,
+            has_raw: false,
+            raw: None,
+            sniffed: None,
+            cloud_placeholder: false,
+        };
+        assert!(target.matches(1, &f.0, &[shot.clone()]));
+        assert!(!target.matches(2, &f.0, &[shot.clone()]));
+        assert!(!target.matches(1, &f.0.join("another-folder"), &[shot.clone()]));
+        assert!(!target.matches(1, &f.0, &[]));
+        let mut changed = shot;
+        changed.jpg = Some(f.0.join("replacement.png"));
+        assert!(!target.matches(1, &f.0, &[changed]));
+    }
+
     #[test]
     fn checks_leave_photo_and_folder_unchanged() {
         let f = Fixture::new();

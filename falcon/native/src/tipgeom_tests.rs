@@ -32376,7 +32376,7 @@ fn quick_rotate_button_routes_current_photo_and_refuses_unavailable_states() {
     app.on_bulk_rotate(|_| panic!("quick rotation must not target the selection"));
     app.set_quick_rotate_ready(true);
     let button = E::find_by_element_id(&app, "MainToolbar::quickrotate").next().unwrap();
-    assert_eq!(button.accessible_label().unwrap(), "Rotate photo right and save");
+    assert_eq!(button.accessible_label().unwrap(), "Rotate photo right and confirm save");
     let p = button.absolute_position(); let s = button.size();
     click(&app, p.x + s.width / 2., p.y + s.height / 2., i_slint_core::items::PointerEventButton::Left);
     assert_eq!(*calls.borrow(), vec![4]);
@@ -32417,4 +32417,51 @@ fn quick_rotate_state_and_cell_fit_both_toolbar_hosts() {
             assert_eq!(bar.get_state().quick_rotate_tip.as_str(), "photo or folder is read-only");
         }
     }
+}
+
+
+#[test]
+fn quick_rotation_uses_apply_confirmation_and_dismissal_never_writes() {
+    use i_slint_backend_testing::ElementHandle as E;
+    let app = boot();
+    app.set_motion_ui(false);
+    app.set_count_rotated(3); // two other photos must not be included in this confirmation
+    let calls = std::rc::Rc::new(std::cell::Cell::new(0));
+    let written = calls.clone();
+    let weak = app.as_weak();
+    app.on_apply_rotations(move || {
+        let app = weak.upgrade().unwrap();
+        assert!(app.get_quick_rotate_confirm());
+        assert_eq!(app.get_rotation_confirm_count(), 1);
+        written.set(written.get() + 1);
+        app.set_confirm_kind(0);
+    });
+    for dismiss in 0..4 {
+        app.set_quick_rotate_name("one-photo.jpg".into());
+        app.set_quick_rotate_confirm(true);
+        app.set_confirm_kind(5);
+        hover(&app, 600., 300.);
+        assert_eq!(app.get_rotation_confirm_count(), 1);
+        assert_eq!(E::find_by_accessible_label(&app, "rotation → write to photos").count(), 1);
+        assert_eq!(E::find_by_accessible_label(&app, "one-photo.jpg").count(), 1);
+        match dismiss {
+            0 | 3 => {
+                let id = if dismiss == 0 { "MainWindow::cfcancel" } else { "MainWindow::cfprimary" };
+                let button = E::find_by_element_id(&app, id).next().unwrap();
+                let p = button.absolute_position(); let s = button.size();
+                click(&app, p.x + s.width / 2., p.y + s.height / 2., i_slint_core::items::PointerEventButton::Left);
+            }
+            1 => key(&app, slint::platform::Key::Escape),
+            _ => key(&app, slint::platform::Key::Return),
+        }
+        hover(&app, 600., 300.);
+        assert_eq!(app.get_confirm_kind(), 0);
+        assert!(!app.get_quick_rotate_confirm(), "closed confirmation cannot scope a later Review apply");
+        assert_eq!(calls.get(), if dismiss == 3 { 1 } else { 0 });
+        assert_eq!(app.get_count_rotated(), 3, "dismissal must not discard pending previews");
+    }
+    app.set_confirm_kind(5); // the original Review confirmation still counts the whole folder
+    hover(&app, 600., 300.);
+    assert_eq!(app.get_rotation_confirm_count(), 3);
+    assert_eq!(E::find_by_accessible_label(&app, "rotations → write to photos").count(), 1);
 }
