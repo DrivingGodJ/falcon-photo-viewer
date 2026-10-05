@@ -17720,7 +17720,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                             (*idx, name.clone(), rep.new_base_turns, plan.delta & 3),
                         );
                     } else {
-                        failed.push(name.clone());
+                        let reasons: Vec<&str> = [&rep.finished_action, &rep.raw_action].into_iter()
+                            .filter_map(|action| match action {
+                                falcon_decode::SideAction::Failed(reason) => Some(reason.as_str()),
+                                _ => None,
+                            }).collect();
+                        failed.push(format!("{name}: {}", reasons.join("; ")));
                     }
                 }
                 let (k, f) = (applied.len(), failed.len());

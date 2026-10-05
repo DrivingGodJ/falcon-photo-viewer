@@ -45,6 +45,8 @@
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
+mod permissions;
+
 use crate::exif_orientation; // the bounded (4 MB-capped) kamadak reader — used for the read-back verify
 
 // ───────────────────────────── the orientation ALGEBRA (pure, 32-cell table) ─────────────────────────────
@@ -1089,6 +1091,19 @@ pub fn apply_rotation(plan: &RotApplyPlan) -> RotApplyReport {
         (turns_of(target) + 4 - consumed) & 3
     };
 
+    // Preflight only actual output targets, before either side of a pair changes.
+    let jpeg_route = match permissions::check_rotation_write_access(plan) {
+        Ok(route) => route,
+        Err(error) => {
+            let failed = || SideAction::Failed(error.to_string());
+            return RotApplyReport {
+                ok: false, new_base_turns,
+                finished_action: if plan.finished.is_some() { failed() } else { SideAction::Skipped },
+                raw_action: if plan.raw.is_some() { failed() } else { SideAction::Skipped },
+            };
+        }
+    };
+
     // ── finished side ─────────────────────────────────────────────────────────────────────
     let finished_action = match &plan.finished {
         None => SideAction::Skipped,
@@ -1110,7 +1125,14 @@ pub fn apply_rotation(plan: &RotApplyPlan) -> RotApplyReport {
             // Structurally: `new_base_turns` is assigned inside the arms, where the CAS outcome is
             // known, instead of before the call on an assumption (v0.8.102 assigned it at the top and
             // the divergence was averted only by the CAS happening to fail).
-            match patch_jpeg_orientation(p, expected, target) {
+            // A read-only JPEG which needs a sidecar must never be opened for write.
+            // The patch route still locates and CAS-checks again on its write handle.
+            let result = match jpeg_route {
+                Some(permissions::JpegRoute::Sidecar(error)) => Err(error),
+                Some(permissions::JpegRoute::AlreadyTarget) => Ok(JpegPatch::AlreadyTarget),
+                _ => patch_jpeg_orientation(p, expected, target),
+            };
+            match result {
                 Ok(JpegPatch::Patched) => {
                     new_base_turns = residual_turns(expected, target);
                     SideAction::Patched

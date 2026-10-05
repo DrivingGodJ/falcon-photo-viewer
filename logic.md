@@ -5139,6 +5139,8 @@ It reports `Sdr`, and that is correct, not assumed: ColorSync converts from the 
 
 ## Orientation and rotation
 
+Before Apply changes either member of a pair, it checks the actual write targets. RAW and non-JPEG originals are read only; read-only originals remain eligible when their XMP output is writable. A JPEG needs write access only for an in-place patch; structural/CAS fallback checks its XMP instead, and an already-applied JPEG needs no write access. Existing XMP files must be writable and their parent folder must permit replacement; a new XMP needs a writable parent. No probe files are created on Windows. Apply revalidates the JPEG on its write handle and reports each failed shot with its reason; preflight is not a transaction against permissions or I/O changing during writes.
+
 Falcon shows every photo upright and applies each turn exactly once. A decoder may already have applied some turns (only HEIC decoders do). Falcon adds the rest, the file's own orientation tag and the user's manual turns, as clockwise quarter-turns. EXIF values that include a mirror keep their rotation and drop the flip. An upright thumbnail does not prove the full-size image is upright.
 
 ### The rotation model
