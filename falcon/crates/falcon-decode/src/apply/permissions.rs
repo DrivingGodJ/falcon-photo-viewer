@@ -4,29 +4,30 @@ use std::{fs::{self, File, OpenOptions}, io};
 
 pub(super) enum JpegRoute { Patch, AlreadyTarget, Sidecar(PatchErr) }
 
-fn at(path: &Path, error: io::Error) -> io::Error {
-    io::Error::new(error.kind(), format!("{}: {error}", path.display()))
+fn at(path: &Path, error: io::Error) -> RotationFailure {
+    RotationFailure::io(path, error)
 }
-fn denied(path: &Path) -> io::Error {
-    at(path, io::Error::new(io::ErrorKind::PermissionDenied, "rotation target is read-only"))
+fn denied(path: &Path) -> RotationFailure {
+    RotationFailure::new(path, RotationFailureReason::ReadOnly)
 }
-fn writable_file(path: &Path) -> io::Result<()> {
+fn writable_file(path: &Path) -> Result<(), RotationFailure> {
     let metadata = fs::metadata(path).map_err(|e| at(path, e))?;
-    if !metadata.is_file() || metadata.permissions().readonly() { return Err(denied(path)); }
+    if !metadata.is_file() { return Err(RotationFailure::new(path, RotationFailureReason::NotFile)); }
+    if metadata.permissions().readonly() { return Err(denied(path)); }
     OpenOptions::new().read(true).write(true).open(path).map_err(|e| at(path, e))?;
     Ok(())
 }
-fn writable_folder(path: &Path) -> io::Result<()> {
+fn writable_folder(path: &Path) -> Result<(), RotationFailure> {
     if !fs::metadata(path).map_err(|e| at(path, e))?.is_dir() {
-        return Err(at(path, io::Error::new(io::ErrorKind::NotADirectory, "not a directory")));
+        return Err(RotationFailure::new(path, RotationFailureReason::NotDirectory));
     }
     #[cfg(unix)]
     {
         use std::{ffi::CString, os::unix::ffi::OsStrExt};
         unsafe extern "C" { fn access(path: *const std::ffi::c_char, mode: std::ffi::c_int) -> std::ffi::c_int; }
-        if fs::metadata(path)?.permissions().readonly() { return Err(denied(path)); }
+        if fs::metadata(path).map_err(|e| at(path, e))?.permissions().readonly() { return Err(denied(path)); }
         let name = CString::new(path.as_os_str().as_bytes())
-            .map_err(|_| at(path, io::Error::new(io::ErrorKind::InvalidInput, "path contains NUL")))?;
+            .map_err(|_| RotationFailure::new(path, RotationFailureReason::InvalidPath))?;
         if unsafe { access(name.as_ptr(), 2 | 1) } != 0 { return Err(at(path, io::Error::last_os_error())); }
     }
     #[cfg(windows)]
@@ -39,7 +40,7 @@ fn writable_folder(path: &Path) -> io::Result<()> {
     }
     Ok(())
 }
-fn writable_sidecar(path: &Path) -> io::Result<()> {
+fn writable_sidecar(path: &Path) -> Result<(), RotationFailure> {
     let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
     writable_folder(parent)?;
     match fs::symlink_metadata(path) {
@@ -48,9 +49,9 @@ fn writable_sidecar(path: &Path) -> io::Result<()> {
         Err(e) => Err(at(path, e)),
     }
 }
-fn jpeg_route(path: &Path, expected: u8, target: u8) -> io::Result<JpegRoute> {
+fn jpeg_route(path: &Path, expected: u8, target: u8) -> Result<JpegRoute, RotationFailure> {
     let mut file = File::open(path).map_err(|e| at(path, e))?;
-    let cap = JPEG_LOCATE_CAP.min(file.metadata()?.len() as usize);
+    let cap = JPEG_LOCATE_CAP.min(file.metadata().map_err(|e| at(path, e))?.len() as usize);
     let mut bytes = vec![0; cap];
     read_full(&mut file, &mut bytes).map_err(|e| at(path, e))?;
     let loc = match locate_jpeg_orientation(&bytes) {
@@ -65,12 +66,12 @@ fn jpeg_route(path: &Path, expected: u8, target: u8) -> io::Result<JpegRoute> {
         else if found == expected as u16 { JpegRoute::Patch }
         else { JpegRoute::Sidecar(PatchErr::Cas { expected, target, found }) })
 }
-pub(super) fn check_rotation_write_access(plan: &RotApplyPlan) -> io::Result<Option<JpegRoute>> {
+pub(super) fn check_rotation_write_access(plan: &RotApplyPlan) -> Result<Option<JpegRoute>, RotationFailure> {
     let mut route = None;
     for (path, raw) in [(plan.finished.as_deref(), false), (plan.raw.as_deref(), true)] {
         let Some(path) = path else { continue };
         if !fs::metadata(path).map_err(|e| at(path, e))?.is_file() {
-            return Err(at(path, io::Error::new(io::ErrorKind::InvalidInput, "source is not a file")));
+            return Err(RotationFailure::new(path, RotationFailureReason::NotFile));
         }
         if !raw && plan.finished_is_jpeg {
             let expected = turns_to_orientation(plan.base_turns);
@@ -83,8 +84,9 @@ pub(super) fn check_rotation_write_access(plan: &RotApplyPlan) -> io::Result<Opt
             }
             route = Some(jpeg);
         } else {
-            // Never require write access to RAW/PNG/HEIC/TIFF originals.
-            File::open(path).map_err(|e| at(path, e))?;
+            // Do not open RAW/non-JPEG originals during preflight. An existing XMP
+            // can supply orientation without reading a locked or cloud-only original.
+            // The apply path reads embedded metadata lazily only when needed.
             writable_sidecar(&sidecar_path_for(path, raw))?;
         }
     }

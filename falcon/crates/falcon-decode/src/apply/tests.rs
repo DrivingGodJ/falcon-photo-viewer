@@ -1124,7 +1124,7 @@ fn rotation_denied_sidecar_preserves_both_pair_members_and_reports_path() {
     rotation_readonly(&xmp, false);
     assert!(!report.ok); assert_eq!(report.new_base_turns, 0);
     match &report.finished_action { SideAction::Failed(reason) => {
-        assert!(reason.contains("pair.xmp")); assert!(reason.contains("read-only"));
+        assert_eq!(reason.path, xmp); assert_eq!(reason.reason, RotationFailureReason::ReadOnly);
     }, _ => panic!("expected path-specific refusal") }
     assert_eq!(std::fs::read(&jpg).unwrap(), bytes);
     assert_eq!(std::fs::read(&xmp).unwrap(), old_xmp);
@@ -1189,4 +1189,36 @@ fn rotation_preflight_creates_no_probe_and_missing_pair_cannot_patch_jpeg() {
         raw: Some(dir.join("missing.CR3")), base_turns: 0, delta: 1 };
     assert!(!apply_rotation(&plan).ok); assert_eq!(std::fs::read(&jpg).unwrap(), bytes);
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// Existing XMP is enough: Apply must not open either kind of sidecar-only original.
+/// Windows uses the maintainer's exclusive sharing lock; Unix removes read access.
+#[cfg(any(windows, unix))]
+#[test]
+fn rotation_existing_sidecar_does_not_open_locked_original() {
+    for raw in [true, false] {
+        let dir = tmp_dir();
+        let bytes = b"synthetic original, embedded orientation is unnecessary";
+        let source = write_tmp(&dir, if raw { "locked.CR3" } else { "locked.png" }, bytes);
+        write_xmp_sidecar(&sidecar_path_for(&source, raw), 1).unwrap();
+        #[cfg(windows)]
+        let lock = {
+            use std::os::windows::fs::OpenOptionsExt;
+            let lock = std::fs::OpenOptions::new().read(true).share_mode(0).open(&source).unwrap();
+            assert_eq!(std::fs::File::open(&source).unwrap_err().raw_os_error(), Some(32));
+            lock
+        };
+        #[cfg(unix)] {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&source, std::fs::Permissions::from_mode(0o000)).unwrap();
+            assert_eq!(std::fs::File::open(&source).unwrap_err().kind(), std::io::ErrorKind::PermissionDenied);
+        }
+        let report = apply_rotation(&one_rotation(&source, false, raw));
+        #[cfg(windows)] drop(lock);
+        #[cfg(unix)] rotation_readonly(&source, false);
+        assert!(report.ok, "{:?} / {:?}", report.finished_action, report.raw_action);
+        assert_eq!(sidecar_orientation(&source, raw), Some(6));
+        assert_eq!(std::fs::read(&source).unwrap(), bytes);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }
