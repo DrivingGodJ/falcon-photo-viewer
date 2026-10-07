@@ -50325,6 +50325,10 @@ mod r35_export {
 #[cfg(test)]
 mod review_save_recovery_tests {
     use super::*;
+    // A visit clears the entire process-wide table, not just this test's path.
+    // Hold a separate test lock for each full scenario (including writer completion)
+    // so parallel test threads cannot clear another scenario's pending save.
+    static SAVE_STATE_TEST_LOCK: Mutex<()> = Mutex::new(());
     fn pending(dir: &Path) -> u64 {
         let ticket = REVIEW_TICKET.fetch_add(1, Ordering::Relaxed);
         REVIEW_SAVES.lock().unwrap().insert(dir.to_owned(), ReviewSaveRecord {
@@ -50334,6 +50338,7 @@ mod review_save_recovery_tests {
     }
     #[test]
     fn failed_visit_cannot_retry_empty_folder_or_later_visit() {
+        let _save_state = SAVE_STATE_TEST_LOCK.lock().unwrap();
         begin_review_visit();
         let dir = Path::new("/review-visit-test"); let first_visit = review_visit();
         let first = pending(dir); review_save_complete(dir, first, false);
@@ -50353,6 +50358,7 @@ mod review_save_recovery_tests {
     }
     #[test]
     fn newest_ticket_only_controls_retry_and_disk_acknowledgement() {
+        let _save_state = SAVE_STATE_TEST_LOCK.lock().unwrap();
         let dir = Path::new("/review-ticket-test");
         let first = pending(dir); let latest = pending(dir);
         review_save_complete(dir, first, false); review_save_complete(dir, first, true);
@@ -50364,6 +50370,7 @@ mod review_save_recovery_tests {
     }
     #[test]
     fn every_final_failure_is_reported_including_old_visit_and_apply_journal() {
+        let _save_state = SAVE_STATE_TEST_LOCK.lock().unwrap();
         use std::sync::mpsc::channel;
         let dir = Path::new("/review-final-failure");
         let old = pending(dir); begin_review_visit(); let new = pending(dir);
@@ -50383,6 +50390,7 @@ mod review_save_recovery_tests {
     }
     #[test]
     fn failed_inline_save_propagates_and_can_recover() {
+        let _save_state = SAVE_STATE_TEST_LOCK.lock().unwrap();
         let dir = std::env::temp_dir().join(format!("falcon-review-recovery-{}", std::process::id()));
         std::fs::create_dir(&dir).unwrap();
         let target = dir.join(SELECTION_FILE); std::fs::create_dir(&target).unwrap();
