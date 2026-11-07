@@ -8,5 +8,5 @@ build instructions and SHA256 checksums. See [BUILDING.md](BUILDING.md) and
 [REBUILDING.md](REBUILDING.md) for building from source and modifying the RAW library.
 
 Windows downloads will be unsigned, and Mac downloads will be ad-hoc signed without Apple
-notarization. The README's [Download and first launch](README.md#download-and-first-launch)
+notarization. The README's [Download and first launch](docs/GUIDE.en.md#quick-start)
 section explains the operating-system prompts and how to allow the app to run. No paid certificate is required to build Falcon yourself.

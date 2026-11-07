@@ -2,68 +2,39 @@
 
 # Falcon Photo Viewer
 
-A desktop photo-culling tool for browsing RAW + JPEG bursts, checking focus, rating and comparing frames, then handing your picks to an editor.
+Find the moments worth keeping in a day's worth of bursts. Falcon brings fast browsing, focus inspection, comparison and hand-off into one desktop culling tool.
 
-[Download upstream releases](https://github.com/HWu0101/falcon-photo-viewer/releases) · [Build guide](BUILDING.md) · [Design and implementation reference](docs/readme-reference.en.md)
+![The workflow from burst browsing through RAW, 1:1 focus checks, ratings and exporting picks](docs/images/falcon-workflow.png)
+
+## See the motion, then inspect the detail
+
+Hold an arrow key to follow a wingbeat, stride or changing expression. Stop on a frame to inspect full-resolution detail, then click the point you want to check at 1:1.
+
+## Compare photographs, not duplicate files
+
+A shot's RAW and JPEG form one culling unit, so the same moment needs only one decision. In two-photo comparison, zoom and pan stay linked. Pin a favorite and step through challengers beside it.
+
+## Hand your picks to an editor
+
+Rate, pick and reject, then copy originals without re-encoding or export sRGB JPG/PNG copies for sharing. Open folders directly without importing a catalogue, using shortcuts or right-click menus for common actions.
+
+Falcon focuses on viewing and culling; exposure, white balance and full editing remain with your photo editor.
+
+## Try it
+
+[Download for Windows / Apple Silicon Mac](https://github.com/HWu0101/falcon-photo-viewer/releases)
+
+See the [user guide](docs/GUIDE.en.md) for system requirements, first-launch prompts, supported formats and shortcuts.
+
+## Explore further
+
+| Topic | Documentation |
+| --- | --- |
+| Downloads, requirements and culling controls | [User guide](docs/GUIDE.en.md) |
+| Design decisions and detailed features | [Original author's design reference](docs/readme-reference.en.md) |
+| Source builds and architecture | [Build guide](BUILDING.md) · [Architecture](logic.md) |
+| Contributions | [Contributing](CONTRIBUTING.md) · [Issues in this fork](https://github.com/DrivingGodJ/falcon-photo-viewer/issues) |
+
+Originally designed by **Hancheng Wu**. This repository is a fork of [HWu0101/falcon-photo-viewer](https://github.com/HWu0101/falcon-photo-viewer), developed with assistance from Claude and Codex. [Apache-2.0](LICENSE) · [NOTICE](NOTICE) · [Third-party terms](THIRD-PARTY-NOTICES.txt)
 
 [![Made with Slint](https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png)](https://slint.dev)
-
-![Falcon: browse bursts, inspect RAW and EXIF, check 1:1 focus, rate and export picks](docs/images/falcon-workflow.png)
-
-This repository is a fork of [HWu0101/falcon-photo-viewer](https://github.com/HWu0101/falcon-photo-viewer). The original was designed by **Hancheng Wu** and developed with assistance from Claude and Codex. Photography experiences, design history and measurements in the original README belong to the original author; they are not independent measurements by this fork.
-
-## Features
-
-- **Burst browsing** prepares neighboring previews and sharpens the current frame at rest; speed depends on hardware and files.
-- **RAW + JPEG pairing** treats a shot as one photograph, including ratings, flags, copies and deletes across both files.
-- **Focus and comparison** provide true 1:1 inspection and linked zoom/pan for two photos.
-- **Culling and hand-off** include ratings, picks/rejects, undo, original-file copies and sRGB JPG/PNG export.
-- **Folder workflow** avoids catalogue imports, with color management, immersive mode and optional hardware decoding.
-
-## Quick start
-
-| Platform | Requirements and launch |
-| --- | --- |
-| Windows | Windows 10/11 x64; extract the release and run `Falcon.exe`; HEIC needs Microsoft HEIF Image Extensions |
-| macOS | macOS 12+ on Apple Silicon; move `Falcon.app` to Applications and open it |
-
-Packages come from upstream and include licenses and rebuild documents; keep them with the app. Windows builds are unsigned; Mac builds have an ad-hoc signature without Apple notarization. Verify the source and checksums before following the system's first-launch prompts. Keep system security checks enabled; managed devices may disallow exceptions. See [Apple's guidance](https://support.apple.com/en-ie/102445). Checksums verify integrity, not publisher identity.
-
-## Usage
-
-Open a photo folder, browse and rate, compare key frames, then export your picks.
-
-| Key | Action |
-| --- | --- |
-| `←` / `→` or wheel | Previous/next; hold to browse a burst |
-| Click photo | Toggle 1:1 at that point and fit-to-window |
-| `1`–`5` / `0` | Rate/clear; repeating a rating also clears it |
-| `P` / `X` / `U` | Pick/reject/unmark |
-| `N` / `C` / `S` / `F` | Next unrated/compare/review panel/immersive mode |
-| `Ctrl+Z` / macOS `⌘Z` | Undo, including deletes and moves |
-
-Supported formats include JPEG, HEIC, common camera RAW, PNG/APNG, TIFF, WebP, JPEG XL, BMP and GIF. RAW support varies by camera; the design reference has the full list. Falcon focuses on viewing and culling and outputs SDR only. It has no full photo editor, cross-folder catalogue, print/upload module or screen-reader support.
-
-## Development and checks
-
-From the repository root:
-
-```bash
-cd falcon
-cargo build --locked --release --bin falcon
-cargo test --locked --workspace
-```
-
-rustup installs the pinned toolchain. Windows also needs Visual Studio C++ Build Tools and the Windows SDK; Mac needs Xcode. The build uses the modified winit and zune-jpeg copies in this repository. Optional acceleration runtimes are detected separately; CUDA and HEVC software decoders are not bundled.
-
-Private camera fixtures are not published. Tests explicitly skip those checks when fixtures are absent; totals do not prove real-camera coverage. See [BUILDING.md](BUILDING.md) for full environment and platform-path requirements.
-
-## Documentation and support
-
-- [Original design, features and measurement reference](docs/readme-reference.en.md) · [Technical architecture](logic.md)
-- [Rebuilding](REBUILDING.md) · [Contributing](CONTRIBUTING.md)
-- [Report an issue in this fork](https://github.com/DrivingGodJ/falcon-photo-viewer/issues)
-
-## License and credits
-
-Original project material is [Apache-2.0](LICENSE), copyright Hancheng Wu and contributors. Dependencies retain their own terms; see [NOTICE](NOTICE) and [third-party notices](THIRD-PARTY-NOTICES.txt). RAW decoding uses rawler under LGPL-2.1; [REBUILDING.md](REBUILDING.md) explains modification and rebuilding. The Slint badge is part of the chosen toolkit attribution route. This software is based in part on the work of the Independent JPEG Group.
