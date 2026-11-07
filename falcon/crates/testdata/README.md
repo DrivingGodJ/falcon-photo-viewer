@@ -1,17 +1,17 @@
-# Optional private test data
+**简体中文** | [English](README.en.md)
 
-The two NV12 files in the private development checkout contain decoded camera-photo excerpts.
-They are excluded from the public source export. Tests load them at runtime; no test or production
-binary embeds them. Do not substitute synthetic pixels under their names: their original hashes
-and expected colour results remain pinned in the CPU/GPU tests.
+# 可选私有测试素材
 
-Set `FALCON_PRIVATE_TILE_DIR` to a directory containing both named files in `REAL_TILE_FIXTURES`
-to run the private rows. An explicitly supplied missing, partial or malformed corpus fails the
-check. Without a corpus, tests print SKIP for the private rows and still run all synthetic golden
-cases, fuzz, layout and CPU/GPU arithmetic checks. Test-framework pass totals can include these
-reported skips; they are not proof of real-camera coverage.
+说明 Falcon 私有相机素材的加载方式与覆盖边界。公开源码不包含原开发环境中的两份 NV12 相机照片片段，测试与生产程序也不嵌入这些文件。
 
-Other optional camera corpora use the runtime variables documented in
-[private fixture setup](../../../docs/testing/private-fixtures.md). No private photos are required
-to compile or run the portable suite. The byte-layout golden rows and source-photo checks remain
-separate tests; synthetic coverage does not certify every camera model.
+## 使用方式
+
+设置运行时变量 `FALCON_PRIVATE_TILE_DIR`，指向同时包含 `REAL_TILE_FIXTURES` 中两个指定文件的目录。显式配置的素材库若缺失、不完整或格式错误，检查会失败。
+
+不要用相同文件名的合成像素代替真实素材：CPU/GPU 测试固定了原文件哈希与预期颜色结果。其他可选相机素材的变量见[私有素材配置](../../../docs/testing/private-fixtures.md)。
+
+## 验证边界
+
+不提供素材库时，对应私有行会打印 SKIP；合成 golden case、fuzz、布局和 CPU/GPU 运算检查仍会运行。测试框架的通过总数可能包含这些显式跳过，不能据此声称已覆盖真实相机。
+
+编译与可移植测试不需要私人照片。字节布局 golden case 与真实照片检查是独立测试，合成覆盖不能认证所有相机型号。

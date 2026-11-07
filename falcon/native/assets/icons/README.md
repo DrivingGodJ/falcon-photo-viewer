@@ -1,39 +1,25 @@
-# Production icons
+**简体中文** | [English](README.en.md)
 
-Revision 3 uses the final alternative app master (approved 437:112), the larger A-series file labels/crop and the
-unchanged generic-document v1 fallback approved by the owner.
-`scripts/build-icons.py` composes the pinned source art and saved typography, with Inter SemiBold
-from the bundled font. It generates the Windows ICO files and Mac PNG iconsets before building Falcon.
-The app never generates icons or reads photos for icon selection. Public builds use these committed resources;
-the private design handoff is not needed to compile or package them.
+# 生产图标资源
 
-`approved-mask.png` is the unchanged generic-document 1024px alpha mask reconstructed from a mask-only Figma render with the
-approved radius 256 and smoothing 0.6. The render's white fill and uniform #1e1e1e exterior were
-converted to coverage; the artwork itself was not colour-keyed. Figma's SVG export omitted
-smoothing, so it was not used. Main and document masters retain their charcoal interior.
+Falcon 已提交的 Windows 和 macOS 图标，以及生成、资源编号和打包检查约束。公开构建直接使用这些文件，不需要私有设计交付材料。
 
-The revision-2 recipe maps the approved Figma CROP transform to source UV coordinates. Text
-uses Inter SemiBold, x=12/y=63, a 120px line box and base size 100; the nine approved sizes and
-the approved 232px fit rule cover longer labels. HarfBuzz retains kerning. The app master
-retains exact RGBA pixels; file renders are compared to independent native Figma references.
-The file mask comes from the approved RAW master; generic-document pixels remain unchanged.
-Icon alpha reduction uses area coverage to avoid faint ringing outside the mask.
+## 资源与约束
 
-Authoring dependencies: Pillow 12.3.0 and uharfbuzz 0.53.3. Run `python scripts/build-icons.py`
-in the private artwork checkout with the revision-3 recipe available. These are developer tools only;
-neither is a runtime/package dependency. Reproduction checks compare all output bytes. The
-normal resource tests and Mac packaging need only Python's standard library.
+第 3 版使用已批准的替代应用主图（437:112）、较大的 A 系列文件标签/裁切，以及不变的通用文档 v1 后备图标。`scripts/build-icons.py` 用固定原图、排版和随附 Inter SemiBold 生成 Windows ICO 与 Mac PNG iconset。应用运行时不会生成图标或读取照片选择图标。
 
-`catalog.rs` pins Windows group resource IDs. Resource 1 and executable icon index 0 are always
-the app. Resource 2 is the generic document fallback; 3 is generic RAW. Negative registry icon
-references identify resources by ID. Never renumber existing IDs when adding formats.
-`icon.ico` and `icon-256.png` in the native crate are generated app aliases for existing callers.
+`approved-mask.png` 是 1024px 通用文档透明蒙版，来自仅含蒙版的 Figma 渲染，圆角 256、平滑度 0.6。白色填充与均匀 `#1e1e1e` 外部被转换为覆盖率，未对图稿做颜色抠除。Figma SVG 导出缺少平滑度，未采用；应用和文档主图保留深灰内部。
 
-`app.iconset` and `document.iconset` contain PNG representations from 16 to 1024 pixels, including
-Retina entries. Mac packaging uses Apple’s `iconutil` to encode compatible ICNS containers, then
-decodes those containers and compares their displayed pixel coverage with the source frames. The Mac bundle declares the generic document resource for both existing
-document groups; the app uses the final alternative master. These containers need native Finder/package acceptance before release.
+第 2 版配方将已批准的 Figma CROP 变换映射到源 UV 坐标。文字为 Inter SemiBold，x=12/y=63、行框 120px、基础字号 100；九种批准字号与 232px 适配规则处理较长标签，HarfBuzz 保留字距。应用主图保留精确 RGBA，文件图与独立的原生 Figma 参考比较。文件蒙版来自批准的 RAW 主图，通用文档像素不变；透明度缩减使用面积覆盖率，避免边缘振铃。
 
-Asset hashes are in `manifest.json`; `check-icon-resources.py` checks the actual bundle before
-signing. `test-icon-resources.py` decodes its PNG entries independently and checks alpha, sizes and
-the bundle script's actual declarations. Public source includes these complete resources; private design references are not required.
+## 生成与使用
+
+重新制作需要私有原图工程及第 3 版配方，开发工具依赖 Pillow 12.3.0 和 uharfbuzz 0.53.3。在该工程中运行 `python scripts/build-icons.py`。它们不是运行或发行依赖；常规资源测试和 Mac 打包仅需 Python 标准库。复现检查比较全部输出字节。
+
+`catalog.rs` 固定 Windows 图标组资源 ID：1 和 EXE 索引 0 始终是应用图标，2 是通用文档，3 是通用 RAW。注册表的负数引用按资源 ID 定位；新增格式不能重编号。native crate 中的 `icon.ico` 与 `icon-256.png` 是供已有调用方使用的应用图标别名。
+
+## 验证与发布
+
+`app.iconset`、`document.iconset` 包含 16–1024px 及 Retina PNG。Mac 使用 Apple `iconutil` 编码 ICNS，再解码检查显示像素覆盖率。bundle 的两组文档类型均使用通用文档资源，应用使用最终替代主图；发布前仍需 Finder/原生安装包验收。
+
+资源哈希在 `manifest.json`。`check-icon-resources.py` 在签名前检查真实 bundle；`test-icon-resources.py` 独立解码 PNG，检查透明度、尺寸与 bundle 脚本声明。公开资源完整，不依赖私人设计参考。
